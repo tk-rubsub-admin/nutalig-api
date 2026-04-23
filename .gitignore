@@ -1,0 +1,53 @@
+##############################
+## Java
+##############################
+.mtj.tmp/
+*.class
+hs_err_pid*
+
+##############################
+## Maven
+##############################
+target/
+
+##############################
+## IntelliJ
+##############################
+out/
+.idea/
+.idea_modules/
+.settings/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+
+##############################
+## OS X
+##############################
+.DS_Store
+
+##############################
+## Visual Studio Code
+##############################
+.vscode/
+.code-workspace
+
+##############################
+## NetBeans
+##############################
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+
+##############################
+## Secret Key
+##############################
+src/main/resources/dpk-project-service-account.json
+src/main/resources/dpk-flower-firebase-adminsdk.json
