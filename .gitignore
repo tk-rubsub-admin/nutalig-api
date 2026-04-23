@@ -22,6 +22,7 @@ out/
 *.iws
 .classpath
 .project
+/uploads
 
 ##############################
 ## OS X
