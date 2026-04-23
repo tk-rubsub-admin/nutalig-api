@@ -1,0 +1,400 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="billing" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="5ebc3538-46cd-4323-838c-d2727b965e79">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="sellerMobileNo" class="java.lang.String"/>
+	<parameter name="sellerTaxId" class="java.lang.String"/>
+	<parameter name="sellerAddress" class="java.lang.String"/>
+	<parameter name="docDate" class="java.lang.String"/>
+	<parameter name="docNo" class="java.lang.String"/>
+	<parameter name="sellerName" class="java.lang.String"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="custId" class="java.lang.String"/>
+	<parameter name="custName" class="java.lang.String"/>
+	<parameter name="custAddress" class="java.lang.String"/>
+	<parameter name="custTelNo" class="java.lang.String"/>
+	<parameter name="custTaxId" class="java.lang.String"/>
+	<parameter name="createdBy" class="java.lang.String"/>
+	<parameter name="docTime" class="java.lang.String"/>
+	<parameter name="remark" class="java.lang.String"/>
+	<parameter name="refDocNo" class="java.lang.String"/>
+	<parameter name="thaiBahtText" class="java.lang.String"/>
+	<parameter name="deliveryDate" class="java.lang.String"/>
+	<parameter name="saleman" class="java.lang.String"/>
+	<parameter name="contactName" class="java.lang.String"/>
+	<parameter name="poAmount" class="java.lang.Double"/>
+	<parameter name="whtAmount" class="java.lang.Double"/>
+	<parameter name="withholdingTax" class="java.lang.Double"/>
+	<parameter name="project" class="java.lang.String"/>
+	<parameter name="grandTotal" class="java.lang.Double"/>
+	<parameter name="discount" class="java.lang.Integer"/>
+	<parameter name="subtotal" class="java.lang.Integer"/>
+	<parameter name="signature" class="java.io.InputStream"/>
+	<parameter name="bankName" class="java.lang.String"/>
+	<parameter name="accountNo" class="java.lang.String"/>
+	<parameter name="receiptDate" class="java.lang.String"/>
+	<parameter name="receiptAmount" class="java.lang.Double"/>
+	<parameter name="paymentChannel" class="java.lang.String"/>
+	<parameter name="isCopy" class="java.lang.Boolean"/>
+	<field name="no" class="java.lang.Integer"/>
+	<field name="invoiceNo" class="java.lang.String"/>
+	<field name="invoiceDate" class="java.lang.String"/>
+	<field name="dueDate" class="java.lang.String"/>
+	<field name="subtotal" class="java.lang.Double"/>
+	<background splitType="Stretch"/>
+	<pageHeader height="254" splitType="Stretch">
+		<element kind="rectangle" uuid="2577d790-da95-4234-a1a4-ece15ded70a7" positionType="Float" x="1" y="144" width="552" height="107" backcolor="rgba(255, 255, 255, 0.0)" radius="6"/>
+		<element kind="textField" uuid="6204ad19-e876-47d4-8b25-a51e22a310c9" x="47" y="152" width="315" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custName}.isEmpty() ? "-" : $P{custName}]]></expression>
+		</element>
+		<element kind="staticText" uuid="531fb660-097f-4d5d-9533-68be345fd09e" x="7" y="152" width="40" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Top">
+			<text><![CDATA[ลูกค้า]]></text>
+		</element>
+		<element kind="frame" uuid="d7ccc4ad-6a98-470f-b6ab-d5cfd8fb413d" x="7" y="170" width="355" height="61">
+			<element kind="textField" uuid="64505602-2b3b-4f4f-845f-6ddf61bdecaf" positionType="Float" stretchType="NoStretch" mode="Transparent" x="40" y="4" width="314" height="18" fontName="TH SarabunPSK" fontSize="13.0" textAdjust="StretchHeight" blankWhenNull="false" printRepeatedValues="false" removeLineWhenBlank="true" vTextAlign="Top">
+				<printWhenExpression><![CDATA[$P{custAddress} != null && !$P{custAddress}.trim().isEmpty()]]></printWhenExpression>
+				<expression><![CDATA[$P{custAddress}]]></expression>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			</element>
+			<element kind="textField" uuid="e0a77d07-dcea-4377-9ddd-728dba1912dc" positionType="Float" x="94" y="22" width="260" height="18" fontName="TH SarabunPSK" fontSize="13.0" blankWhenNull="true" vTextAlign="Top">
+				<expression><![CDATA[$P{custTaxId}]]></expression>
+			</element>
+			<element kind="staticText" uuid="50b3e2c6-bef8-4a7b-9e42-a6a8c051bd27" x="0" y="4" width="40" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Top">
+				<text><![CDATA[ที่อยู่]]></text>
+			</element>
+			<element kind="staticText" uuid="fa221759-b18e-4df9-8118-7d4a1b8da591" x="0" y="22" width="94" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Top">
+				<text><![CDATA[เลขประจำตัวผู้เสียภาษี]]></text>
+			</element>
+		</element>
+		<element kind="staticText" uuid="80536e7d-876b-4448-959d-8b34b64e1d0e" positionType="Float" x="362" y="188" width="51" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Top">
+			<text><![CDATA[โทรศัพท์]]></text>
+		</element>
+		<element kind="staticText" uuid="c0691726-dbb3-47d4-970a-763fcbcda1df" positionType="Float" x="362" y="170" width="51" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" removeLineWhenBlank="true" bold="true" vTextAlign="Top">
+			<text><![CDATA[ผู้ติดต่อ]]></text>
+		</element>
+		<element kind="staticText" uuid="cb6f8ffa-8723-47fe-8007-80c43f4629ca" positionType="Float" x="362" y="152" width="51" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" removeLineWhenBlank="true" bold="true" vTextAlign="Top">
+			<text><![CDATA[ชื่องาน]]></text>
+		</element>
+		<element kind="textField" uuid="d416fc81-0f84-4b19-b779-9aefbde6b0f8" positionType="Float" x="413" y="188" width="129" height="18" fontName="TH SarabunPSK" fontSize="13.0" textAdjust="StretchHeight" blankWhenNull="true" vTextAlign="Top">
+			<expression><![CDATA[$P{custTelNo}]]></expression>
+		</element>
+		<element kind="textField" uuid="ad335b8b-b6d9-4311-900b-fcf3813bf074" positionType="Float" x="413" y="170" width="129" height="18" fontName="TH SarabunPSK" fontSize="13.0" blankWhenNull="true" removeLineWhenBlank="true" vTextAlign="Middle">
+			<expression><![CDATA[$P{contactName}]]></expression>
+		</element>
+		<element kind="textField" uuid="71816ddb-b1ce-4851-b5dc-8c6a606a6f0b" positionType="Float" x="413" y="152" width="129" height="18" fontName="TH SarabunPSK" fontSize="13.0" blankWhenNull="true" removeLineWhenBlank="true" vTextAlign="Middle">
+			<expression><![CDATA[$P{project}]]></expression>
+		</element>
+		<element kind="staticText" uuid="58f93bb4-efc3-4188-8103-c6811e35acc0" x="413" y="5" width="142" height="20" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="16.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ใบเสร็จรับเงิน]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<pen lineWidth="0.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="817abdb7-39a2-4c8c-b5e7-7f25837073d8" x="373" y="47" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[เลขที่]]></text>
+		</element>
+		<element kind="textField" uuid="5504a82b-df4d-4bec-b1c9-c25a0e3b2c7a" x="425" y="47" width="130" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{docNo}]]></expression>
+		</element>
+		<element kind="textField" uuid="0822ed64-1986-46cd-a99c-2e201aa39be2" x="5" y="65" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{sellerName}]]></expression>
+		</element>
+		<element kind="textField" uuid="877cd046-7e47-4e92-9dc3-0f3cc4600006" stretchType="NoStretch" x="5" y="83" width="320" height="20" fontName="TH SarabunPSK" fontSize="13.0" linkType="None" linkTarget="Self" vTextAlign="Middle">
+			<expression><![CDATA[$P{sellerAddress}]]></expression>
+		</element>
+		<element kind="textField" uuid="695b4543-8df5-4bae-b0d4-694da61c1677" x="5" y="104" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA["เลขประจำตัวผู้เสียภาษี  " + $P{sellerTaxId}]]></expression>
+		</element>
+		<element kind="textField" uuid="a38f74c6-8d00-496e-b577-31fa341009a0" x="5" y="122" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA["โทร.  " + $P{sellerMobileNo}]]></expression>
+		</element>
+		<element kind="image" uuid="4d072d25-32d8-4e42-bf3c-19c23f6d8088" x="35" y="5" width="50" height="50">
+			<expression><![CDATA[$P{logo}]]></expression>
+		</element>
+		<element kind="staticText" uuid="b997c2e8-eb4c-42f2-889d-e63ea080b4d3" x="373" y="85" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Middle">
+			<text><![CDATA[วันที่เอกสาร]]></text>
+		</element>
+		<element kind="textField" uuid="341be94a-a6e5-4478-b2a9-20d0df248217" x="425" y="85" width="130" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="MMMM d, yyyy" vTextAlign="Middle">
+			<expression><![CDATA[$P{docDate}]]></expression>
+		</element>
+		<element kind="staticText" uuid="f2e14dd2-e71d-4b97-865c-92f6597682fa" x="373" y="66" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[อ้างอิง]]></text>
+		</element>
+		<element kind="textField" uuid="8f8a2b99-4582-472d-9fcb-0a118a0d1e45" x="425" y="66" width="130" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{refDocNo}]]></expression>
+		</element>
+		<element kind="staticText" uuid="2052757c-8b13-46e8-96f7-503415969519" x="373" y="104" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" bold="true" vTextAlign="Middle">
+			<text><![CDATA[ผู้ขาย]]></text>
+		</element>
+		<element kind="textField" uuid="92b40f0b-39fc-4cb1-ac12-ce099a4dbf27" x="425" y="104" width="130" height="18" fontName="TH SarabunPSK" fontSize="13.0" blankWhenNull="true" vTextAlign="Middle">
+			<expression><![CDATA[$P{saleman}]]></expression>
+		</element>
+		<element kind="textField" uuid="8e643082-9d8d-4060-8a04-1012ee0c40b1" x="413" y="25" width="142" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<expression><![CDATA[$P{isCopy} ? "สำเนา" : "ต้นฉบับ"]]></expression>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</pageHeader>
+	<columnHeader height="26" splitType="Stretch">
+		<element kind="staticText" uuid="b6589101-e346-418a-9785-4edc091ccb2c" x="0" y="5" width="30" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ลำดับ]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="280e967b-b9ab-4651-9050-be16f224f954" x="30" y="5" width="242" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[รายการเอกสาร]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="646b1f18-6275-4bf6-b6b1-df07c641810b" x="272" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[วันที่เอกสาร]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="62cd3dea-f5f4-4cb4-84ee-4ce5a1e8c1c4" x="412" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ราคา]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="fc1d38ea-644b-46c5-b99e-110e0891aef0" x="482" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ราคารวม]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="9658db76-1eac-451a-bcf8-d77268638ef9" x="342" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[วันครบกำหนด]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</columnHeader>
+	<detail>
+		<band height="22" splitType="Stretch">
+			<element kind="textField" uuid="37b9f211-be5f-4701-a24a-1df7cec12539" x="0" y="0" width="30" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+				<expression><![CDATA[$F{no}]]></expression>
+				<box>
+					<leftPen lineWidth="0.0"/>
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="72b0ca9e-15bc-417e-9b52-a9a274f42fb9" x="30" y="0" width="242" height="20" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+				<expression><![CDATA[$F{invoiceNo}]]></expression>
+				<box leftPadding="10">
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="69e9f18c-2b68-49cc-8f5c-c54774dfff59" x="272" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+				<expression><![CDATA[$F{invoiceDate}]]></expression>
+				<box rightPadding="4">
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="7c0360ee-ba78-4903-b3c7-d1a9ad52a341" positionType="Float" stretchType="ElementGroupHeight" x="412" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$F{subtotal}]]></expression>
+				<box rightPadding="4">
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="73b3ad0d-bdf3-4ac3-816c-7af08f71c661" positionType="Float" stretchType="ElementGroupHeight" x="482" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$F{subtotal}]]></expression>
+				<box rightPadding="4">
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="42036119-2577-4b58-b5e8-2f7789c8ad5e" x="342" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+				<expression><![CDATA[$F{dueDate}]]></expression>
+				<box rightPadding="4">
+					<bottomPen lineWidth="1.0"/>
+				</box>
+			</element>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</band>
+	</detail>
+	<pageFooter height="27" splitType="Prevent">
+		<element kind="textField" uuid="d2155530-089c-440a-ab23-dde5e01a8a86" x="525" y="3" width="30" height="21" fontName="TH SarabunPSK" fontSize="13.0" evaluationTime="Report" hTextAlign="Left" vTextAlign="Middle">
+			<expression><![CDATA["/" + $V{PAGE_NUMBER}]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+		</element>
+		<element kind="textField" uuid="33a8a6d1-848d-429f-b4cd-f6fda67587d1" x="500" y="3" width="30" height="21" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<expression><![CDATA["หน้า " + $V{PAGE_NUMBER}]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</pageFooter>
+	<lastPageFooter height="243">
+		<element kind="frame" uuid="43e92b52-5844-4eb3-8b3a-19966b7e75e3" x="5" y="8" width="552" height="72">
+			<element kind="textField" uuid="27488ab6-0cd4-416b-875b-97401376905a" x="0" y="46" width="360" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" hTextAlign="Left" vTextAlign="Middle">
+				<expression><![CDATA["(" + $P{thaiBahtText} + ")"]]></expression>
+				<box leftPadding="5" rightPadding="0">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="staticText" uuid="5afd34de-6603-469a-8014-63b059937301" positionType="Float" x="410" y="10" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" removeLineWhenBlank="true" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{discount} > 0]]></printWhenExpression>
+				<text><![CDATA[ส่วนลด]]></text>
+			</element>
+			<element kind="textField" uuid="6e4b8ded-077b-49fc-9fef-84e5f3612f71" positionType="Float" x="462" y="46" width="70" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$P{grandTotal} - $P{whtAmount}]]></expression>
+				<box rightPadding="4">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="40c6ff7b-1683-4879-9b74-8d67f23b21b9" positionType="Float" x="462" y="10" width="70" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" removeLineWhenBlank="true" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{discount} > 0]]></printWhenExpression>
+				<expression><![CDATA[$P{discount}]]></expression>
+				<box rightPadding="4">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="fe24ee19-ef2a-4b14-a385-cac3757d363f" positionType="Float" x="462" y="28" width="70" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" removeLineWhenBlank="true" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{whtAmount} > 0]]></printWhenExpression>
+				<expression><![CDATA[$P{whtAmount}]]></expression>
+				<box rightPadding="4">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="23e16311-1b7c-4e83-90a0-a18050d99e96" x="462" y="-8" width="70" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.00#;#,##0.00#-" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$P{subtotal}]]></expression>
+				<box rightPadding="4">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="staticText" uuid="d977a4d2-86fb-4853-9211-736e1c8cc0c8" x="410" y="-8" width="52" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<text><![CDATA[รวมเป็นเงิน]]></text>
+			</element>
+			<element kind="staticText" uuid="10f1d88b-cd8e-4170-96bc-da778d8415ed" positionType="Float" x="362" y="46" width="100" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<text><![CDATA[จำนวนเงินทั้งสิ้น	]]></text>
+			</element>
+			<element kind="staticText" uuid="1d3cb4f1-6451-4fac-a4b4-a6cc89c7deef" positionType="Float" x="362" y="28" width="100" height="18" forecolor="#56AF31" fontName="TH SarabunPSK" fontSize="13.0" removeLineWhenBlank="true" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{whtAmount} > 0]]></printWhenExpression>
+				<text><![CDATA[จำนวนเงินที่หัก ณ ที่จ่าย]]></text>
+			</element>
+			<element kind="staticText" uuid="898f0a16-f170-460f-b680-c227300e6984" x="532" y="-8" width="20" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<text><![CDATA[บาท]]></text>
+			</element>
+			<element kind="staticText" uuid="e1f60e42-56b7-43d1-a2bc-52fcaf15a11e" x="532" y="10" width="20" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{discount} > 0]]></printWhenExpression>
+				<text><![CDATA[บาท]]></text>
+			</element>
+			<element kind="staticText" uuid="de1bcb35-a6c1-4c3b-b42f-dbac76d19f02" positionType="Float" x="532" y="28" width="20" height="18" fontName="TH SarabunPSK" fontSize="13.0" removeLineWhenBlank="true" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$P{whtAmount} > 0]]></printWhenExpression>
+				<text><![CDATA[บาท]]></text>
+			</element>
+			<element kind="staticText" uuid="c2ddf4ad-3d3e-49c8-8eda-f867e131d2b6" x="532" y="46" width="20" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<text><![CDATA[บาท]]></text>
+			</element>
+		</element>
+		<element kind="staticText" uuid="e353c99f-3888-4ff3-80f7-e3ad2d8404f1" x="33" y="188" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ลูกค้า]]></text>
+		</element>
+		<element kind="staticText" uuid="3a2a5054-d960-4d32-b3d6-2e0e2f0916ed" x="33" y="206" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[______/______/______]]></text>
+		</element>
+		<element kind="staticText" uuid="07f7b8c8-d65b-4f3b-bc9f-cc8edf3efd77" x="33" y="170" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[]]></text>
+			<box>
+				<pen lineWidth="2.0"/>
+				<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Dotted" lineColor="#000000"/>
+				<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="5652dbe5-f2d0-4f52-9cc0-c8ee43eb4f71" x="367" y="170" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[]]></text>
+			<box>
+				<pen lineWidth="2.0"/>
+				<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Dotted" lineColor="#000000"/>
+				<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="c475a274-0d79-436e-8824-52ee340b122e" x="367" y="188" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<expression><![CDATA[$P{sellerName}]]></expression>
+		</element>
+		<element kind="image" uuid="63d3c756-9492-4b1f-8e0e-53b5b3162fd7" x="367" y="147" width="110" height="39" hImageAlign="Center" vImageAlign="Middle">
+			<expression><![CDATA[$P{signature}]]></expression>
+		</element>
+		<element kind="staticText" uuid="80f54ba0-6e9c-4aed-8b9d-52af555e842b" x="33" y="97" width="197" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[การชำระเงินจะสมบูรณ์เมื่อบริษัทได้รับเงินเรียบร้อยแล้ว]]></text>
+		</element>
+		<element kind="staticText" uuid="449b2a18-b4b9-4cde-8655-cc23586f2469" x="260" y="97" width="30" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[เงินสด]]></text>
+		</element>
+		<element kind="staticText" uuid="5d59a840-eaba-4d25-b04b-4d6800921961" x="320" y="97" width="30" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[โอนเงิน]]></text>
+		</element>
+		<element kind="image" uuid="c0aaf97d-0040-4d13-92d6-c3c1852652d1" x="238" y="97" width="16" height="16">
+			<printWhenExpression><![CDATA[$P{paymentChannel}.equalsIgnoreCase("CASH")]]></printWhenExpression>
+			<expression><![CDATA["report/checked.png"]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="image" uuid="13851844-c5ca-411f-85f8-1a4a289cfaed" x="298" y="97" width="16" height="16">
+			<printWhenExpression><![CDATA[$P{paymentChannel}.equalsIgnoreCase("TRANSFER")]]></printWhenExpression>
+			<expression><![CDATA["report/checked.png"]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="image" uuid="1121331c-777c-4d64-ac9c-82d78ebc5299" x="238" y="98" width="16" height="16">
+			<printWhenExpression><![CDATA[$P{paymentChannel}.equalsIgnoreCase("TRANSFER")]]></printWhenExpression>
+			<expression><![CDATA["report/unchecked.png"]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="image" uuid="90004b62-5af0-4c37-8439-fdb7667d7314" x="298" y="98" width="16" height="16">
+			<printWhenExpression><![CDATA[$P{paymentChannel}.equalsIgnoreCase("CASH")]]></printWhenExpression>
+			<expression><![CDATA["report/unchecked.png"]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="textField" uuid="5bcdc919-b197-4f9e-80a4-d931c5678eed" x="33" y="122" width="476" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{paymentChannel}.equalsIgnoreCase("TRANSFER")]]></printWhenExpression>
+			<expression><![CDATA[$P{bankName} +" เลขที่บัญชี " + $P{accountNo} + " วันที่ " + $P{receiptDate} + " จำนวน " + new java.text.DecimalFormat("#,##0.00").format($P{receiptAmount}) + " บาท"]]></expression>
+		</element>
+		<element kind="textField" uuid="d405bda3-9cde-4067-97bb-7a7bbe801a0f" x="367" y="206" width="110" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="MMMM d, yyyy" hTextAlign="Center" vTextAlign="Middle">
+			<expression><![CDATA[$P{docDate}]]></expression>
+		</element>
+		<element kind="textField" uuid="298218a7-0382-48a1-a657-5386c3267e16" x="525" y="221" width="30" height="21" fontName="TH SarabunPSK" fontSize="13.0" evaluationTime="Report" hTextAlign="Left" vTextAlign="Middle">
+			<expression><![CDATA["/" + $V{PAGE_NUMBER}]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+		</element>
+		<element kind="textField" uuid="5b2d853b-51e2-4a1d-abfa-b0303d68201d" x="500" y="221" width="30" height="21" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<expression><![CDATA["หน้า " + $V{PAGE_NUMBER}]]></expression>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</lastPageFooter>
+</jasperReport>

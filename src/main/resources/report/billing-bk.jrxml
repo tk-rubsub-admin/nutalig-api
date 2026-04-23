@@ -1,0 +1,171 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="billing" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="5ebc3538-46cd-4323-838c-d2727b965e79">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="sellerMobileNo" class="java.lang.String"/>
+	<parameter name="sellerTaxId" class="java.lang.String"/>
+	<parameter name="sellerAddress" class="java.lang.String"/>
+	<parameter name="docDate" class="java.lang.String"/>
+	<parameter name="docNo" class="java.lang.String"/>
+	<parameter name="sellerName" class="java.lang.String"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="custId" class="java.lang.String"/>
+	<parameter name="custName" class="java.lang.String"/>
+	<parameter name="custAddress" class="java.lang.String"/>
+	<parameter name="custTelNo" class="java.lang.String"/>
+	<parameter name="custTaxId" class="java.lang.String"/>
+	<parameter name="createdBy" class="java.lang.String"/>
+	<field name="no" class="java.lang.Integer"/>
+	<field name="itemSku" class="java.lang.String"/>
+	<field name="itemName" class="java.lang.String"/>
+	<field name="qty" class="java.lang.Integer"/>
+	<field name="amount" class="java.lang.Double"/>
+	<variable name="formattedCreatedDate" class="java.lang.String">
+		<initialValueExpression><![CDATA[new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse($P{docDate})]]></initialValueExpression>
+	</variable>
+	<background splitType="Stretch"/>
+	<title height="150" splitType="Stretch">
+		<element kind="staticText" uuid="1a49fea5-96f5-4909-823f-469790611916" x="380" y="0" width="170" height="42" fontName="TH SarabunPSK" fontSize="16.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ใบคำสั่งซื้อ
+(Purchase Order)]]></text>
+			<box>
+				<pen lineWidth="0.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="5c464b0e-8648-4e3c-9027-e99a733e3690" x="380" y="42" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Left" vTextAlign="Middle">
+			<text><![CDATA[เลขที่]]></text>
+		</element>
+		<element kind="staticText" uuid="5f27f69f-97ac-4a67-a6d9-b6c0e945315b" x="380" y="60" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<text><![CDATA[วันที่]]></text>
+		</element>
+		<element kind="textField" uuid="f21ef9c0-cb47-47b6-b421-dfab3b13b8d2" x="432" y="42" width="118" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{docNo}]]></expression>
+		</element>
+		<element kind="textField" uuid="a31430f2-1ead-4768-9f5b-e3ee154ae4e7" x="432" y="60" width="118" height="18" fontName="TH SarabunPSK" fontSize="13.0" pattern="MMMM d, yyyy" vTextAlign="Middle">
+			<expression><![CDATA[new java.text.SimpleDateFormat("dd/MM/yyyy").format(new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse($P{docDate}))]]></expression>
+		</element>
+		<element kind="staticText" uuid="0be71551-8363-4dab-a11c-25d2263e090f" x="380" y="78" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<text><![CDATA[พนักงานขาย]]></text>
+		</element>
+		<element kind="textField" uuid="4be533e1-ee45-4ff2-90b9-268f8e53eecf" x="0" y="60" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{sellerName}]]></expression>
+		</element>
+		<element kind="textField" uuid="e168b96a-da42-46bb-ae0e-4bd50b43501d" x="0" y="78" width="280" height="36" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{sellerAddress}]]></expression>
+		</element>
+		<element kind="textField" uuid="be8b9cab-1882-4db1-afdd-898299a2535f" x="0" y="114" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA["เลขประจำตัวผู้เสียภาษี  " + $P{sellerTaxId}]]></expression>
+		</element>
+		<element kind="textField" uuid="27d8cb63-ccac-4a34-b912-844b45db192f" x="0" y="132" width="280" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA["โทร.  " + $P{sellerMobileNo}]]></expression>
+		</element>
+		<element kind="image" uuid="f81c8320-498f-4673-9a0e-71a865b939d7" x="30" y="0" width="50" height="50">
+			<expression><![CDATA[$P{logo}]]></expression>
+		</element>
+		<element kind="textField" uuid="e2ea9ace-bb80-40e4-bae1-1031df4ba7f7" x="432" y="78" width="118" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{createdBy}]]></expression>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</title>
+	<pageHeader height="80" splitType="Stretch">
+		<element kind="rectangle" uuid="2577d790-da95-4234-a1a4-ece15ded70a7" x="2" y="3" width="550" height="70" backcolor="rgba(255, 255, 255, 0.0)" radius="6"/>
+		<element kind="staticText" uuid="26296851-4f52-4a3a-8d27-5ba70bef412e" x="5" y="10" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<text><![CDATA[รหัสลูกค้า]]></text>
+		</element>
+		<element kind="staticText" uuid="5be79cbe-119f-4a6a-a7bf-fa705f43ebf1" x="5" y="28" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<text><![CDATA[ที่อยู่]]></text>
+		</element>
+		<element kind="staticText" uuid="d515a598-bfb5-48f6-825e-efecd3a83b7d" x="277" y="46" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<text><![CDATA[เลขผู้เสียภาษี]]></text>
+		</element>
+		<element kind="textField" uuid="e1de4574-cda5-4c4d-9fd8-5082e29a8d78" x="57" y="10" width="218" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custId}.isEmpty() ? "-" : $P{custId}]]></expression>
+		</element>
+		<element kind="textField" uuid="e0a77d07-dcea-4377-9ddd-728dba1912dc" x="329" y="46" width="218" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custTaxId}.isEmpty() ? "-" : $P{custTaxId}]]></expression>
+		</element>
+		<element kind="textField" uuid="64505602-2b3b-4f4f-845f-6ddf61bdecaf" x="57" y="28" width="218" height="36" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custAddress}.isEmpty() ? "-" : $P{custAddress}]]></expression>
+		</element>
+		<element kind="staticText" uuid="fb39d1c3-76d2-40a5-889a-78052e1e3f36" x="277" y="28" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<text><![CDATA[โทรศัพท์]]></text>
+		</element>
+		<element kind="textField" uuid="64748f29-9a2c-42bd-9fb2-c85b5a24b630" x="329" y="28" width="218" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custTelNo}.isEmpty() ? "-" : $P{custTelNo}]]></expression>
+		</element>
+		<element kind="textField" uuid="6204ad19-e876-47d4-8b25-a51e22a310c9" x="329" y="10" width="218" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<expression><![CDATA[$P{custName}.isEmpty() ? "-" : $P{custName}]]></expression>
+		</element>
+		<element kind="staticText" uuid="531fb660-097f-4d5d-9533-68be345fd09e" x="277" y="10" width="52" height="18" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Top">
+			<text><![CDATA[ลูกค้า]]></text>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</pageHeader>
+	<columnHeader height="25" splitType="Stretch">
+		<element kind="staticText" uuid="b6589101-e346-418a-9785-4edc091ccb2c" x="0" y="5" width="30" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ลำดับ]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="018d9ff5-7fcf-44da-9b8e-c0e424286381" x="30" y="5" width="150" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[รหัสสินค้า]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="280e967b-b9ab-4651-9050-be16f224f954" x="180" y="5" width="230" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[รายการสินค้า]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="646b1f18-6275-4bf6-b6b1-df07c641810b" x="410" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[จำนวน]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="62cd3dea-f5f4-4cb4-84ee-4ce5a1e8c1c4" x="480" y="5" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[ราคา]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+			</box>
+		</element>
+	</columnHeader>
+	<detail>
+		<band height="25" splitType="Stretch">
+			<element kind="textField" uuid="37b9f211-be5f-4701-a24a-1df7cec12539" x="0" y="0" width="30" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Center" vTextAlign="Middle">
+				<expression><![CDATA[$F{no}]]></expression>
+			</element>
+			<element kind="textField" uuid="e09afa03-9ddc-4686-9ee9-158360eb63b3" x="30" y="0" width="150" height="20" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+				<expression><![CDATA[$F{itemSku}]]></expression>
+				<property name="com.jaspersoft.studio.unit.leftIndent" value="pixel"/>
+				<box leftPadding="4"/>
+			</element>
+			<element kind="textField" uuid="72b0ca9e-15bc-417e-9b52-a9a274f42fb9" x="180" y="0" width="230" height="20" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+				<expression><![CDATA[$F{itemName}]]></expression>
+				<box leftPadding="4"/>
+			</element>
+			<element kind="textField" uuid="69e9f18c-2b68-49cc-8f5c-c54774dfff59" x="410" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$F{qty}]]></expression>
+				<box rightPadding="4"/>
+			</element>
+			<element kind="textField" uuid="7c0360ee-ba78-4903-b3c7-d1a9ad52a341" x="480" y="0" width="70" height="20" fontName="TH SarabunPSK" fontSize="13.0" hTextAlign="Right" vTextAlign="Middle">
+				<expression><![CDATA[$F{amount} == null ? "0.00" : $F{amount}]]></expression>
+				<box rightPadding="4"/>
+			</element>
+		</band>
+	</detail>
+	<columnFooter height="45" splitType="Stretch"/>
+	<pageFooter height="54" splitType="Stretch"/>
+	<summary height="42" splitType="Stretch"/>
+</jasperReport>

@@ -1,0 +1,169 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="priceList.rxml" language="java" columnCount="1" pageWidth="595" pageHeight="842" orientation="Landscape" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="10" bottomMargin="10" uuid="382243be-14c1-4df7-a0f7-7df707a7dc7d">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<property name="com.jaspersoft.studio.unit." value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageHeight" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.topMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.bottomMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.leftMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.rightMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnSpacing" value="pixel"/>
+	<style name="RowStriped" mode="Opaque">
+		<conditionalStyle mode="Opaque" backcolor="#C7CCD1" markup="">
+			<conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 == 0]]></conditionExpression>
+		</conditionalStyle>
+		<conditionalStyle>
+			<conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 != 0]]></conditionExpression>
+		</conditionalStyle>
+	</style>
+	<parameter name="templateName" class="java.lang.String"/>
+	<parameter name="dateTime" class="java.lang.String"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="areaType" class="java.lang.String"/>
+	<field name="productName" class="java.lang.String"/>
+	<field name="wholeSalePrice" class="java.math.BigDecimal"/>
+	<field name="salePrice" class="java.math.BigDecimal"/>
+	<field name="type" class="java.lang.String"/>
+	<background splitType="Stretch"/>
+	<pageHeader height="107" splitType="Stretch">
+		<element kind="textField" uuid="821550ca-45eb-4846-8198-1c5ef28471d2" x="0" y="0" width="280" height="20" fontName="TH SarabunPSK" fontSize="16.0" vTextAlign="Middle">
+			<expression><![CDATA[$P{templateName}]]></expression>
+		</element>
+		<element kind="textField" uuid="6859b078-a622-422b-a447-4b949354f136" x="280" y="0" width="274" height="20" fontName="TH SarabunPSK" fontSize="16.0" hTextAlign="Right" vTextAlign="Middle">
+			<expression><![CDATA[$P{dateTime}]]></expression>
+		</element>
+		<element kind="image" uuid="30b1b347-7c19-46f5-899e-59154d746784" x="0" y="21" width="554" height="51" hImageAlign="Center">
+			<expression><![CDATA[$P{logo}]]></expression>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box padding="0">
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="7f8cb3c0-afb0-498c-8f57-4b6f4b2236e0" x="0" y="72" width="554" height="18" fontName="TH SarabunPSK" fontSize="14.0" hTextAlign="Center" vTextAlign="Middle">
+			<expression><![CDATA[$P{areaType}.equalsIgnoreCase("PROVINCE") ? "LINE : @DPKFLOWER / TEL. 092-587-4222" : "LINE : @PAWANBAIMAI / TEL. 098-274-4522"]]></expression>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="staticText" uuid="a3e084ca-f215-4bf9-8a65-19e4234ab805" x="0" y="90" width="554" height="16" fontName="TH SarabunPSK" fontSize="14.0" bold="true" hTextAlign="Center">
+			<text><![CDATA[*** อัปเดตราคาทุกวันทาง Line ร้านนะคะ ***]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+	</pageHeader>
+	<columnHeader height="20" splitType="Stretch">
+		<element kind="staticText" uuid="242776c7-6bb0-4ff0-a39c-9fc365c916ef" mode="Opaque" x="0" y="0" width="354" height="20" forecolor="#FFFFFF" backcolor="#875F0E" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("BKK")]]></printWhenExpression>
+			<text><![CDATA[ชื่อสินค้า]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="a01f6b7f-9724-454f-87ae-e5a3f99178e8" mode="Opaque" x="454" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#875F0E" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("BKK")]]></printWhenExpression>
+			<text><![CDATA[ราคาขายส่ง]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="fbd5f27c-178d-4035-a2cc-5c5a24f81504" mode="Opaque" x="0" y="0" width="354" height="20" forecolor="#FFFFFF" backcolor="#168C26" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("PROVINCE")]]></printWhenExpression>
+			<text><![CDATA[ชื่อสินค้า]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="b577169f-cddc-45b8-b8a3-394def6530d4" mode="Opaque" x="454" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#168C26" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("PROVINCE")]]></printWhenExpression>
+			<text><![CDATA[ราคาขาย]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="6d251cb6-8453-4dd5-a18b-8b62f38ccae1" mode="Opaque" x="354" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#168C26" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("BKK")]]></printWhenExpression>
+			<text><![CDATA[ราคาขายปลีก]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="staticText" uuid="86adaf36-8bca-4ecf-b31d-1c3f71b85b56" mode="Opaque" x="354" y="0" width="100" height="20" forecolor="#FFFFFF" backcolor="#875F0E" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{areaType}.equalsIgnoreCase("PROVINCE")]]></printWhenExpression>
+			<text><![CDATA[ราคาขายปลีก]]></text>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</columnHeader>
+	<detail>
+		<band height="20" splitType="Stretch">
+			<element kind="rectangle" uuid="9f553f84-d186-47a4-8a42-3f06f0a6ca51" x="0" y="0" width="554" height="20" style="RowStriped">
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<pen lineWidth="0.0"/>
+			</element>
+			<element kind="textField" uuid="39a4c663-8142-4ca8-a509-c2f7655d063d" x="0" y="0" width="554" height="20" forecolor="#FF0905" fontName="TH SarabunPSK" fontSize="13.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$F{type}.equalsIgnoreCase( "space" )]]></printWhenExpression>
+				<expression><![CDATA[$F{productName}]]></expression>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box leftPadding="10"/>
+			</element>
+			<element kind="textField" uuid="f9f25140-8d68-43b1-ba80-c5e747f46d6c" x="0" y="0" width="354" height="20" fontName="TH SarabunPSK" fontSize="13.0" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$F{type}.equalsIgnoreCase( "product" )]]></printWhenExpression>
+				<expression><![CDATA[$F{productName}]]></expression>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box leftPadding="10"/>
+			</element>
+			<element kind="textField" uuid="124372cd-acce-4e71-abcb-532ad4789d4f" x="454" y="0" width="100" height="20" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.###;(#,##0.###)" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$F{type}.equalsIgnoreCase( "product" )]]></printWhenExpression>
+				<expression><![CDATA[$F{wholeSalePrice}]]></expression>
+				<box rightPadding="25"/>
+			</element>
+			<element kind="textField" uuid="9536fb0e-3d11-4865-bfd6-87167c0366e4" x="354" y="0" width="100" height="20" fontName="TH SarabunPSK" fontSize="13.0" pattern="#,##0.###;(#,##0.###)" blankWhenNull="false" hTextAlign="Right" vTextAlign="Middle">
+				<printWhenExpression><![CDATA[$F{type}.equalsIgnoreCase( "product" )]]></printWhenExpression>
+				<expression><![CDATA[$F{salePrice} == null ? "-" : $F{salePrice}]]></expression>
+				<box rightPadding="25"/>
+			</element>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</band>
+	</detail>
+	<pageFooter height="15">
+		<element kind="textField" uuid="80b9381b-8e4d-448f-8b11-47fd4bb38047" x="515" y="0" width="19" height="15" fontName="TH SarabunPSK" hTextAlign="Right">
+			<expression><![CDATA["หน้า " + $V{PAGE_NUMBER}]]></expression>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</element>
+		<element kind="textField" uuid="3dc0e7bc-20a4-424a-af8c-f1f1816cbfcd" x="534" y="0" width="20" height="15" fontName="TH SarabunPSK" evaluationTime="Report" hTextAlign="Left">
+			<expression><![CDATA[" / " + $V{PAGE_NUMBER}]]></expression>
+		</element>
+	</pageFooter>
+</jasperReport>

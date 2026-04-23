@@ -1,0 +1,101 @@
+spring:
+  application:
+    name: api
+  output:
+    ansi:
+      enabled: ALWAYS
+  jackson:
+    time-zone: Asia/Bangkok
+  mvc:
+    format:
+      date: yyyy-MM-dd
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 1m
+  datasource:
+    url: jdbc:mysql://203.150.106.14:3306/nutalig
+    username: nutalig_user
+    password: P@ssw0rd1234!
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 5
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+
+server:
+  port: 8005
+  shutdown: graceful
+  max-http-request-header-size: 2MB
+  servlet:
+    context-path: /nutalig
+
+logging:
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} |%clr(%5p) | %clr(${spring.application.name}){green} | %X{IPAddress} | %X{traceId:-} | %X{spanId:-} | %clr(${PID}){magenta} %clr(---){faint} %clr([%7.15t]){faint} | %clr(%-10.40logger{10}:%L){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:%wEx}"
+  level:
+    org.springframework.cache: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info,metric
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+line:
+  message:
+    api: https://api.line.me/v2/bot/message/push
+  channel:
+    id: ${LINE_CHANNEL_ID:${line.channel-id:}}
+    secret: ${LINE_CHANNEL_SECRET:${line.channel-secret:65f21992eee89aa98b958b255b60e60a}}
+    access-token: XPxE1ZPu7Q/OsDARP9A15xTl8vWGg0f1Mhn8EHFyEJ9v1ox5c0Yh20CC9JxLIwvklrRdvWoYxIGTFy8mJRdLoqrhf1Vr/qjc4WLgaPp/0WaXjOrA+XYrNgqoaUiIdjz3YkiPYYqhvxsShWBRuhm/MAdB04t89/1O/w1cDnyilFU=
+  login:
+    authorize-url: https://access.line.me/oauth2/v2.1/authorize
+    token-url: https://api.line.me/oauth2/v2.1/token
+    verify-access-token-url: https://api.line.me/oauth2/v2.1/verify
+    verify-id-token-url: https://api.line.me/oauth2/v2.1/verify
+    profile-url: https://api.line.me/v2/profile
+    redirect-uri: https://initially-leadless-larae.ngrok-free.dev/nutalig/v1/auth/line/callback
+    scope: openid profile
+    login-success-url: http://localhost:3000/login-success
+    login-failure-url: http://localhost:3000/login-failure
+    link-success-url: https://initially-leadless-larae.ngrok-free.dev
+    link-failure-url: https://initially-leadless-larae.ngrok-free.dev
+  channel-id: 2009827715
+  channel-secret: 36a290d42a99bb893997ad6e6a98b5e7
+  redirect-uri: https://initially-leadless-larae.ngrok-free.dev/nutalig/v1/auth/line/callback
+  scope: openid profile
+
+openai:
+  base-url: https://api.openai.com/v1
+  api-key: sk-proj-f_BHp0fBg1wnYvfqNzCAwhgJsYFvsCOFVNn-
+
+app:
+  upload:
+    dir: ./uploads
+    public-base-url: http://localhost:8005/nutalig/uploads
+
+# Alternative datasource values
+# spring:
+#   datasource:
+#     url: jdbc:mysql://203.154.68.159:3306/dpkflower
+#     username: api-user
+#     password: DpkFl@werUser1234
+#
+# spring:
+#   datasource:
+#     url: jdbc:mysql://host.docker.internal:3306/dpkflower

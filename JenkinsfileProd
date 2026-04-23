@@ -1,0 +1,43 @@
+@Library('shared-jenkins-library@master') _
+
+pipeline {
+    agent { label "master" }
+    tools { maven 'maven3' }
+
+    parameters {
+        string(name: 'IMAGE_VERSION', defaultValue: '1.x.x-x', description: 'Your image Version.')
+        string(name: 'APP_NAME', defaultValue: 'api', description: 'Your Application Name')
+        string(name: 'REPO_NAME', defaultValue: '', description: 'Your Repo Name')
+        string(name: 'KUBE_NAMESPACE', defaultValue: 'application', description: 'Target Kubernetes Namespace')
+        string(name: 'ENABLE_AUTO_SCALE', defaultValue: 'true', description: 'Enable pod auto scaling.')
+        string(name: 'MINIMUM_POD', defaultValue: '4', description: 'Minimum to start pod for service')
+        string(name: 'MAXIMUM_POD', defaultValue: '10', description: 'Maximum to start pod for service')
+    }
+
+    stages {
+        stage ('Helm Deploy') {
+            steps {
+                script {
+                    helmDeployProd(
+                        params.REPO_NAME,
+                        params.APP_NAME,
+                        params.IMAGE_VERSION,
+                        params.KUBE_NAMESPACE,
+                        params.ENVIRONMENT,
+                        params.ENABLE_AUTO_SCALE,
+                        params.MINIMUM_POD,
+                        params.MAXIMUM_POD
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sendNotifications(currentBuild.result)
+            }
+        }
+    }
+}

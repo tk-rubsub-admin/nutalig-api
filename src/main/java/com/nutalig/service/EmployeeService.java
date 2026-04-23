@@ -1,0 +1,188 @@
+package com.nutalig.service;
+
+import com.nutalig.constant.EmployeeStatus;
+import com.nutalig.constant.SystemConstant;
+import com.nutalig.controller.employee.request.CreateEmployeeRequest;
+import com.nutalig.controller.employee.request.SearchEmployeeRequest;
+import com.nutalig.controller.employee.request.UpdateEmployeeRequest;
+import com.nutalig.controller.employee.response.SearchEmployeeResponse;
+import com.nutalig.controller.request.PageableRequest;
+import com.nutalig.controller.response.Pagination;
+import com.nutalig.dto.EmployeeDto;
+import com.nutalig.entity.EmployeeEntity;
+import com.nutalig.entity.SystemConfigEntity;
+import com.nutalig.exception.DataNotFoundException;
+import com.nutalig.exception.InvalidRequestException;
+import com.nutalig.mapper.EmployeeMapper;
+import com.nutalig.repository.EmployeeProcurementMappingRepository;
+import com.nutalig.repository.EmployeeRepository;
+import com.nutalig.repository.SystemConfigRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+
+import static com.nutalig.repository.specification.EmployeeSpecification.employeeIdEqual;
+import static com.nutalig.repository.specification.EmployeeSpecification.keywordContain;
+import static com.nutalig.repository.specification.EmployeeSpecification.nameContain;
+import static com.nutalig.repository.specification.EmployeeSpecification.positionEqual;
+import static com.nutalig.repository.specification.EmployeeSpecification.statusEqual;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class EmployeeService {
+
+    private final EmployeeRepository employeeRepository;
+    private final EmployeeProcurementMappingRepository employeeProcurementMappingRepository;
+    private final SystemConfigRepository systemConfigRepository;
+    private final EmployeeMapper employeeMapper;
+
+    @Transactional
+    public EmployeeDto createEmployee(CreateEmployeeRequest request) throws InvalidRequestException {
+        log.info("Create employee request {}", request);
+
+        validateCreateRequest(request);
+
+        boolean existed = employeeRepository.findById(request.getEmployeeId().trim()).isPresent();
+        if (existed) {
+            throw new InvalidRequestException("Employee id " + request.getEmployeeId() + " already exists.");
+        }
+
+        EmployeeEntity entity = employeeMapper.toEntity(request);
+        entity.setEmployeeId(request.getEmployeeId().trim());
+        if (entity.getStatus() == null) {
+            entity.setStatus(EmployeeStatus.ACTIVE);
+        }
+        entity.setTeam(getOptionalSystemConfig(SystemConstant.TEAM, request.getTeam(), "Team"));
+        entity.setPosition(getOptionalSystemConfig(SystemConstant.POSITION, request.getPosition(), "Position"));
+
+        entity = employeeRepository.save(entity);
+
+        log.info("Create employee success id {}", entity.getEmployeeId());
+        return employeeMapper.toDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public SearchEmployeeResponse searchEmployee(SearchEmployeeRequest searchRequest, PageableRequest pageableRequest) {
+        log.info("Search employee by criteria {} page {} size {}", searchRequest, pageableRequest.getPage(), pageableRequest.getSize());
+
+        pageableRequest.setSortBy("employeeId");
+        pageableRequest.setSortDirection(Sort.Direction.ASC);
+        Pageable pageable = pageableRequest.build();
+
+        Page<EmployeeEntity> employeePage = employeeRepository.findAll(buildSearchCriteria(searchRequest), pageable);
+        Page<EmployeeDto> employeeDtoPage = employeePage.map(employeeMapper::toDto);
+
+        SearchEmployeeResponse response = new SearchEmployeeResponse();
+        response.setEmployees(employeeDtoPage.getContent());
+        response.setPagination(Pagination.build(employeeDtoPage));
+        return response;
+    }
+
+    @Transactional
+    public EmployeeDto updateEmployee(String employeeId, UpdateEmployeeRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        log.info("Update employee id {} request {}", employeeId, request);
+
+        EmployeeEntity entity = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new DataNotFoundException("Employee id " + employeeId + " not found."));
+
+        if (request.getFirstNameTh() != null) {
+            entity.setFirstNameTh(StringUtils.trimToNull(request.getFirstNameTh()));
+        }
+        if (request.getLastNameTh() != null) {
+            entity.setLastNameTh(StringUtils.trimToNull(request.getLastNameTh()));
+        }
+        if (request.getNickName() != null) {
+            entity.setNickName(StringUtils.trimToNull(request.getNickName()));
+        }
+        if (request.getPosition() != null) {
+            entity.setPosition(getOptionalSystemConfig(SystemConstant.POSITION, request.getPosition(), "Position"));
+        }
+        if (request.getTeam() != null) {
+            entity.setTeam(getOptionalSystemConfig(SystemConstant.TEAM, request.getTeam(), "Team"));
+        }
+        if (request.getPhoneNumber() != null) {
+            entity.setPhoneNumber(StringUtils.trimToNull(request.getPhoneNumber()));
+        }
+        if (request.getStatus() != null) {
+            entity.setStatus(request.getStatus());
+        }
+        if (request.getAdditional() != null) {
+            entity.setAdditional(StringUtils.trimToNull(request.getAdditional()));
+        }
+
+        entity = employeeRepository.save(entity);
+
+        log.info("Update employee success id {}", employeeId);
+        return employeeMapper.toDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmployeeDto> getProcurementEmployeesBySalesEmployeeId(String salesEmployeeId) {
+        log.info("Get procurement employees by sales employee id {}", salesEmployeeId);
+
+        if (StringUtils.isBlank(salesEmployeeId)) {
+            return List.of();
+        }
+
+        return employeeProcurementMappingRepository.findBySalesEmployee_EmployeeId(salesEmployeeId.trim()).stream()
+                .filter(mapping -> mapping.getProcurementEmployee() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        mapping -> mapping.getProcurementEmployee().getEmployeeId(),
+                        mapping -> mapping,
+                        (left, right) -> Boolean.TRUE.equals(left.getIsDefault()) ? left : right,
+                        LinkedHashMap::new
+                ))
+                .values()
+                .stream()
+                .sorted(Comparator.comparing(mapping ->
+                        StringUtils.defaultString(mapping.getProcurementEmployee().getEmployeeId())))
+                .map(mapping -> {
+                    EmployeeDto dto = employeeMapper.toDto(mapping.getProcurementEmployee());
+                    dto.setIsDefault(mapping.getIsDefault());
+                    return dto;
+                })
+                .toList();
+    }
+
+    private void validateCreateRequest(CreateEmployeeRequest request) throws InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("Request is required.");
+        }
+        if (StringUtils.isBlank(request.getEmployeeId())) {
+            throw new InvalidRequestException("Employee id is required.");
+        }
+    }
+
+    private Specification<EmployeeEntity> buildSearchCriteria(SearchEmployeeRequest request) {
+        if (request == null) {
+            return Specification.where(null);
+        }
+
+        return Specification.where(employeeIdEqual(request.getEmployeeIdEqual()))
+                .and(nameContain(request.getNameContain()))
+                .and(positionEqual(request.getPositionEqual()))
+                .and(statusEqual(request.getStatusEqual()))
+                .and(keywordContain(request.getKeyword()));
+    }
+
+    private SystemConfigEntity getOptionalSystemConfig(SystemConstant groupCode, String code, String fieldName)
+            throws InvalidRequestException {
+        String trimmedCode = StringUtils.trimToNull(code);
+        if (trimmedCode == null) {
+            return null;
+        }
+
+        return systemConfigRepository.findByIdGroupCodeAndIdCode(groupCode, trimmedCode)
+                .orElseThrow(() -> new InvalidRequestException(fieldName + " " + trimmedCode + " not found."));
+    }
+}
