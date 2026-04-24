@@ -42,11 +42,22 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String path = request.getServletPath();
+        String path = normalizePath(request);
         boolean skip = WHITELIST.stream().anyMatch(path::startsWith);
 
         log.info("[JWTFilter] path: {} skip: {}", path, skip );
         return skip;
+    }
+
+    private String normalizePath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+
+        return path.isBlank() ? "/" : path;
     }
 
     @Override
