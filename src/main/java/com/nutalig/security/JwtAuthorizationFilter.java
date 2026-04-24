@@ -27,17 +27,17 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     private final LineAuthService lineAuthService;
 
     private static final List<String> WHITELIST = List.of(
-            "/nutalig/v1/auth/login",
-            "/nutalig/v1/auth/line/login",
-            "/nutalig/v1/auth/line/register",
-            "/nutalig/v1/auth/line/login/url",
-            "/nutalig/v1/auth/line/register/url",
-            "/nutalig/v1/auth/line/callback",
+            "/nutalig/api/v1/auth/login",
+            "/nutalig/api/v1/auth/line/login",
+            "/nutalig/api/v1/auth/line/register",
+            "/nutalig/api/v1/auth/line/login/url",
+            "/nutalig/api/v1/auth/line/register/url",
+            "/nutalig/api/v1/auth/line/callback",
             "/actuator",
             "/v3/api-docs",
             "/swagger-ui",
-            "/nutalig/line-webhook",
-            "/nutalig/uploads"
+            "/nutalig/api/line-webhook",
+            "/nutalig/api/uploads"
     );
 
     @Override
