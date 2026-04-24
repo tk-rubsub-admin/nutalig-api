@@ -27,22 +27,22 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     private final LineAuthService lineAuthService;
 
     private static final List<String> WHITELIST = List.of(
-            "/nutalig/api/v1/auth/login",
-            "/nutalig/api/v1/auth/line/login",
-            "/nutalig/api/v1/auth/line/register",
-            "/nutalig/api/v1/auth/line/login/url",
-            "/nutalig/api/v1/auth/line/register/url",
-            "/nutalig/api/v1/auth/line/callback",
+            "/v1/login",
+            "/v1/auth/line/login",
+            "/v1/auth/line/register",
+            "/v1/auth/line/login/url",
+            "/v1/auth/line/register/url",
+            "/v1/auth/line/callback",
             "/actuator",
             "/v3/api-docs",
             "/swagger-ui",
-            "/nutalig/api/line-webhook",
-            "/nutalig/api/uploads"
+            "/line-webhook",
+            "/uploads"
     );
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String path = request.getRequestURI();
+        String path = request.getServletPath();
         boolean skip = WHITELIST.stream().anyMatch(path::startsWith);
 
         log.info("[JWTFilter] path: {} skip: {}", path, skip );
