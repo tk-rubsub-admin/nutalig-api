@@ -71,8 +71,8 @@ line:
     profile-url: https://api.line.me/v2/profile
     redirect-uri: https://initially-leadless-larae.ngrok-free.dev/nutalig/v1/auth/line/callback
     scope: openid profile
-    login-success-url: http://localhost:3000/login-success
-    login-failure-url: http://localhost:3000/login-failure
+    login-success-url: https://nutalig.tk-rubsub.online/login-success
+    login-failure-url: https://nutalig.tk-rubsub.online/login-failure
     link-success-url: https://initially-leadless-larae.ngrok-free.dev
     link-failure-url: https://initially-leadless-larae.ngrok-free.dev
   channel-id: 2009827715

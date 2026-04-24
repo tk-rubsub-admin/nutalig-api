@@ -35,7 +35,7 @@ ARG JAR_FILE=target/api.jar
 ADD ${JAR_FILE} app.jar
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8002
 
 # Run the JAR file
-ENTRYPOINT java -jar /app.jar
+ENTRYPOINT java ${JAVA_OPTS} -jar /app.jar
