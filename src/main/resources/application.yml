@@ -32,11 +32,11 @@ spring:
           batch_size: 50
 
 server:
-  port: 8005
+  port: 8002
   shutdown: graceful
   max-http-request-header-size: 2MB
   servlet:
-    context-path: /nutalig
+    context-path: /
 
 logging:
   pattern:
