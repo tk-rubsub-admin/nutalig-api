@@ -69,15 +69,15 @@ line:
     verify-access-token-url: https://api.line.me/oauth2/v2.1/verify
     verify-id-token-url: https://api.line.me/oauth2/v2.1/verify
     profile-url: https://api.line.me/v2/profile
-    redirect-uri: https://initially-leadless-larae.ngrok-free.dev/nutalig/v1/auth/line/callback
+    redirect-uri: https://nutalig.tk-rubsub.online/api/nutalig/v1/auth/line/callback
     scope: openid profile
     login-success-url: https://nutalig.tk-rubsub.online/login-success
     login-failure-url: https://nutalig.tk-rubsub.online/login-failure
-    link-success-url: https://initially-leadless-larae.ngrok-free.dev
-    link-failure-url: https://initially-leadless-larae.ngrok-free.dev
+    link-success-url: https://nutalig.tk-rubsub.online/api
+    link-failure-url: https://nutalig.tk-rubsub.online/api
   channel-id: 2009827715
   channel-secret: 36a290d42a99bb893997ad6e6a98b5e7
-  redirect-uri: https://initially-leadless-larae.ngrok-free.dev/nutalig/v1/auth/line/callback
+  redirect-uri: https://nutalig.tk-rubsub.online/api/nutalig/v1/auth/line/callback
   scope: openid profile
 
 openai:

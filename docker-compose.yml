@@ -11,6 +11,7 @@ services:
     ports:
       - "${APP_PORT:-8002}:8002"
     environment:
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-prod}"
       TZ: Asia/Bangkok
       JAVA_OPTS: "${JAVA_OPTS:--Djava.awt.headless=true -Xms256m -Xmx1024m}"
       SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/nutalig}"
