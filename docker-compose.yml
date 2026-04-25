@@ -8,8 +8,11 @@ services:
       dockerfile: Dockerfile
     image: nutalig/api:local
     restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     ports:
-      - "${APP_PORT:-8002}:8002"
+      - "${APP_PORT:-8002}:8005"
     environment:
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-prod}"
       TZ: Asia/Bangkok
@@ -17,6 +20,11 @@ services:
       SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/nutalig}"
       SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME:-root}"
       SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD:-root}"
+      SPRING_RABBITMQ_HOST: "${SPRING_RABBITMQ_HOST:-rabbitmq}"
+      SPRING_RABBITMQ_PORT: "${SPRING_RABBITMQ_PORT:-5672}"
+      SPRING_RABBITMQ_USERNAME: "${SPRING_RABBITMQ_USERNAME:-nutalig}"
+      SPRING_RABBITMQ_PASSWORD: "${SPRING_RABBITMQ_PASSWORD:-nutalig123}"
+      SPRING_RABBITMQ_VIRTUAL_HOST: "${SPRING_RABBITMQ_VIRTUAL_HOST:-/}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       LINE_CHANNEL_ID: "${LINE_CHANNEL_ID:-}"
       LINE_CHANNEL_SECRET: "${LINE_CHANNEL_SECRET:-}"
@@ -28,8 +36,31 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8002/nutalig/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8005/nutalig/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  rabbitmq:
+    container_name: nutalig-rabbitmq
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER:-nutalig}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS:-nutalig123}"
+      RABBITMQ_DEFAULT_VHOST: "${RABBITMQ_DEFAULT_VHOST:-/}"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  rabbitmq_data:
