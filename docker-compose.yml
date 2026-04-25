@@ -12,7 +12,7 @@ services:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8002}:8005"
+      - "${APP_PORT:-8002}:8002"
     environment:
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-prod}"
       TZ: Asia/Bangkok
