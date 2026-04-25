@@ -183,6 +183,20 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    public GeneralResponse<RequestPriceHeaderDto> deleteAttachment(
+            @PathVariable("id") String id,
+            @PathVariable("attachmentId") Long attachmentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete rfq attachment {} from {} ===", attachmentId, id);
+
+        RequestPriceHeaderDto response = rfqService.deleteAttachment(id, attachmentId, userId);
+
+        log.info("=== End delete rfq attachment {} from {} ===", attachmentId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PostMapping("/{id}/pictures")
     public GeneralResponse<RequestPriceHeaderDto> addPictures(
             @PathVariable("id") String id,
@@ -194,6 +208,20 @@ public class RFQController {
         RequestPriceHeaderDto response = rfqService.addPictures(id, pictures, userId);
 
         log.info("=== End add rfq pictures {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/attachments")
+    public GeneralResponse<RequestPriceHeaderDto> addAttachments(
+            @PathVariable("id") String id,
+            @RequestPart("attachments") java.util.List<MultipartFile> attachments,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start add rfq attachments {} by {} ===", id, userId);
+
+        RequestPriceHeaderDto response = rfqService.addAttachments(id, attachments, userId);
+
+        log.info("=== End add rfq attachments {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

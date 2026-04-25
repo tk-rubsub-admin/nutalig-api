@@ -47,4 +47,10 @@ public class RequestPricePicturesEntity {
     @Column(name = "updated_by")
     @EqualsAndHashCode.Exclude
     private String updatedBy;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_type")
+    private String fileType;
 }

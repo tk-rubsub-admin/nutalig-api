@@ -6,7 +6,7 @@ import com.nutalig.constant.ActivityEntityType;
 import com.nutalig.constant.ActivitySource;
 import com.nutalig.constant.RFQStatus;
 import com.nutalig.constant.SystemConstant;
-import com.nutalig.controller.file.response.UploadImageResponse;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.rfq.request.CreateRequestPriceAdditionalCostRequest;
@@ -52,6 +52,8 @@ import static com.nutalig.repository.specification.RequestPriceHeaderSpecificati
 public class RFQService {
     private final static String SLA = "SLA-RFQ-PRICE";
     private final static String PROCUREMENT_ROLE_CODE = "PROCUREMENT";
+    private final static String PICTURE_FILE_TYPE = "PICTURE";
+    private final static String OTHER_FILE_TYPE = "OTHER";
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
     private final RequestPriceDetailRepository requestPriceDetailRepository;
@@ -119,7 +121,8 @@ public class RFQService {
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
 
         applyRelations(entity, request.getSalesId(), request.getCustomerId(), request.getOrderTypeCode(), request.getProcurementId());
-        attachPictures(entity, request.getPictures(), userId);
+        attachPictures(entity, request.getPictures(), PICTURE_FILE_TYPE, userId);
+        attachPictures(entity, request.getAttachments(), OTHER_FILE_TYPE, userId);
 
         if (entity.getCustomer() != null) {
             entity.setContactName(entity.getCustomer().getContacts().getFirst().getContactName());
@@ -471,8 +474,17 @@ public class RFQService {
 
     @Transactional(rollbackFor = Exception.class)
     public RequestPriceHeaderDto deletePicture(String rfqId, Long pictureId, String userId) throws DataNotFoundException {
+        return deleteStoredAttachment(rfqId, pictureId, userId, "ลบรูปภาพของคำขอราคาเลขที่ ");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RequestPriceHeaderDto deleteAttachment(String rfqId, Long attachmentId, String userId) throws DataNotFoundException {
+        return deleteStoredAttachment(rfqId, attachmentId, userId, "ลบไฟล์แนบของคำขอราคาเลขที่ ");
+    }
+
+    private RequestPriceHeaderDto deleteStoredAttachment(String rfqId, Long attachmentId, String userId, String activityMessagePrefix) throws DataNotFoundException {
         RequestPriceHeaderEntity entity = getEntityById(rfqId);
-        RequestPricePicturesEntity picture = getPictureFromHeader(entity, pictureId);
+        RequestPricePicturesEntity picture = getPictureFromHeader(entity, attachmentId);
 
         entity.removePicture(picture);
         normalizePictureSort(entity);
@@ -486,7 +498,7 @@ public class RFQService {
                 ActivityActorType.USER,
                 ActivityAction.DELETE_PICTURE,
                 ActivitySource.WEB,
-                "ลบรูปภาพของคำขอราคาเลขที่ " + entity.getId(),
+                activityMessagePrefix + entity.getId(),
                 null
         );
 
@@ -501,9 +513,13 @@ public class RFQService {
 
         RequestPriceHeaderEntity entity = getEntityById(rfqId);
         RequestPricePicturesEntity picture = getPictureFromHeader(entity, pictureId);
-        UploadImageResponse uploadedFile = fileStorageService.uploadImage(pictureFile);
+        UploadFileResponse uploadedFile = fileStorageService.uploadFile(pictureFile);
 
         picture.setPictureUrl(uploadedFile.getUrl());
+        picture.setFileName(uploadedFile.getFileName());
+        if (StringUtils.isBlank(picture.getFileType())) {
+            picture.setFileType(PICTURE_FILE_TYPE);
+        }
         picture.setUpdatedBy(userProfileService.getNameFromId(userId));
         picture.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
 
@@ -518,7 +534,7 @@ public class RFQService {
         }
 
         RequestPriceHeaderEntity entity = getEntityById(rfqId);
-        attachPictures(entity, pictures, userId);
+        attachPictures(entity, pictures, PICTURE_FILE_TYPE, userId);
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
 
@@ -532,6 +548,33 @@ public class RFQService {
                 ActivityAction.UPLOAD_PICTURE,
                 ActivitySource.WEB,
                 "เพิ่มรูปภาพของคำขอราคาเลขที่ " + entity.getId(),
+                null
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RequestPriceHeaderDto addAttachments(String rfqId, List<MultipartFile> attachments, String userId) throws Exception {
+        if (attachments == null || attachments.isEmpty()) {
+            throw new InvalidRequestException("Attachments are required");
+        }
+
+        RequestPriceHeaderEntity entity = getEntityById(rfqId);
+        attachPictures(entity, attachments, OTHER_FILE_TYPE, userId);
+        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+
+        entity = requestPriceHeaderRepository.save(entity);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPLOAD_PICTURE,
+                ActivitySource.WEB,
+                "เพิ่มไฟล์แนบของคำขอราคาเลขที่ " + entity.getId(),
                 null
         );
 
@@ -748,7 +791,7 @@ public class RFQService {
         return costType;
     }
 
-    private void attachPictures(RequestPriceHeaderEntity entity, List<MultipartFile> pictures, String userId) throws Exception {
+    private void attachPictures(RequestPriceHeaderEntity entity, List<MultipartFile> pictures, String fileType, String userId) throws Exception {
         if (pictures == null || pictures.isEmpty()) {
             return;
         }
@@ -764,10 +807,12 @@ public class RFQService {
                 continue;
             }
 
-            UploadImageResponse uploadedFile = fileStorageService.uploadImage(picture);
+            UploadFileResponse uploadedFile = fileStorageService.uploadFile(picture);
 
             RequestPricePicturesEntity pictureEntity = new RequestPricePicturesEntity();
             pictureEntity.setPictureUrl(uploadedFile.getUrl());
+            pictureEntity.setFileName(uploadedFile.getFileName());
+            pictureEntity.setFileType(fileType);
             pictureEntity.setSort(nextSort++);
             pictureEntity.setUpdatedBy(userProfileService.getNameFromId(userId));
             pictureEntity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));

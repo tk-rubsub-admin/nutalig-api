@@ -1,15 +1,18 @@
 package com.nutalig.service;
 
 import com.nutalig.config.AppProperties;
-import com.nutalig.controller.file.response.UploadImageResponse;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -18,15 +21,13 @@ public class FileStorageService {
 
     private final AppProperties appProperties;
 
-    public UploadImageResponse uploadImage(MultipartFile file) throws Exception {
+    public UploadFileResponse uploadFile(MultipartFile file) throws Exception {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File is empty.");
         }
 
-        String extension = FilenameUtils.getExtension(file.getOriginalFilename());
-        if (extension == null || extension.isBlank()) {
-            extension = resolveExtensionFromContentType(file.getContentType());
-        }
+        String contentType = StringUtils.trimToNull(file.getContentType());
+        String extension = resolveExtension(file.getOriginalFilename(), contentType);
 
         String fileName = UUID.randomUUID() +
                 ((extension == null || extension.isBlank()) ? "" : "." + extension);
@@ -35,14 +36,25 @@ public class FileStorageService {
         Files.createDirectories(uploadPath);
 
         Path targetPath = uploadPath.resolve(fileName);
-        Files.copy(file.getInputStream(), targetPath);
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
 
         String url = appProperties.getUpload().getPublicBaseUrl() + "/" + fileName;
 
-        System.out.println("Saved file to: " + targetPath);
-        System.out.println("Public URL: " + url);
+        return new UploadFileResponse(fileName, url, contentType);
+    }
 
-        return new UploadImageResponse(fileName, url);
+    public UploadFileResponse uploadImage(MultipartFile file) throws Exception {
+        return uploadFile(file);
+    }
+
+    private String resolveExtension(String originalFilename, String contentType) {
+        String extension = FilenameUtils.getExtension(originalFilename);
+        if (StringUtils.isNotBlank(extension)) {
+            return extension;
+        }
+        return resolveExtensionFromContentType(contentType);
     }
 
     private String resolveExtensionFromContentType(String contentType) {
@@ -55,6 +67,17 @@ public class FileStorageService {
             case "image/png" -> "png";
             case "image/webp" -> "webp";
             case "image/gif" -> "gif";
+            case "application/pdf" -> "pdf";
+            case "application/illustrator", "application/postscript" -> "ai";
+            case "text/plain" -> "txt";
+            case "text/csv" -> "csv";
+            case "application/msword" -> "doc";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
+            case "application/vnd.ms-excel" -> "xls";
+            case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
+            case "application/vnd.ms-powerpoint" -> "ppt";
+            case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
+            case "application/zip", "application/x-zip-compressed" -> "zip";
             default -> "";
         };
     }

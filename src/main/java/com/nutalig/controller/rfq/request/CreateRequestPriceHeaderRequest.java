@@ -24,4 +24,5 @@ public class CreateRequestPriceHeaderRequest {
     private String capacity;
     private String description;
     private List<MultipartFile> pictures;
+    private List<MultipartFile> attachments;
 }
