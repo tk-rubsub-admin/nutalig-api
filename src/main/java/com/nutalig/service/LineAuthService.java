@@ -409,6 +409,7 @@ public class LineAuthService {
         user.setUpdatedBy(actor);
         user.setLineUserId(profile.getUserId());
         user.setPictureUrl(StringUtils.trimToNull(profile.getPictureUrl()));
+        user.setStatus(Status.ACTIVE);
         user.setIsVerified(Boolean.TRUE);
         user.setVerifiedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
     }
