@@ -19,5 +19,8 @@ public class EmployeeDto {
     private String additional;
     private SystemConfigDto team;
     private Boolean isDefault;
+    private Boolean hasUser;
+    private String userId;
+    private UserDto userDto;
 
 }

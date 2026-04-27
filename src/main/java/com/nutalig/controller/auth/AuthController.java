@@ -2,6 +2,7 @@ package com.nutalig.controller.auth;
 
 import com.nutalig.controller.auth.request.LoginRequest;
 import com.nutalig.controller.auth.request.LineLoginRequest;
+import com.nutalig.controller.auth.request.LineRegisterRequest;
 import com.nutalig.controller.auth.response.*;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.exception.DataNotFoundException;
@@ -57,8 +58,28 @@ public class AuthController {
     }
 
     @GetMapping("/v1/auth/line/register/url")
-    public GeneralResponse<LineAuthorizeUrlResponse> getLineRegisterUrl(@RequestParam("userId") String userId) throws InvalidRequestException {
+    public GeneralResponse<LineAuthorizeUrlResponse> getLineRegisterUrl(
+            @RequestParam(value = "token", required = false) String token,
+            @RequestParam(value = "userId", required = false) String userId
+    ) throws InvalidRequestException, DataNotFoundException {
+        if (token != null && !token.isBlank()) {
+            return new GeneralResponse<>(SUCCESS, lineAuthService.buildRegisterAuthorizeUrlByToken(token));
+        }
+
         return new GeneralResponse<>(SUCCESS, lineAuthService.buildRegisterAuthorizeUrl(userId));
+    }
+
+    @GetMapping("/v1/auth/line/register/validate")
+    public GeneralResponse<LineRegisterValidationResponse> validateLineRegisterToken(
+            @RequestParam("token") String token
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, lineAuthService.validateRegisterToken(token));
+    }
+
+    @PostMapping("/v1/auth/line/register")
+    public GeneralResponse<LineRegisterResponse> registerWithLine(@Valid @RequestBody LineRegisterRequest request)
+            throws InvalidRequestException, DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, lineAuthService.register(request));
     }
 
     @GetMapping("/v1/auth/line/callback")

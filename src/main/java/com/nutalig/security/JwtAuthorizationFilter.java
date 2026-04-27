@@ -31,6 +31,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
             "/v1/auth/line/login",
             "/v1/auth/line/register",
             "/v1/auth/line/login/url",
+            "/v1/auth/line/register/validate",
             "/v1/auth/line/register/url",
             "/v1/auth/line/callback",
             "/actuator",

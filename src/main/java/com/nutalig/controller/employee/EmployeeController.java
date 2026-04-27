@@ -1,16 +1,13 @@
 package com.nutalig.controller.employee;
 
 import com.nutalig.controller.employee.request.CreateEmployeeRequest;
-import com.nutalig.controller.employee.request.SearchEmployeeRequest;
 import com.nutalig.controller.employee.request.UpdateEmployeeRequest;
-import com.nutalig.controller.employee.response.SearchEmployeeResponse;
-import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.controller.response.Pageable;
 import com.nutalig.dto.EmployeeDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.EmployeeService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -45,15 +43,28 @@ public class EmployeeController {
     }
 
     @GetMapping
-    public GeneralResponse<SearchEmployeeResponse> searchEmployee(
-            SearchEmployeeRequest searchRequest,
-            @Valid PageableRequest pageableRequest
+    public GeneralResponse<Pageable<EmployeeDto>> searchEmployees(
+            @RequestParam("page") Integer page,
+            @RequestParam("size") Integer size,
+            @RequestParam(value = "keyword", required = false) String keyword
     ) {
-        log.info("=== Start search employee page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+        log.info("=== Start search employees page {} size {} keyword {} ===", page, size, keyword);
 
-        SearchEmployeeResponse response = employeeService.searchEmployee(searchRequest, pageableRequest);
+        Pageable<EmployeeDto> response = employeeService.searchEmployees(page, size, keyword);
 
-        log.info("=== End search employee page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+        log.info("=== End search employees page {} size {} ===", page, size);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}")
+    public GeneralResponse<EmployeeDto> getEmployeeById(
+            @PathVariable("id") String employeeId
+    ) throws DataNotFoundException {
+        log.info("=== Start get employee {} ===", employeeId);
+
+        EmployeeDto response = employeeService.getEmployeeById(employeeId);
+
+        log.info("=== End get employee {} ===", employeeId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

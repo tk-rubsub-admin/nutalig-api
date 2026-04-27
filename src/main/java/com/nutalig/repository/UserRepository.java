@@ -16,6 +16,9 @@ public interface UserRepository extends JpaRepository<UserEntity, String>, JpaSp
     Optional<UserEntity> findByUsername(String username);
 
     Optional<UserEntity> findByLineUserId(String lineUserId);
+    Optional<UserEntity> findByEmployeeEntity_EmployeeId(String employeeId);
+
+    boolean existsByLineUserId(String lineUserId);
 
     @Query("""
        SELECT u 

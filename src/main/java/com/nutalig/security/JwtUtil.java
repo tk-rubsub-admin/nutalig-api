@@ -47,6 +47,29 @@ public class JwtUtil {
         }
     }
 
+    public static boolean isExpired(String token) {
+        try {
+            Date expiration = getClaims(token).getExpiration();
+            return expiration != null && expiration.before(new Date());
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static Date getIssuedAt(String token) {
+        return getClaims(token).getIssuedAt();
+    }
+
+    public static Date getExpiration(String token) {
+        try {
+            return getClaims(token).getExpiration();
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return e.getClaims().getExpiration();
+        }
+    }
+
     public static Boolean isTokenExpired(String token, String poId) {
         try {
             var claims = getClaims(token);

@@ -9,5 +9,6 @@ public class LineStatePayload {
 
     String intent;
     String userId;
+    String registrationToken;
     String nonce;
 }

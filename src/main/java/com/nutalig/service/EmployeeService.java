@@ -14,14 +14,15 @@ import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.EmployeeMapper;
+import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.EmployeeProcurementMappingRepository;
 import com.nutalig.repository.EmployeeRepository;
 import com.nutalig.repository.SystemConfigRepository;
+import com.nutalig.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,8 @@ public class EmployeeService {
     private final EmployeeProcurementMappingRepository employeeProcurementMappingRepository;
     private final SystemConfigRepository systemConfigRepository;
     private final EmployeeMapper employeeMapper;
+    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     @Transactional
     public EmployeeDto createEmployee(CreateEmployeeRequest request) throws InvalidRequestException {
@@ -76,7 +79,7 @@ public class EmployeeService {
 
         pageableRequest.setSortBy("employeeId");
         pageableRequest.setSortDirection(Sort.Direction.ASC);
-        Pageable pageable = pageableRequest.build();
+        org.springframework.data.domain.Pageable pageable = pageableRequest.build();
 
         Page<EmployeeEntity> employeePage = employeeRepository.findAll(buildSearchCriteria(searchRequest), pageable);
         Page<EmployeeDto> employeeDtoPage = employeePage.map(employeeMapper::toDto);
@@ -85,6 +88,48 @@ public class EmployeeService {
         response.setEmployees(employeeDtoPage.getContent());
         response.setPagination(Pagination.build(employeeDtoPage));
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public com.nutalig.controller.response.Pageable<EmployeeDto> searchEmployees(Integer page, Integer size, String keyword) {
+        int normalizedPage = page == null || page < 1 ? 1 : page;
+        int normalizedSize = size == null || size < 1 ? 10 : size;
+
+        SearchEmployeeRequest searchRequest = new SearchEmployeeRequest();
+        searchRequest.setKeyword(StringUtils.trimToNull(keyword));
+
+        PageableRequest pageableRequest = new PageableRequest();
+        pageableRequest.setPage(normalizedPage);
+        pageableRequest.setSize(normalizedSize);
+
+        SearchEmployeeResponse searchResponse = searchEmployee(searchRequest, pageableRequest);
+
+        com.nutalig.controller.response.Pageable<EmployeeDto> response = new com.nutalig.controller.response.Pageable<>();
+        response.setRecords(searchResponse.getEmployees());
+        response.setPagination(searchResponse.getPagination());
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeDto getEmployeeById(String employeeId) throws DataNotFoundException {
+        EmployeeEntity entity = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new DataNotFoundException("Employee id " + employeeId + " not found."));
+
+        EmployeeDto dto = employeeMapper.toDto(entity);
+        userRepository.findByEmployeeEntity_EmployeeId(employeeId)
+                .ifPresentOrElse(
+                        user -> {
+                            dto.setHasUser(Boolean.TRUE);
+                            dto.setUserId(user.getId());
+                            dto.setUserDto(userMapper.toDto(user));
+                        },
+                        () -> {
+                            dto.setHasUser(Boolean.FALSE);
+                            dto.setUserId(null);
+                            dto.setUserDto(null);
+                        }
+                );
+        return dto;
     }
 
     @Transactional

@@ -4,5 +4,7 @@ import lombok.Data;
 
 @Data
 public class LineRegisterRequest {
-    private String userId;
+    private String token;
+    private String accessToken;
+    private String idToken;
 }
