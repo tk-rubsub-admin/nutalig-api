@@ -55,9 +55,9 @@ public class QuotationEntity extends AuditDateEntity {
     private CustomerContactEntity customerContact;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sales_id", referencedColumnName = "sales_id")
+    @JoinColumn(name = "sales_id", referencedColumnName = "employee_id")
     @ToString.Exclude
-    private SalesEntity sales;
+    private EmployeeEntity sales;
 
     @Column(name = "co_sales_id", length = 20)
     private String coSalesId;

@@ -16,7 +16,7 @@ public class QuotationDto {
     private CustomerDto customer;
     private CustomerAddressDto customerAddress;
     private CustomerContactDto customerContact;
-    private SalesAccountDto saleAccount;
+    private EmployeeDto saleAccount;
     private String coSaleId;
     private QuotationStatus status;
     private String remark;

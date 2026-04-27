@@ -56,6 +56,7 @@ public class QuotationService {
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
     private final SalesRepository salesRepository;
+    private final EmployeeRepository employeeRepository;
     private final SystemConfigService systemConfigService;
     private final CustomerMapper customerMapper;
     private final ObjectMapper objectMapper;
@@ -132,7 +133,7 @@ public class QuotationService {
         UserEntity createdByEntity = userRepository.findById(createdBy)
                 .orElseThrow(() -> new DataNotFoundException("User " + createdBy + " not found."));
 
-        SalesEntity salesEntity = resolveSales(requestDto.getSalesId());
+        EmployeeEntity saleEntity = resolveSales(requestDto.getSalesId());
 
         String nextId = generatedIdSequenceService.getNextSequence(customerEntity.getId(), 3);
         String docId = customerEntity.getId() + "/" + nextId;
@@ -149,7 +150,7 @@ public class QuotationService {
         quotationEntity.setCustomer(customerEntity);
         quotationEntity.setCustomerAddress(customerAddressEntity);
         quotationEntity.setCustomerContact(customerContactEntity);
-        quotationEntity.setSales(salesEntity);
+        quotationEntity.setSales(saleEntity);
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
 
@@ -276,10 +277,10 @@ public class QuotationService {
         dto.setCustTaxId(quotationEntity.getCustomer().getTaxId());
         dto.setCustAddress(buildFullAddress(quotationEntity.getCustomerAddress()));
         dto.setCustMobileNo(quotationEntity.getCustomerContact().getContactNumber());
-        dto.setSalesId(quotationEntity.getSales().getSalesId());
-        dto.setSalesName(quotationEntity.getSales().getName());
-        dto.setSalesMobileNo(quotationEntity.getSales().getMobileNo());
-        dto.setSalesNickname(quotationEntity.getSales().getNickname());
+        dto.setSalesId(quotationEntity.getSales().getEmployeeId());
+        dto.setSalesName(quotationEntity.getSales().getFirstNameTh() + " " + quotationEntity.getSales().getLastNameTh());
+        dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
+        dto.setSalesNickname(quotationEntity.getSales().getNickName());
         dto.setCoSalesId(quotationEntity.getCoSalesId());
 
         if (quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
@@ -452,34 +453,18 @@ public class QuotationService {
         throw new DataNotFoundException("Customer " + input + " not found.");
     }
 
-    private SalesEntity resolveSales(String input) throws DataNotFoundException {
+    private EmployeeEntity resolveSales(String input) throws DataNotFoundException {
 
         if (input == null || input.isBlank()) {
             throw new DataNotFoundException("Sales id is empty");
         }
 
         // 1️⃣ search by salesId
-        Optional<SalesEntity> byId =
-                salesRepository.findBySalesIdAndType(input, SalesType.INTERNAL_SALES);
+        Optional<EmployeeEntity> byId =
+                employeeRepository.findById(input);
 
         if (byId.isPresent()) {
             return byId.get();
-        }
-
-        // 2️⃣ search by nickname
-        Optional<SalesEntity> byNickname =
-                salesRepository.findFirstByNicknameContainingIgnoreCaseAndType(input, SalesType.INTERNAL_SALES);
-
-        if (byNickname.isPresent()) {
-            return byNickname.get();
-        }
-
-        // 3️⃣ search by name
-        Optional<SalesEntity> byName =
-                salesRepository.findFirstByNameContainingIgnoreCaseAndType(input, SalesType.INTERNAL_SALES);
-
-        if (byName.isPresent()) {
-            return byName.get();
         }
 
         throw new DataNotFoundException("Internal sale " + input + " not found.");
