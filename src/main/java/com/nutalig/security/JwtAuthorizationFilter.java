@@ -1,9 +1,11 @@
 package com.nutalig.security;
 
+import com.nutalig.constant.ErrorCode;
+import com.nutalig.constant.ResponseStatus;
 import com.nutalig.dto.UserDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
-import com.nutalig.service.LineAuthService;
+import com.nutalig.service.AppSessionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,7 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
-    private final LineAuthService lineAuthService;
+    private final AppSessionService appSessionService;
+    private final AuthErrorResponseWriter authErrorResponseWriter;
 
     private static final List<String> WHITELIST = List.of(
             "/v1/login",
@@ -79,36 +82,49 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         }
 
         String authHeader = request.getHeader("Authorization");
-        String token = null;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            authErrorResponseWriter.write(request, response, HttpServletResponse.SC_UNAUTHORIZED,
+                    ErrorCode.INVALID_REQUEST, "Missing bearer token");
+            return;
+        }
 
-            try {
-                UserDto userDto = lineAuthService.getAuthenticatedUserByAccessToken(token);
+        String token = authHeader.substring(7);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDto,
-                                null,
-                                userDto.getAuthorities()
-                        );
+        try {
+            UserDto userDto = appSessionService.authenticate(token);
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDto,
+                            null,
+                            userDto.getAuthorities()
+                    );
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
 
-            } catch (DataNotFoundException | InvalidRequestException e) {
-                log.warn("LINE access token authentication failed: {}", e.getMessage());
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
-            }
-        } else {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        } catch (DataNotFoundException | InvalidRequestException e) {
+            log.warn("App session authentication failed: {}", e.getMessage());
+            authErrorResponseWriter.write(request, response, HttpServletResponse.SC_UNAUTHORIZED,
+                    resolveErrorCode(e), e.getMessage());
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveErrorCode(Exception exception) {
+        if (exception instanceof InvalidRequestException invalidRequestException
+                && invalidRequestException.getCode() != null) {
+            return invalidRequestException.getCode();
+        }
+        if (exception instanceof DataNotFoundException dataNotFoundException
+                && dataNotFoundException.getCode() != null) {
+            return dataNotFoundException.getCode();
+        }
+        return ResponseStatus.FAILED;
     }
 }

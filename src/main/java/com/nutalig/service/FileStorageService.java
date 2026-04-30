@@ -5,7 +5,11 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import lombok.RequiredArgsConstructor;
 
 import java.io.InputStream;
@@ -40,7 +44,7 @@ public class FileStorageService {
             Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        String url = appProperties.getUpload().getPublicBaseUrl() + "/" + fileName;
+        String url = buildPublicFileUrl(fileName);
 
         return new UploadFileResponse(fileName, url, contentType);
     }
@@ -80,5 +84,19 @@ public class FileStorageService {
             case "application/zip", "application/x-zip-compressed" -> "zip";
             default -> "";
         };
+    }
+
+    private String buildPublicFileUrl(String fileName) {
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        if (requestAttributes instanceof ServletRequestAttributes) {
+            return ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/uploads/")
+                    .path(fileName)
+                    .build()
+                    .toUriString();
+        }
+
+        String publicBaseUrl = StringUtils.removeEnd(appProperties.getUpload().getPublicBaseUrl(), "/");
+        return publicBaseUrl + "/" + fileName;
     }
 }

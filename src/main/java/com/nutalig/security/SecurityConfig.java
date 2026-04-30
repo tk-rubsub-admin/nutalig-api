@@ -1,11 +1,10 @@
 package com.nutalig.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.constant.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,33 +14,25 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
-
-import java.time.ZonedDateTime;
-import java.util.HashMap;
-import java.util.Map;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(securedEnabled = true, jsr250Enabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final ObjectMapper objectMapper;
+    private final AuthErrorResponseWriter authErrorResponseWriter;
     private final JwtAuthorizationFilter tokenAuthenticationFilter;
     private final SecurityContextRepository securityContextRepository;
 
     @Bean
     public AuthenticationEntryPoint restAuthenticationEntryPoint() {
-        return (httpServletRequest, httpServletResponse, e) -> {
-            Map<String, Object> errorObject = new HashMap<>();
-            errorObject.put("message", "Access Denied");
-            errorObject.put("error", HttpStatus.FORBIDDEN);
-            errorObject.put("code", HttpStatus.FORBIDDEN.value());
-            errorObject.put("timestamp", ZonedDateTime.now());
-            httpServletResponse.setContentType("application/json;charset=UTF-8");
-            httpServletResponse.setStatus(HttpStatus.FORBIDDEN.value());
-            httpServletResponse.getWriter().write(objectMapper.writeValueAsString(errorObject));
-        };
+        return (request, response, e) -> authErrorResponseWriter.write(
+                request,
+                response,
+                401,
+                ErrorCode.INVALID_REQUEST,
+                "Unauthorized"
+        );
     }
 
     // Configuring HttpSecurity

@@ -20,6 +20,7 @@ public class UserProfileService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final AppSessionService appSessionService;
 
     private static String DEFAULT_PASSWORD = "password1234";
 
@@ -28,8 +29,9 @@ public class UserProfileService {
         log.info("On user login : {}", userId);
     }
 
-    public void onUserLogout(String userId) {
-        log.info("On user logout : {}", userId);
+    public void onUserLogout(String token) {
+        log.info("On user logout by token");
+        appSessionService.revokeSessionByToken(token);
     }
 
     @Transactional(readOnly = true)

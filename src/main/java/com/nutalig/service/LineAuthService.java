@@ -62,10 +62,14 @@ public class LineAuthService {
     private final LineConfiguration lineConfiguration;
     private final UserDetailsServiceImpl userDetailsService;
     private final UserRepository userRepository;
+    private final AppSessionService appSessionService;
 
     public LineLoginResponse login(LineLoginRequest request) throws InvalidRequestException, DataNotFoundException {
         UserDto user = getAuthenticatedUserByAccessToken(request.getAccessToken());
-        return new LineLoginResponse(request.getAccessToken(), user);
+        UserEntity userEntity = userRepository.findById(user.getId())
+                .orElseThrow(() -> new DataNotFoundException("User " + user.getId() + " not found."));
+        String sessionToken = appSessionService.issueSessionToken(userEntity);
+        return new LineLoginResponse(sessionToken, userDetailsService.getUserById(userEntity.getId()));
     }
 
     public LineRegisterResponse register(LineRegisterRequest request) throws InvalidRequestException, DataNotFoundException {
@@ -85,7 +89,8 @@ public class LineAuthService {
 
         if (StringUtils.isNotBlank(user.getLineUserId())) {
             if (StringUtils.equals(user.getLineUserId(), profile.getUserId())) {
-                return new LineRegisterResponse(request.getAccessToken(), userDetailsService.getUserById(user.getId()), false);
+                String sessionToken = appSessionService.issueSessionToken(user);
+                return new LineRegisterResponse(sessionToken, userDetailsService.getUserById(user.getId()), false);
             }
             throw new InvalidRequestException("บัญชีนี้ผูก LINE แล้ว");
         }
@@ -99,7 +104,8 @@ public class LineAuthService {
         bindLineProfile(user, profile, LINE_REGISTER_ACTOR);
         userRepository.save(user);
 
-        return new LineRegisterResponse(request.getAccessToken(), userDetailsService.getUserById(user.getId()), true);
+        String sessionToken = appSessionService.issueSessionToken(user);
+        return new LineRegisterResponse(sessionToken, userDetailsService.getUserById(user.getId()), true);
     }
 
     public LineAuthorizeUrlResponse buildLoginAuthorizeUrl() throws InvalidRequestException {
@@ -172,6 +178,7 @@ public class LineAuthService {
         user.setIsVerified(Boolean.FALSE);
         user.setStatus(Status.PENDING_ACTIVATE);
         user.setVerifiedDate(null);
+        user.setCurrentSessionId(null);
         user.setUpdatedBy(SUPER_ADMIN_ACTOR);
         userRepository.save(user);
     }

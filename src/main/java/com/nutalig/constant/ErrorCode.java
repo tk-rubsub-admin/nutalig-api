@@ -9,4 +9,5 @@ public class ErrorCode {
     public static final String DATA_DUPLICATE = "data_duplicate";
     public static final String INVALID_REQUEST = "invalid_request";
     public static final String TOKEN_EXPIRED = "token_expired";
+    public static final String SESSION_REVOKED = "session_revoked";
 }

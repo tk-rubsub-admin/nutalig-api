@@ -53,6 +53,9 @@ public class UserEntity extends AuditDateEntity {
     @Column(name = "verified_date")
     private ZonedDateTime verifiedDate;
 
+    @Column(name = "current_session_id")
+    private String currentSessionId;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "employee_id", referencedColumnName = "employee_id")
     private EmployeeEntity employeeEntity;

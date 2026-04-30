@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -40,8 +41,8 @@ public class AuthController {
     }
 
     @PostMapping("/v1/logout")
-    public GeneralResponse logout(@RequestBody LoginRequest loginRequest) {
-        userProfileService.onUserLogout(loginRequest.getUserId());
+    public GeneralResponse logout(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader) {
+        userProfileService.onUserLogout(extractBearerToken(authorizationHeader));
         return new GeneralResponse(SUCCESS);
     }
 
@@ -105,5 +106,12 @@ public class AuthController {
 //        log.info("=== End one time login ===");
 //        return token;
 //    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authorizationHeader.substring(7);
+    }
 
 }
