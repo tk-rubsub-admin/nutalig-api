@@ -16,6 +16,7 @@ import com.nutalig.dto.document.QuotationItemDocumentDto;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.mapper.CustomerMapper;
+import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.repository.*;
 import com.nutalig.repository.specification.QuotationSpecification;
 import com.nutalig.utils.DateUtil;
@@ -55,10 +56,10 @@ public class QuotationService {
     private final QuotationRepository quotationRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
-    private final SalesRepository salesRepository;
     private final EmployeeRepository employeeRepository;
     private final SystemConfigService systemConfigService;
     private final CustomerMapper customerMapper;
+    private final EmployeeMapper employeeMapper;
     private final ObjectMapper objectMapper;
 
     record QuotationSummary(
@@ -483,6 +484,7 @@ public class QuotationService {
         CustomerDto customerDto = customerMapper.toDto(entity.getCustomer());
         CustomerAddressDto customerAddressDto = customerMapper.toAddressDto(entity.getCustomerAddress());
         CustomerContactDto customerContactDto = customerMapper.toContactDto(entity.getCustomerContact());
+        EmployeeDto salesDto = employeeMapper.toDto(entity.getSales());
 
         QuotationDto dto = new QuotationDto();
         dto.setDocDate(entity.getDocDate().format(DateUtil.DD_MM_YY));
@@ -490,6 +492,7 @@ public class QuotationService {
         dto.setCustomer(customerDto);
         dto.setCustomerAddress(customerAddressDto);
         dto.setCustomerContact(customerContactDto);
+        dto.setSaleAccount(salesDto);
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setQuotationNo(entity.getQuotationNo());
         dto.setStatus(entity.getStatus());

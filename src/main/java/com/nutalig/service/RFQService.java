@@ -52,6 +52,7 @@ import static com.nutalig.repository.specification.RequestPriceHeaderSpecificati
 public class RFQService {
     private final static String SLA = "SLA-RFQ-PRICE";
     private final static String PROCUREMENT_ROLE_CODE = "PROCUREMENT";
+    private final static String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
     private final static String PICTURE_FILE_TYPE = "PICTURE";
     private final static String OTHER_FILE_TYPE = "OTHER";
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
@@ -201,7 +202,7 @@ public class RFQService {
                 ActivityActorType.USER,
                 ActivityAction.UPDATE,
                 ActivitySource.API,
-                "เพิ่มรายละเอียดคำขอราคาเลขที่ " + entity.getId(),
+                "เพิ่มรายละเอียดราคาคำขอราคาเลขที่ " + entity.getId(),
                 detail
         );
 
@@ -646,7 +647,7 @@ public class RFQService {
         }
 
         String roleCode = userProfileService.getRoleCodeFromId(userId);
-        return PROCUREMENT_ROLE_CODE.equalsIgnoreCase(roleCode);
+        return PROCUREMENT_ROLE_CODE.equalsIgnoreCase(roleCode) || SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(roleCode);
     }
 
     private void extractChangedDetails(

@@ -20,6 +20,7 @@ public class EmployeeDto {
     private SystemConfigDto team;
     private Boolean isDefault;
     private Boolean hasUser;
+    private Boolean isLineConnected;
     private String userId;
     private UserDto userDto;
 

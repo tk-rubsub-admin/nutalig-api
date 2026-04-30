@@ -11,6 +11,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.EmployeeDto;
 import com.nutalig.entity.EmployeeEntity;
 import com.nutalig.entity.SystemConfigEntity;
+import com.nutalig.entity.UserEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.EmployeeMapper;
@@ -82,11 +83,13 @@ public class EmployeeService {
         org.springframework.data.domain.Pageable pageable = pageableRequest.build();
 
         Page<EmployeeEntity> employeePage = employeeRepository.findAll(buildSearchCriteria(searchRequest), pageable);
-        Page<EmployeeDto> employeeDtoPage = employeePage.map(employeeMapper::toDto);
+        List<EmployeeDto> employees = enrichEmployees(employeePage.getContent().stream()
+                .map(employeeMapper::toDto)
+                .toList());
 
         SearchEmployeeResponse response = new SearchEmployeeResponse();
-        response.setEmployees(employeeDtoPage.getContent());
-        response.setPagination(Pagination.build(employeeDtoPage));
+        response.setEmployees(employees);
+        response.setPagination(Pagination.build(employeePage));
         return response;
     }
 
@@ -120,11 +123,13 @@ public class EmployeeService {
                 .ifPresentOrElse(
                         user -> {
                             dto.setHasUser(Boolean.TRUE);
+                            dto.setIsLineConnected(StringUtils.isNotBlank(user.getLineUserId()));
                             dto.setUserId(user.getId());
                             dto.setUserDto(userMapper.toDto(user));
                         },
                         () -> {
                             dto.setHasUser(Boolean.FALSE);
+                            dto.setIsLineConnected(Boolean.FALSE);
                             dto.setUserId(null);
                             dto.setUserDto(null);
                         }
@@ -196,7 +201,12 @@ public class EmployeeService {
                     dto.setIsDefault(mapping.getIsDefault());
                     return dto;
                 })
-                .toList();
+                .toList()
+                .stream()
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toList(),
+                        this::enrichEmployees
+                ));
     }
 
     private void validateCreateRequest(CreateEmployeeRequest request) throws InvalidRequestException {
@@ -218,6 +228,60 @@ public class EmployeeService {
                 .and(positionEqual(request.getPositionEqual()))
                 .and(statusEqual(request.getStatusEqual()))
                 .and(keywordContain(request.getKeyword()));
+    }
+
+    private List<EmployeeDto> enrichEmployees(List<EmployeeDto> employees) {
+        if (employees == null || employees.isEmpty()) {
+            return employees;
+        }
+
+        List<String> employeeIds = employees.stream()
+                .map(EmployeeDto::getEmployeeId)
+                .filter(StringUtils::isNotBlank)
+                .toList();
+
+        if (employeeIds.isEmpty()) {
+            employees.forEach(this::clearUserFlags);
+            return employees;
+        }
+
+        Map<String, UserEntity> userByEmployeeId = userRepository.findByEmployeeEntity_EmployeeIdIn(employeeIds).stream()
+                .filter(user -> user.getEmployeeEntity() != null
+                        && StringUtils.isNotBlank(user.getEmployeeEntity().getEmployeeId()))
+                .collect(java.util.stream.Collectors.toMap(
+                        user -> user.getEmployeeEntity().getEmployeeId(),
+                        user -> user,
+                        (left, right) -> left
+                ));
+
+        employees.forEach(employee -> applyUserFlags(employee, userByEmployeeId.get(employee.getEmployeeId())));
+        return employees;
+    }
+
+    private void applyUserFlags(EmployeeDto employee, UserEntity user) {
+        if (employee == null) {
+            return;
+        }
+        if (user == null) {
+            clearUserFlags(employee);
+            return;
+        }
+
+        employee.setHasUser(Boolean.TRUE);
+        employee.setIsLineConnected(StringUtils.isNotBlank(user.getLineUserId()));
+        employee.setUserId(user.getId());
+        employee.setUserDto(userMapper.toDto(user));
+    }
+
+    private void clearUserFlags(EmployeeDto employee) {
+        if (employee == null) {
+            return;
+        }
+
+        employee.setHasUser(Boolean.FALSE);
+        employee.setIsLineConnected(Boolean.FALSE);
+        employee.setUserId(null);
+        employee.setUserDto(null);
     }
 
     private SystemConfigEntity getOptionalSystemConfig(SystemConstant groupCode, String code, String fieldName)
