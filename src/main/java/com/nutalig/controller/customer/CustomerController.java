@@ -1,7 +1,10 @@
 package com.nutalig.controller.customer;
 
 import com.nutalig.controller.customer.request.CreateCustomerRequest;
+import com.nutalig.controller.customer.request.CreateCustomerAddressRequest;
+import com.nutalig.controller.customer.request.CreateCustomerContactRequest;
 import com.nutalig.controller.customer.request.SearchCustomerRequest;
+import com.nutalig.controller.customer.request.UpdateCustomerRequest;
 import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
@@ -49,6 +52,20 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, customerDto);
     }
 
+    @PatchMapping("/v1/customers/{customerId}")
+    public GeneralResponse<CustomerDto> updateCustomer(
+            @PathVariable String customerId,
+            @RequestBody UpdateCustomerRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update customer {} ===", customerId);
+
+        CustomerDto response = customerService.updateCustomer(customerId, request, userId);
+
+        log.info("=== End update customer {} ===", customerId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/v1/customers")
     public GeneralResponse<SearchCustomerResponse> getCustomers(
             SearchCustomerRequest searchCustomerRequest,
@@ -82,6 +99,58 @@ public class CustomerController {
         List<CustomerDto> response = customerService.getAllCustomer(searchCustomerRequest);
 
         log.info("=== End get all customer ===");
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/v1/customers/{customerId}/addresses")
+    public GeneralResponse<CustomerDto> addCustomerAddress(
+            @PathVariable String customerId,
+            @RequestBody CreateCustomerAddressRequest request
+    ) throws DataNotFoundException {
+        log.info("=== Start add customer address to customer {} ===", customerId);
+
+        CustomerDto response = customerService.addCustomerAddress(customerId, request);
+
+        log.info("=== End add customer address to customer {} ===", customerId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/v1/customers/{customerId}/addresses/{addressId}")
+    public GeneralResponse<CustomerDto> deleteCustomerAddress(
+            @PathVariable String customerId,
+            @PathVariable Long addressId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete customer address {} from customer {} ===", addressId, customerId);
+
+        CustomerDto response = customerService.deleteCustomerAddress(customerId, addressId);
+
+        log.info("=== End delete customer address {} from customer {} ===", addressId, customerId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/v1/customers/{customerId}/contacts/{contactId}")
+    public GeneralResponse<CustomerDto> deleteCustomerContact(
+            @PathVariable String customerId,
+            @PathVariable Long contactId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete customer contact {} from customer {} ===", contactId, customerId);
+
+        CustomerDto response = customerService.deleteCustomerContact(customerId, contactId);
+
+        log.info("=== End delete customer contact {} from customer {} ===", contactId, customerId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/v1/customers/{customerId}/contacts")
+    public GeneralResponse<CustomerDto> addCustomerContact(
+            @PathVariable String customerId,
+            @RequestBody CreateCustomerContactRequest request
+    ) throws DataNotFoundException {
+        log.info("=== Start add customer contact to customer {} ===", customerId);
+
+        CustomerDto response = customerService.addCustomerContact(customerId, request);
+
+        log.info("=== End add customer contact to customer {} ===", customerId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

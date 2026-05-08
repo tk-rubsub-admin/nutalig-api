@@ -11,7 +11,6 @@ public class CreateCustomerRequest {
     private String customerType;
     private String email;
     private String taxId;
-    private String companyName;
     private String branchNumber;
     private String branchName;
     private String creditTerm;
