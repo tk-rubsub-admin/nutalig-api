@@ -137,6 +137,16 @@ public class EmployeeService {
         return dto;
     }
 
+    @Transactional(readOnly = true)
+    public boolean checkExistingEmployeeId(String employeeId) {
+        String trimmedEmployeeId = StringUtils.trimToNull(employeeId);
+        if (trimmedEmployeeId == null) {
+            return false;
+        }
+
+        return employeeRepository.existsById(trimmedEmployeeId);
+    }
+
     @Transactional
     public EmployeeDto updateEmployee(String employeeId, UpdateEmployeeRequest request)
             throws DataNotFoundException, InvalidRequestException {

@@ -10,14 +10,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -68,7 +61,19 @@ public class EmployeeController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PutMapping("/{employeeId}")
+    @GetMapping("/check-existing")
+    public GeneralResponse<?> checkExistingEmployeeId(@RequestParam("employeeId") String employeeId) {
+        log.info("=== Start check existing employee id {} ===", employeeId);
+
+        boolean exists = employeeService.checkExistingEmployeeId(employeeId);
+        record CheckExistingEmployeeResponse(boolean exists) {
+        }
+
+        log.info("=== End check existing employee id {} ===", employeeId);
+        return new GeneralResponse<>(SUCCESS, new CheckExistingEmployeeResponse(exists));
+    }
+
+    @PatchMapping("/{employeeId}")
     public GeneralResponse<EmployeeDto> updateEmployee(
             @PathVariable("employeeId") String employeeId,
             @RequestBody UpdateEmployeeRequest request
