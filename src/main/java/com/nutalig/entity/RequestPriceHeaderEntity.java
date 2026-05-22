@@ -11,6 +11,8 @@ import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.JoinColumnOrFormula;
 import org.hibernate.annotations.JoinColumnsOrFormulas;
 import org.hibernate.annotations.JoinFormula;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +29,7 @@ public class RequestPriceHeaderEntity extends AuditDateEntity {
     @Id
     @GeneratedValue(generator = "rfqIdGenerator")
     @GenericGenerator(name = "rfqIdGenerator",
-            parameters = {@org.hibernate.annotations.Parameter(name = "prefix", value = "RFQ")},
+            parameters = {@org.hibernate.annotations.Parameter(name = "prefix", value = "NTL-RFQ")},
             strategy = "com.nutalig.repository.jpa.IdWithMonthGenerator")
     @EqualsAndHashCode.Include
     @ToString.Include
@@ -87,17 +89,32 @@ public class RequestPriceHeaderEntity extends AuditDateEntity {
     @JoinColumn(name = "product_family", referencedColumnName = "code", insertable = false, updatable = false)
     private ProductFamilyEntity productFamilyEntity;
 
-    @ToString.Include
-    @Column(name = "product_usage")
-    private String productUsage;
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "product_usage", referencedColumnName = "code")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private ProductSubtype1Entity productUsage;
 
-    @ToString.Include
-    @Column(name = "system_mechanic")
-    private String systemMechanic;
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "system_mechanic", referencedColumnName = "code")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private ProductSubtype2Entity systemMechanic;
 
-    @ToString.Include
     @Column(name = "material")
-    private String material;
+    private String materialCode;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumns({
+            @JoinColumn(name = "material", referencedColumnName = "code", insertable = false, updatable = false),
+            @JoinColumn(name = "product_family", referencedColumnName = "product_family_code", insertable = false, updatable = false)
+    })
+    @NotFound(action = NotFoundAction.IGNORE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private ProductMaterialEntity material;
 
     @ToString.Include
     @Column(name = "capacity")

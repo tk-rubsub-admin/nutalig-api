@@ -2,6 +2,9 @@ package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RFQStatus;
 import com.nutalig.entity.CustomerEntity;
+import com.nutalig.entity.ProductMaterialEntity;
+import com.nutalig.entity.ProductSubtype1Entity;
+import com.nutalig.entity.ProductSubtype2Entity;
 import com.nutalig.entity.RequestPriceHeaderEntity;
 import com.nutalig.entity.SalesEntity;
 import com.nutalig.entity.SystemConfigEntity;
@@ -9,6 +12,8 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.domain.Specification;
+
+import java.util.List;
 
 public class RequestPriceHeaderSpecification {
 
@@ -26,6 +31,14 @@ public class RequestPriceHeaderSpecification {
         }
 
         return (root, query, cb) -> cb.equal(root.get("status"), status);
+    }
+
+    public static Specification<RequestPriceHeaderEntity> statusIn(List<RFQStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
+
+        return (root, query, cb) -> root.get("status").in(statuses);
     }
 
     public static Specification<RequestPriceHeaderEntity> customerIdEqual(String customerId) {
@@ -70,15 +83,24 @@ public class RequestPriceHeaderSpecification {
             String pattern = "%" + keyword.trim().toLowerCase() + "%";
             Join<RequestPriceHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
             Join<RequestPriceHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            Join<RequestPriceHeaderEntity, ProductSubtype1Entity> subtype1Join = root.join("productUsage", JoinType.LEFT);
+            Join<RequestPriceHeaderEntity, ProductSubtype2Entity> subtype2Join = root.join("systemMechanic", JoinType.LEFT);
+            Join<RequestPriceHeaderEntity, ProductMaterialEntity> materialJoin = root.join("material", JoinType.LEFT);
 
             return cb.or(
                     cb.like(cb.lower(root.get("id")), pattern),
                     cb.like(cb.lower(root.get("contactName")), pattern),
                     cb.like(cb.lower(root.get("contactPhone")), pattern),
                     cb.like(cb.lower(root.get("productFamily")), pattern),
-                    cb.like(cb.lower(root.get("productUsage")), pattern),
-                    cb.like(cb.lower(root.get("systemMechanic")), pattern),
-                    cb.like(cb.lower(root.get("material")), pattern),
+                    cb.like(cb.lower(subtype1Join.get("code")), pattern),
+                    cb.like(cb.lower(subtype1Join.get("nameTh")), pattern),
+                    cb.like(cb.lower(subtype1Join.get("nameEn")), pattern),
+                    cb.like(cb.lower(subtype2Join.get("code")), pattern),
+                    cb.like(cb.lower(subtype2Join.get("nameTh")), pattern),
+                    cb.like(cb.lower(subtype2Join.get("nameEn")), pattern),
+                    cb.like(cb.lower(materialJoin.get("code")), pattern),
+                    cb.like(cb.lower(materialJoin.get("nameTh")), pattern),
+                    cb.like(cb.lower(materialJoin.get("nameEn")), pattern),
                     cb.like(cb.lower(root.get("capacity")), pattern),
                     cb.like(cb.lower(root.get("description")), pattern),
                     cb.like(cb.lower(customerJoin.get("customerName")), pattern),

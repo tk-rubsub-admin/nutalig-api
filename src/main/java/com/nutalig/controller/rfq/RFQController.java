@@ -9,6 +9,7 @@ import com.nutalig.controller.rfq.request.SearchRFQRequest;
 import com.nutalig.controller.rfq.request.UpdateRequestPriceAdditionalCostRequest;
 import com.nutalig.controller.rfq.request.UpdateRequestPriceDetailRequest;
 import com.nutalig.dto.RequestPriceHeaderDto;
+import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.RFQService;
@@ -53,6 +54,17 @@ public class RFQController {
         RequestPriceHeaderDto response = rfqService.getRFQById(id, userId);
 
         log.info("=== End get rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/suggest-suppliers")
+    public GeneralResponse<java.util.List<SupplierDto>> suggestSuppliers(@PathVariable("id") String id)
+            throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start suggest suppliers for rfq {} ===", id);
+
+        java.util.List<SupplierDto> response = rfqService.suggestSuppliers(id);
+
+        log.info("=== End suggest suppliers for rfq {} size {} ===", id, response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

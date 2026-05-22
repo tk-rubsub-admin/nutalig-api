@@ -21,9 +21,9 @@ public class RequestPriceHeaderDto {
     private List<RequestPriceDetailDto> details;
     private List<RequestPriceAdditionalCostDto> additionalCosts;
     private ProductFamilyDto productFamily;
-    private String productUsage;
-    private String systemMechanic;
-    private String material;
+    private ProductSubtype1Dto productSubtype1;
+    private ProductSubtype2Dto productSubType2;
+    private ProductMaterialDto material;
     private String capacity;
     private String description;
     private String createdBy;

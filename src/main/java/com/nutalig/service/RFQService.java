@@ -20,10 +20,12 @@ import com.nutalig.controller.rfq.request.UpdateRequestPriceHeaderRequest;
 import com.nutalig.dto.RequestPriceHeaderDto;
 import com.nutalig.dto.SlaConfigDto;
 import com.nutalig.entity.*;
+import com.nutalig.entity.id.ProductMaterialId;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
 import com.nutalig.repository.*;
+import com.nutalig.dto.SupplierDto;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,7 @@ import static com.nutalig.repository.specification.RequestPriceHeaderSpecificati
 import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.orderTypeCodeEqual;
 import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.salesIdEqual;
 import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.statusEqual;
+import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.statusIn;
 
 @Slf4j
 @Service
@@ -64,11 +67,15 @@ public class RFQService {
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final ProductFamilyRepository productFamilyEntityRepository;
+    private final ProductSubtype1Repository productSubtype1Repository;
+    private final ProductSubtype2Repository productSubtype2Repository;
+    private final ProductMaterialRepository productMaterialRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
     private final ActivityHistoryService activityHistoryService;
     private final UserProfileService userProfileService;
     private final SlaConfigService slaConfigService;
+    private final SupplierService supplierService;
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
@@ -113,6 +120,19 @@ public class RFQService {
         return mapToDto(entity);
     }
 
+    @Transactional(readOnly = true)
+    public List<SupplierDto> suggestSuppliers(String id) throws DataNotFoundException, InvalidRequestException {
+        RequestPriceHeaderEntity entity = getEntityById(id);
+
+        String productFamilyCode = StringUtils.trimToNull(entity.getProductFamily());
+        if (productFamilyCode == null) {
+            throw new InvalidRequestException("RFQ " + id + " does not have product family.");
+        }
+
+        String productMaterialCode = StringUtils.trimToNull(entity.getMaterialCode());
+        return supplierService.suggestSuppliers(productFamilyCode, productMaterialCode);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public RequestPriceHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
         RequestPriceHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
@@ -122,6 +142,13 @@ public class RFQService {
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
 
         applyRelations(entity, request.getSalesId(), request.getCustomerId(), request.getOrderTypeCode(), request.getProcurementId());
+        applyProductHierarchy(
+                entity,
+                request.getProductFamily(),
+                request.getProductUsage(),
+                request.getSystemMechanic(),
+                request.getMaterial()
+        );
         attachPictures(entity, request.getPictures(), PICTURE_FILE_TYPE, userId);
         attachPictures(entity, request.getAttachments(), OTHER_FILE_TYPE, userId);
 
@@ -422,17 +449,15 @@ public class RFQService {
             editFields.add("ประเภทงาน");
         }
         if (StringUtils.isNotEmpty(request.getProductFamily())) {
-            ProductFamilyEntity productFamilyEntity = productFamilyEntityRepository
-                    .getReferenceById(request.getProductFamily());
-            entity.setProductFamilyEntity(productFamilyEntity);
             editFields.add("หมวดหมู่หลัก (Product Family)");
         }
+        if (StringUtils.isNotEmpty(request.getProductUsage())) {
+            editFields.add("Product Subtype 1");
+        }
         if (StringUtils.isNotEmpty(request.getSystemMechanic())) {
-            entity.setSystemMechanic(request.getSystemMechanic());
-            editFields.add("System mechanic");
+            editFields.add("Product Subtype 2");
         }
         if (StringUtils.isNotEmpty(request.getMaterial())) {
-            entity.setMaterial(request.getMaterial());
             editFields.add("วัสดุ");
         }
         if (StringUtils.isNotEmpty(request.getCapacity())) {
@@ -443,6 +468,20 @@ public class RFQService {
             entity.setDescription(request.getDescription());
             editFields.add("รายละเอียด");
         }
+
+        applyProductHierarchy(
+                entity,
+                StringUtils.isNotEmpty(request.getProductFamily()) ? request.getProductFamily() : entity.getProductFamily(),
+                StringUtils.isNotEmpty(request.getProductUsage())
+                        ? request.getProductUsage()
+                        : entity.getProductUsage() == null ? null : entity.getProductUsage().getCode(),
+                StringUtils.isNotEmpty(request.getSystemMechanic())
+                        ? request.getSystemMechanic()
+                        : entity.getSystemMechanic() == null ? null : entity.getSystemMechanic().getCode(),
+                StringUtils.isNotEmpty(request.getMaterial())
+                        ? request.getMaterial()
+                        : entity.getMaterialCode()
+        );
 
         entity = requestPriceHeaderRepository.save(entity);
         java.util.Map<String, Object> afterDetail = buildActivityDetail(entity);
@@ -632,9 +671,9 @@ public class RFQService {
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("orderTypeCode", entity.getOrderType() != null ? entity.getOrderType().getId().getCode() : null);
         detail.put("productFamily", entity.getProductFamily());
-        detail.put("productUsage", entity.getProductUsage());
-        detail.put("systemMechanic", entity.getSystemMechanic());
-        detail.put("material", entity.getMaterial());
+        detail.put("productUsage", entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null);
+        detail.put("systemMechanic", entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null);
+        detail.put("material", entity.getMaterialCode());
         detail.put("capacity", entity.getCapacity());
         detail.put("description", entity.getDescription());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
@@ -745,6 +784,50 @@ public class RFQService {
         entity.setProcurement(resolveProcurement(procurementId));
     }
 
+    private void applyProductHierarchy(
+            RequestPriceHeaderEntity entity,
+            String productFamilyCodeInput,
+            String productSubtype1CodeInput,
+            String productSubtype2CodeInput,
+            String productMaterialCodeInput
+    ) throws DataNotFoundException, InvalidRequestException {
+        String productFamilyCode = StringUtils.trimToNull(productFamilyCodeInput);
+        String productSubtype1Code = StringUtils.trimToNull(productSubtype1CodeInput);
+        String productSubtype2Code = StringUtils.trimToNull(productSubtype2CodeInput);
+        String productMaterialCode = StringUtils.trimToNull(productMaterialCodeInput);
+
+        ProductSubtype1Entity productSubtype1 = resolveProductSubtype1(productSubtype1Code);
+        ProductSubtype2Entity productSubtype2 = resolveProductSubtype2(productSubtype2Code);
+
+        if (productSubtype2 != null) {
+            if (productSubtype1 != null && !StringUtils.equals(productSubtype2.getProductSubtype1Code(), productSubtype1.getCode())) {
+                throw new InvalidRequestException("Product subtype2 does not belong to product subtype1.");
+            }
+            if (productSubtype1 == null) {
+                productSubtype1 = productSubtype2.getProductSubtype1Entity();
+            }
+        }
+
+        if (productSubtype1 != null) {
+            if (productFamilyCode != null && !StringUtils.equals(productSubtype1.getProductFamilyCode(), productFamilyCode)) {
+                throw new InvalidRequestException("Product subtype1 does not belong to product family.");
+            }
+            if (productFamilyCode == null) {
+                productFamilyCode = productSubtype1.getProductFamilyCode();
+            }
+        }
+
+        ProductMaterialEntity productMaterial = resolveProductMaterial(productFamilyCode, productMaterialCode);
+        ProductFamilyEntity productFamily = resolveProductFamily(productFamilyCode);
+
+        entity.setProductFamily(productFamilyCode);
+        entity.setProductFamilyEntity(productFamily);
+        entity.setProductUsage(productSubtype1);
+        entity.setSystemMechanic(productSubtype2);
+        entity.setMaterialCode(productMaterialCode);
+        entity.setMaterial(productMaterial);
+    }
+
     private EmployeeEntity resolveSales(String salesId) throws DataNotFoundException {
         if (StringUtils.isBlank(salesId)) {
             return null;
@@ -761,6 +844,52 @@ public class RFQService {
 
         return employeeRepository.findById(procurementId.trim())
                 .orElseThrow(() -> new DataNotFoundException("Procurement " + procurementId + " not found."));
+    }
+
+    private ProductFamilyEntity resolveProductFamily(String productFamilyCode) throws DataNotFoundException {
+        if (StringUtils.isBlank(productFamilyCode)) {
+            return null;
+        }
+
+        return productFamilyEntityRepository.findById(productFamilyCode.trim())
+                .orElseThrow(() -> new DataNotFoundException("Product family code " + productFamilyCode + " not found."));
+    }
+
+    private ProductSubtype1Entity resolveProductSubtype1(String productSubtype1Code) throws DataNotFoundException {
+        if (StringUtils.isBlank(productSubtype1Code)) {
+            return null;
+        }
+
+        return productSubtype1Repository.findById(productSubtype1Code.trim())
+                .orElseThrow(() -> new DataNotFoundException("Product subtype1 code " + productSubtype1Code + " not found."));
+    }
+
+    private ProductSubtype2Entity resolveProductSubtype2(String productSubtype2Code) throws DataNotFoundException {
+        if (StringUtils.isBlank(productSubtype2Code)) {
+            return null;
+        }
+
+        return productSubtype2Repository.findById(productSubtype2Code.trim())
+                .orElseThrow(() -> new DataNotFoundException("Product subtype2 code " + productSubtype2Code + " not found."));
+    }
+
+    private ProductMaterialEntity resolveProductMaterial(String productFamilyCode, String productMaterialCode)
+            throws DataNotFoundException, InvalidRequestException {
+        if (StringUtils.isBlank(productMaterialCode)) {
+            return null;
+        }
+        if (StringUtils.isBlank(productFamilyCode)) {
+            throw new InvalidRequestException("Product family is required when material is provided.");
+        }
+
+        ProductMaterialId productMaterialId = new ProductMaterialId();
+        productMaterialId.setProductFamilyCode(productFamilyCode.trim());
+        productMaterialId.setCode(productMaterialCode.trim());
+
+        return productMaterialRepository.findById(productMaterialId)
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Product material code " + productMaterialCode + " not found in family " + productFamilyCode + "."
+                ));
     }
 
     private CustomerEntity resolveCustomer(String customerId) throws DataNotFoundException {
@@ -862,8 +991,13 @@ public class RFQService {
             return Specification.where(null);
         }
 
+        List<RFQStatus> statuses = request.getStatuses();
+        if (statuses == null || statuses.isEmpty()) {
+            statuses = request.getStatus() == null ? null : List.of(request.getStatus());
+        }
+
         return Specification.where(idEqual(request.getId()))
-                .and(statusEqual(request.getStatus()))
+                .and(statusIn(statuses))
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(orderTypeCodeEqual(request.getOrderTypeCode()))

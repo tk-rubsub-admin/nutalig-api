@@ -23,10 +23,14 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 
 import java.util.List;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {CustomerMapper.class, SystemConfigMapper.class, ProductFamilyMapper.class})
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING,
+        uses = {CustomerMapper.class, SystemConfigMapper.class, ProductFamilyMapper.class, ProductSubtype1Mapper.class,
+                ProductSubtype2Mapper.class, ProductMaterialMapper.class})
 public interface RequestPriceHeaderMapper {
 
     @Mapping(target = "productFamily", source = "productFamilyEntity")
+    @Mapping(target = "productSubtype1", source = "productUsage")
+    @Mapping(target = "productSubType2", source = "systemMechanic")
     RequestPriceHeaderDto toDto(RequestPriceHeaderEntity entity);
 
     List<RequestPriceHeaderDto> toDtoList(List<RequestPriceHeaderEntity> entities);
@@ -41,6 +45,10 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "pictures", ignore = true)
     @Mapping(target = "details", ignore = true)
     @Mapping(target = "additionalCosts", ignore = true)
+    @Mapping(target = "productUsage", ignore = true)
+    @Mapping(target = "systemMechanic", ignore = true)
+    @Mapping(target = "materialCode", ignore = true)
+    @Mapping(target = "material", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
@@ -55,6 +63,10 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "pictures", ignore = true)
     @Mapping(target = "details", ignore = true)
     @Mapping(target = "additionalCosts", ignore = true)
+    @Mapping(target = "productUsage", ignore = true)
+    @Mapping(target = "systemMechanic", ignore = true)
+    @Mapping(target = "materialCode", ignore = true)
+    @Mapping(target = "material", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)

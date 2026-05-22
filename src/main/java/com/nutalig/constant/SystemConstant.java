@@ -12,5 +12,6 @@ public enum SystemConstant {
     SALES_TYPE,
     POSITION,
     TEAM,
-    VAT
+    VAT,
+    UNIT
 }
