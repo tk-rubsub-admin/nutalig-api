@@ -1,23 +1,26 @@
 package com.nutalig.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.JoinColumnOrFormula;
-import org.hibernate.annotations.JoinColumnsOrFormulas;
-import org.hibernate.annotations.JoinFormula;
-
-import java.math.BigDecimal;
 
 @Getter
 @Setter
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
-@Entity
-@Table(name = "request_price_additional_cost")
-public class RequestPriceAdditionalCostEntity extends AuditDateEntity {
+@Table(name = "rfq_supplier_quote_additional_cost")
+@Entity(name = "RfqSupplierQuoteAdditionalCost")
+public class RfqSupplierQuoteAdditionalCostEntity extends AuditDateEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,9 +29,8 @@ public class RequestPriceAdditionalCostEntity extends AuditDateEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "request_price_header_id", referencedColumnName = "id", nullable = false)
-    @ToString.Exclude
-    private RequestPriceHeaderEntity requestPriceHeader;
+    @JoinColumn(name = "quote_id", referencedColumnName = "id", nullable = false)
+    private RfqSupplierQuoteEntity supplierQuote;
 
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;

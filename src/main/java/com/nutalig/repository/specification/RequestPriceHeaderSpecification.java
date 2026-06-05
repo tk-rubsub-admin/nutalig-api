@@ -1,13 +1,8 @@
 package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RFQStatus;
-import com.nutalig.entity.CustomerEntity;
-import com.nutalig.entity.ProductMaterialEntity;
-import com.nutalig.entity.ProductSubtype1Entity;
-import com.nutalig.entity.ProductSubtype2Entity;
-import com.nutalig.entity.RequestPriceHeaderEntity;
-import com.nutalig.entity.SalesEntity;
-import com.nutalig.entity.SystemConfigEntity;
+import com.nutalig.entity.*;
+import com.nutalig.entity.RfqHeaderEntity;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +12,7 @@ import java.util.List;
 
 public class RequestPriceHeaderSpecification {
 
-    public static Specification<RequestPriceHeaderEntity> idEqual(String id) {
+    public static Specification<RfqHeaderEntity> idEqual(String id) {
         if (StringUtils.isBlank(id)) {
             return null;
         }
@@ -25,7 +20,7 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> cb.equal(cb.lower(root.get("id")), id.trim().toLowerCase());
     }
 
-    public static Specification<RequestPriceHeaderEntity> statusEqual(RFQStatus status) {
+    public static Specification<RfqHeaderEntity> statusEqual(RFQStatus status) {
         if (status == null) {
             return null;
         }
@@ -33,7 +28,7 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> cb.equal(root.get("status"), status);
     }
 
-    public static Specification<RequestPriceHeaderEntity> statusIn(List<RFQStatus> statuses) {
+    public static Specification<RfqHeaderEntity> statusIn(List<RFQStatus> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return null;
         }
@@ -41,51 +36,51 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> root.get("status").in(statuses);
     }
 
-    public static Specification<RequestPriceHeaderEntity> customerIdEqual(String customerId) {
+    public static Specification<RfqHeaderEntity> customerIdEqual(String customerId) {
         if (StringUtils.isBlank(customerId)) {
             return null;
         }
 
         return (root, query, cb) -> {
-            Join<RequestPriceHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
+            Join<RfqHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
             return cb.equal(cb.lower(customerJoin.get("id")), customerId.trim().toLowerCase());
         };
     }
 
-    public static Specification<RequestPriceHeaderEntity> salesIdEqual(String salesId) {
+    public static Specification<RfqHeaderEntity> salesIdEqual(String salesId) {
         if (StringUtils.isBlank(salesId)) {
             return null;
         }
 
         return (root, query, cb) -> {
-            Join<RequestPriceHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            Join<RfqHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
             return cb.equal(cb.lower(salesJoin.get("salesId")), salesId.trim().toLowerCase());
         };
     }
 
-    public static Specification<RequestPriceHeaderEntity> orderTypeCodeEqual(String orderTypeCode) {
+    public static Specification<RfqHeaderEntity> orderTypeCodeEqual(String orderTypeCode) {
         if (StringUtils.isBlank(orderTypeCode)) {
             return null;
         }
 
         return (root, query, cb) -> {
-            Join<RequestPriceHeaderEntity, SystemConfigEntity> orderTypeJoin = root.join("orderType", JoinType.LEFT);
+            Join<RfqHeaderEntity, SystemConfigEntity> orderTypeJoin = root.join("orderType", JoinType.LEFT);
             return cb.equal(cb.lower(orderTypeJoin.get("id").get("code")), orderTypeCode.trim().toLowerCase());
         };
     }
 
-    public static Specification<RequestPriceHeaderEntity> keywordContain(String keyword) {
+    public static Specification<RfqHeaderEntity> keywordContain(String keyword) {
         if (StringUtils.isBlank(keyword)) {
             return null;
         }
 
         return (root, query, cb) -> {
             String pattern = "%" + keyword.trim().toLowerCase() + "%";
-            Join<RequestPriceHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
-            Join<RequestPriceHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
-            Join<RequestPriceHeaderEntity, ProductSubtype1Entity> subtype1Join = root.join("productUsage", JoinType.LEFT);
-            Join<RequestPriceHeaderEntity, ProductSubtype2Entity> subtype2Join = root.join("systemMechanic", JoinType.LEFT);
-            Join<RequestPriceHeaderEntity, ProductMaterialEntity> materialJoin = root.join("material", JoinType.LEFT);
+            Join<RfqHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
+            Join<RfqHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            Join<RfqHeaderEntity, ProductSubtype1Entity> subtype1Join = root.join("productUsage", JoinType.LEFT);
+            Join<RfqHeaderEntity, ProductSubtype2Entity> subtype2Join = root.join("systemMechanic", JoinType.LEFT);
+            Join<RfqHeaderEntity, ProductMaterialEntity> materialJoin = root.join("material", JoinType.LEFT);
 
             return cb.or(
                     cb.like(cb.lower(root.get("id")), pattern),

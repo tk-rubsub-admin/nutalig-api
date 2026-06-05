@@ -2,14 +2,12 @@ package com.nutalig.dto;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
 @Data
-public class RequestPriceAdditionalCostDto {
+public class RfqSupplierQuoteAdditionalCostDto {
 
     private Long id;
-    private SupplierDto supplier;
     private String description;
     private String unit;
     private String value;

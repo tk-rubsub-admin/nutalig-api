@@ -1,0 +1,349 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260604-001-create-rfq-supplier-quote-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS rfq_supplier_quote (
+                  id VARCHAR(255) NOT NULL,
+                  rfq_header_id VARCHAR(255) NOT NULL,
+                  supplier_id VARCHAR(255) NOT NULL,
+                  inquiry_id VARCHAR(255) DEFAULT NULL,
+                  status VARCHAR(50) NOT NULL,
+                  remark TEXT DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_rfq_supplier_quote_rfq_supplier (rfq_header_id, supplier_id),
+                  KEY idx_rfq_supplier_quote_rfq (rfq_header_id),
+                  KEY idx_rfq_supplier_quote_supplier (supplier_id),
+                  KEY idx_rfq_supplier_quote_inquiry (inquiry_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS rfq_supplier_quote_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  quote_id VARCHAR(255) NOT NULL,
+                  rfq_detail_id BIGINT DEFAULT NULL,
+                  option_name VARCHAR(255) DEFAULT NULL,
+                  spec TEXT NOT NULL,
+                  sort_order INT DEFAULT NULL,
+                  remark TEXT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_detail_quote (quote_id),
+                  KEY idx_rfq_supplier_quote_detail_rfq_detail (rfq_detail_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS rfq_supplier_quote_tier (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  quote_detail_id BIGINT NOT NULL,
+                  quantity DECIMAL(18,0) NOT NULL,
+                  product_price DECIMAL(18,4) NOT NULL,
+                  land_freight_cost DECIMAL(18,4) DEFAULT NULL,
+                  sea_freight_cost DECIMAL(18,4) DEFAULT NULL,
+                  land_total_price DECIMAL(18,4) DEFAULT NULL,
+                  sea_total_price DECIMAL(18,4) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_tier_detail (quote_detail_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS rfq_supplier_quote_additional_cost (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  quote_id VARCHAR(255) NOT NULL,
+                  description TEXT NOT NULL,
+                  unit VARCHAR(50) DEFAULT NULL,
+                  value VARCHAR(255) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_additional_cost_quote (quote_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260604-002-normalize-rfq-supplier-quote-collation
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE rfq_supplier_quote CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              ALTER TABLE rfq_supplier_quote_detail CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              ALTER TABLE rfq_supplier_quote_tier CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              ALTER TABLE rfq_supplier_quote_additional_cost CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260604-002a-align-rfq-supplier-quote-supplier-collation
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE rfq_supplier_quote
+                  MODIFY supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci NOT NULL;
+
+  - changeSet:
+      id: 20260604-003-add-fk-rfq-supplier-quote-rfq
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_rfq
+                foreignKeyTableName: rfq_supplier_quote
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote
+            baseColumnNames: rfq_header_id
+            referencedTableName: rfq_header
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_rfq
+
+  - changeSet:
+      id: 20260604-006-add-fk-rfq-supplier-quote-detail-quote
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_detail_quote
+                foreignKeyTableName: rfq_supplier_quote_detail
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_detail
+            baseColumnNames: quote_id
+            referencedTableName: rfq_supplier_quote
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_detail_quote
+
+  - changeSet:
+      id: 20260604-007-add-fk-rfq-supplier-quote-detail-rfq-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_detail_rfq_detail
+                foreignKeyTableName: rfq_supplier_quote_detail
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_detail
+            baseColumnNames: rfq_detail_id
+            referencedTableName: rfq_detail
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_detail_rfq_detail
+
+  - changeSet:
+      id: 20260604-008-add-fk-rfq-supplier-quote-tier-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_tier_detail
+                foreignKeyTableName: rfq_supplier_quote_tier
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_tier
+            baseColumnNames: quote_detail_id
+            referencedTableName: rfq_supplier_quote_detail
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_tier_detail
+
+  - changeSet:
+      id: 20260604-009-add-fk-rfq-supplier-quote-additional-cost-quote
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_additional_cost_quote
+                foreignKeyTableName: rfq_supplier_quote_additional_cost
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_additional_cost
+            baseColumnNames: quote_id
+            referencedTableName: rfq_supplier_quote
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_additional_cost_quote
+
+  - changeSet:
+      id: 20260605-001-add-rfq-detail-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: supplier_id
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: supplier_id
+                  type: VARCHAR(255)
+        - sql:
+            sql: |
+              ALTER TABLE rfq_detail
+                  MODIFY supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci DEFAULT NULL;
+        - createIndex:
+            tableName: rfq_detail
+            indexName: idx_rfq_detail_supplier_id
+            columns:
+              - column:
+                  name: supplier_id
+
+  - changeSet:
+      id: 20260605-002-add-fk-rfq-detail-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_detail_supplier
+                foreignKeyTableName: rfq_detail
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_detail
+            baseColumnNames: supplier_id
+            referencedTableName: supplier
+            referencedColumnNames: id
+            constraintName: fk_rfq_detail_supplier
+
+  - changeSet:
+      id: 20260605-003-add-rfq-tier-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: supplier_id
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: supplier_id
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260605-004-normalize-rfq-tier-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_tier
+            columnName: supplier_id
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE rfq_tier
+                  MODIFY supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci DEFAULT NULL;
+
+  - changeSet:
+      id: 20260605-004a-add-index-rfq-tier-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: rfq_tier
+                indexName: idx_rfq_tier_supplier_id
+      changes:
+        - createIndex:
+            tableName: rfq_tier
+            indexName: idx_rfq_tier_supplier_id
+            columns:
+              - column:
+                  name: supplier_id
+
+  - changeSet:
+      id: 20260605-005-add-fk-rfq-tier-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_tier_supplier
+                foreignKeyTableName: rfq_tier
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_tier
+            baseColumnNames: supplier_id
+            referencedTableName: supplier
+            referencedColumnNames: id
+            constraintName: fk_rfq_tier_supplier
+
+  - changeSet:
+      id: 20260605-006-add-rfq-additional-cost-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_additional_cost
+                columnName: supplier_id
+      changes:
+        - addColumn:
+            tableName: rfq_additional_cost
+            columns:
+              - column:
+                  name: supplier_id
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260605-007-normalize-rfq-additional-cost-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_additional_cost
+            columnName: supplier_id
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE rfq_additional_cost
+                  MODIFY supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci DEFAULT NULL;
+
+  - changeSet:
+      id: 20260605-007a-add-index-rfq-additional-cost-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: rfq_additional_cost
+                indexName: idx_rfq_additional_cost_supplier_id
+      changes:
+        - createIndex:
+            tableName: rfq_additional_cost
+            indexName: idx_rfq_additional_cost_supplier_id
+            columns:
+              - column:
+                  name: supplier_id
+
+  - changeSet:
+      id: 20260605-008-add-fk-rfq-additional-cost-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_additional_cost_supplier
+                foreignKeyTableName: rfq_additional_cost
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_additional_cost
+            baseColumnNames: supplier_id
+            referencedTableName: supplier
+            referencedColumnNames: id
+            constraintName: fk_rfq_additional_cost_supplier

@@ -12,6 +12,7 @@ public class CreateRequestPriceDetailRequest {
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String supplierId;
     private List<CreateRequestPriceTierRequest> tiers;
 
     @Data

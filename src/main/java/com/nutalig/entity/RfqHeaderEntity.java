@@ -1,7 +1,6 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.RFQStatus;
-import com.nutalig.dto.EmployeeDto;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -22,9 +21,9 @@ import java.time.ZonedDateTime;
 @Setter
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Table(name = "request_price_header")
+@Table(name = "rfq_header")
 @Entity(name = "RequestPriceHeader")
-public class RequestPriceHeaderEntity extends AuditDateEntity {
+public class RfqHeaderEntity extends AuditDateEntity {
 
     @Id
     @GeneratedValue(generator = "rfqIdGenerator")
@@ -65,13 +64,13 @@ public class RequestPriceHeaderEntity extends AuditDateEntity {
     private CustomerEntity customer;
 
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RequestPricePicturesEntity> pictures = new ArrayList<>();
+    private List<RfqPicturesEntity> pictures = new ArrayList<>();
 
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RequestPriceDetailEntity> details = new ArrayList<>();
+    private List<RfqDetailEntity> details = new ArrayList<>();
 
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RequestPriceAdditionalCostEntity> additionalCosts = new ArrayList<>();
+    private List<RfqAdditionalCostEntity> additionalCosts = new ArrayList<>();
 
     @OneToOne
     @JoinColumnsOrFormulas({
@@ -146,32 +145,32 @@ public class RequestPriceHeaderEntity extends AuditDateEntity {
     @Column(name = "quoted_date")
     private ZonedDateTime quotedDate;
 
-    public void addPicture(RequestPricePicturesEntity picture) {
+    public void addPicture(RfqPicturesEntity picture) {
         pictures.add(picture);
         picture.setRequestPriceHeader(this);
     }
 
-    public void removePicture(RequestPricePicturesEntity picture) {
+    public void removePicture(RfqPicturesEntity picture) {
         pictures.remove(picture);
         picture.setRequestPriceHeader(null);
     }
 
-    public void addDetail(RequestPriceDetailEntity detail) {
+    public void addDetail(RfqDetailEntity detail) {
         details.add(detail);
         detail.setRequestPriceHeader(this);
     }
 
-    public void removeDetail(RequestPriceDetailEntity detail) {
+    public void removeDetail(RfqDetailEntity detail) {
         details.remove(detail);
         detail.setRequestPriceHeader(null);
     }
 
-    public void addAdditionalCost(RequestPriceAdditionalCostEntity additionalCost) {
+    public void addAdditionalCost(RfqAdditionalCostEntity additionalCost) {
         additionalCosts.add(additionalCost);
         additionalCost.setRequestPriceHeader(this);
     }
 
-    public void removeAdditionalCost(RequestPriceAdditionalCostEntity additionalCost) {
+    public void removeAdditionalCost(RfqAdditionalCostEntity additionalCost) {
         additionalCosts.remove(additionalCost);
         additionalCost.setRequestPriceHeader(null);
     }

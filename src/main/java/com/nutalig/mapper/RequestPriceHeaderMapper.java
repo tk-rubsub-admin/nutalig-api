@@ -7,13 +7,9 @@ import com.nutalig.dto.RequestPriceAdditionalCostDto;
 import com.nutalig.dto.RequestPriceDetailDto;
 import com.nutalig.dto.RequestPricePicturesDto;
 import com.nutalig.dto.RequestPriceTierDto;
-import com.nutalig.entity.RequestPriceAdditionalCostEntity;
-import com.nutalig.entity.RequestPriceDetailEntity;
+import com.nutalig.entity.*;
 import com.nutalig.dto.SalesAccountDto;
-import com.nutalig.entity.RequestPriceHeaderEntity;
-import com.nutalig.entity.RequestPricePicturesEntity;
-import com.nutalig.entity.RequestPriceTierEntity;
-import com.nutalig.entity.SalesEntity;
+import com.nutalig.entity.RfqTierEntity;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -25,15 +21,15 @@ import java.util.List;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING,
         uses = {CustomerMapper.class, SystemConfigMapper.class, ProductFamilyMapper.class, ProductSubtype1Mapper.class,
-                ProductSubtype2Mapper.class, ProductMaterialMapper.class})
+                ProductSubtype2Mapper.class, ProductMaterialMapper.class, SupplierMapper.class})
 public interface RequestPriceHeaderMapper {
 
     @Mapping(target = "productFamily", source = "productFamilyEntity")
     @Mapping(target = "productSubtype1", source = "productUsage")
     @Mapping(target = "productSubType2", source = "systemMechanic")
-    RequestPriceHeaderDto toDto(RequestPriceHeaderEntity entity);
+    RequestPriceHeaderDto toDto(RfqHeaderEntity entity);
 
-    List<RequestPriceHeaderDto> toDtoList(List<RequestPriceHeaderEntity> entities);
+    List<RequestPriceHeaderDto> toDtoList(List<RfqHeaderEntity> entities);
 
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -53,7 +49,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
-    RequestPriceHeaderEntity toEntity(CreateRequestPriceHeaderRequest request);
+    RfqHeaderEntity toEntity(CreateRequestPriceHeaderRequest request);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
@@ -71,23 +67,23 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
-    void updateEntityFromRequest(UpdateRequestPriceHeaderRequest request, @MappingTarget RequestPriceHeaderEntity entity);
+    void updateEntityFromRequest(UpdateRequestPriceHeaderRequest request, @MappingTarget RfqHeaderEntity entity);
 
-    RequestPricePicturesDto toPictureDto(RequestPricePicturesEntity entity);
+    RequestPricePicturesDto toPictureDto(RfqPicturesEntity entity);
 
-    List<RequestPricePicturesDto> toPictureDtoList(List<RequestPricePicturesEntity> entities);
+    List<RequestPricePicturesDto> toPictureDtoList(List<RfqPicturesEntity> entities);
 
-    RequestPriceDetailDto toDetailDto(RequestPriceDetailEntity entity);
+    RequestPriceDetailDto toDetailDto(RfqDetailEntity entity);
 
-    List<RequestPriceDetailDto> toDetailDtoList(List<RequestPriceDetailEntity> entities);
+    List<RequestPriceDetailDto> toDetailDtoList(List<RfqDetailEntity> entities);
 
-    RequestPriceTierDto toTierDto(RequestPriceTierEntity entity);
+    RequestPriceTierDto toTierDto(RfqTierEntity entity);
 
-    List<RequestPriceTierDto> toTierDtoList(List<RequestPriceTierEntity> entities);
+    List<RequestPriceTierDto> toTierDtoList(List<RfqTierEntity> entities);
 
-    RequestPriceAdditionalCostDto toAdditionalCostDto(RequestPriceAdditionalCostEntity entity);
+    RequestPriceAdditionalCostDto toAdditionalCostDto(RfqAdditionalCostEntity entity);
 
-    List<RequestPriceAdditionalCostDto> toAdditionalCostDtoList(List<RequestPriceAdditionalCostEntity> entities);
+    List<RequestPriceAdditionalCostDto> toAdditionalCostDtoList(List<RfqAdditionalCostEntity> entities);
 
     SalesAccountDto toSalesDto(SalesEntity entity);
 }

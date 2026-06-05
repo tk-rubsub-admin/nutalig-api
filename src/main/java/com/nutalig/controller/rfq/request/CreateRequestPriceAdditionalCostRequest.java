@@ -11,4 +11,5 @@ public class CreateRequestPriceAdditionalCostRequest {
     private String unit;
     private String value;
     private Integer sortOrder;
+    private String supplierId;
 }

@@ -21,17 +21,17 @@ import java.time.ZonedDateTime;
 @Setter
 @ToString
 @Entity
-@Table(name = "request_price_pictures")
-public class RequestPricePicturesEntity {
+@Table(name = "rfq_pictures")
+public class RfqPicturesEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "request_price_header_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "rfq_header_id", referencedColumnName = "id", nullable = false)
     @ToString.Exclude
-    private RequestPriceHeaderEntity requestPriceHeader;
+    private RfqHeaderEntity requestPriceHeader;
 
     @Column(name = "pic_url", length = 1000)
     private String pictureUrl;

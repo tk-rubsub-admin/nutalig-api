@@ -2,19 +2,14 @@ package com.nutalig.controller.rfq;
 
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
-import com.nutalig.controller.rfq.request.CreateRequestPriceAdditionalCostRequest;
-import com.nutalig.controller.rfq.request.CreateRequestPriceDetailRequest;
-import com.nutalig.controller.rfq.request.ReorderRFQPicturesRequest;
-import com.nutalig.controller.rfq.request.SearchRFQRequest;
-import com.nutalig.controller.rfq.request.UpdateRequestPriceAdditionalCostRequest;
-import com.nutalig.controller.rfq.request.UpdateRequestPriceDetailRequest;
+import com.nutalig.controller.rfq.request.*;
+import com.nutalig.dto.RfqSupplierInquiryDto;
+import com.nutalig.dto.RfqSupplierQuoteDto;
 import com.nutalig.dto.RequestPriceHeaderDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.RFQService;
-import com.nutalig.controller.rfq.request.CreateRequestPriceHeaderRequest;
-import com.nutalig.controller.rfq.request.UpdateRequestPriceHeaderRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +63,139 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{id}/inquiries/generate")
+    public GeneralResponse<RfqSupplierInquiryDto> generateInquiry(
+            @PathVariable("id") String id,
+            @RequestBody GenerateRfqSupplierInquiryRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start generate inquiry rfq {} by {} ===", id, userId);
+
+        RfqSupplierInquiryDto response = rfqService.generateInquiry(id, request, userId);
+
+        log.info("=== End generate inquiry {} for rfq {} ===", response.getId(), id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/inquiries")
+    public GeneralResponse<java.util.List<RfqSupplierInquiryDto>> getInquiries(@PathVariable("id") String id)
+            throws DataNotFoundException {
+        log.info("=== Start get inquiries rfq {} ===", id);
+
+        java.util.List<RfqSupplierInquiryDto> response = rfqService.getInquiries(id);
+
+        log.info("=== End get inquiries rfq {} size {} ===", id, response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/inquiries/{inquiryId}")
+    public GeneralResponse<RfqSupplierInquiryDto> getInquiry(
+            @PathVariable("id") String id,
+            @PathVariable("inquiryId") String inquiryId
+    ) throws DataNotFoundException {
+        log.info("=== Start get inquiry {} rfq {} ===", inquiryId, id);
+
+        RfqSupplierInquiryDto response = rfqService.getInquiry(id, inquiryId);
+
+        log.info("=== End get inquiry {} rfq {} ===", inquiryId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/inquiries/{inquiryId}")
+    public GeneralResponse<RfqSupplierInquiryDto> updateInquiry(
+            @PathVariable("id") String id,
+            @PathVariable("inquiryId") String inquiryId,
+            @RequestBody UpdateRfqSupplierInquiryRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update inquiry {} rfq {} by {} ===", inquiryId, id, userId);
+
+        RfqSupplierInquiryDto response = rfqService.updateInquiry(id, inquiryId, request, userId);
+
+        log.info("=== End update inquiry {} rfq {} ===", inquiryId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/inquiries/{inquiryId}/finalize")
+    public GeneralResponse<RfqSupplierInquiryDto> finalizeInquiry(
+            @PathVariable("id") String id,
+            @PathVariable("inquiryId") String inquiryId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start finalize inquiry {} rfq {} by {} ===", inquiryId, id, userId);
+
+        RfqSupplierInquiryDto response = rfqService.finalizeInquiry(id, inquiryId, userId);
+
+        log.info("=== End finalize inquiry {} rfq {} ===", inquiryId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/supplier-quotes")
+    public GeneralResponse<java.util.List<RfqSupplierQuoteDto>> getSupplierQuotes(@PathVariable("id") String id)
+            throws DataNotFoundException {
+        log.info("=== Start get supplier quotes rfq {} ===", id);
+
+        java.util.List<RfqSupplierQuoteDto> response = rfqService.getSupplierQuotes(id);
+
+        log.info("=== End get supplier quotes rfq {} size {} ===", id, response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/supplier-quotes/{quoteId}")
+    public GeneralResponse<RfqSupplierQuoteDto> getSupplierQuote(
+            @PathVariable("id") String id,
+            @PathVariable("quoteId") String quoteId
+    ) throws DataNotFoundException {
+        log.info("=== Start get supplier quote {} rfq {} ===", quoteId, id);
+
+        RfqSupplierQuoteDto response = rfqService.getSupplierQuote(id, quoteId);
+
+        log.info("=== End get supplier quote {} rfq {} ===", quoteId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/supplier-quotes")
+    public GeneralResponse<RfqSupplierQuoteDto> createSupplierQuote(
+            @PathVariable("id") String id,
+            @RequestBody UpsertRfqSupplierQuoteRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start create supplier quote rfq {} by {} ===", id, userId);
+
+        RfqSupplierQuoteDto response = rfqService.createSupplierQuote(id, request, userId);
+
+        log.info("=== End create supplier quote {} rfq {} ===", response.getId(), id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/supplier-quotes/{quoteId}")
+    public GeneralResponse<RfqSupplierQuoteDto> updateSupplierQuote(
+            @PathVariable("id") String id,
+            @PathVariable("quoteId") String quoteId,
+            @RequestBody UpsertRfqSupplierQuoteRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update supplier quote {} rfq {} by {} ===", quoteId, id, userId);
+
+        RfqSupplierQuoteDto response = rfqService.updateSupplierQuote(id, quoteId, request, userId);
+
+        log.info("=== End update supplier quote {} rfq {} ===", quoteId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/{id}/supplier-quotes/{quoteId}")
+    public GeneralResponse<Void> deleteSupplierQuote(
+            @PathVariable("id") String id,
+            @PathVariable("quoteId") String quoteId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete supplier quote {} rfq {} ===", quoteId, id);
+
+        rfqService.deleteSupplierQuote(id, quoteId);
+
+        log.info("=== End delete supplier quote {} rfq {} ===", quoteId, id);
+        return new GeneralResponse<>(SUCCESS);
+    }
+
     @PostMapping
     public GeneralResponse<RequestPriceHeaderDto> createRFQ(
             @ModelAttribute CreateRequestPriceHeaderRequest request,
@@ -106,6 +234,20 @@ public class RFQController {
         RequestPriceHeaderDto response = rfqService.addRFQAdditionalCosts(id, requests, userId);
 
         log.info("=== End add rfq additional costs {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/customers")
+    public GeneralResponse<RequestPriceHeaderDto> updateCustomer(
+            @PathVariable("id") String id,
+            @RequestBody UpdateRfqCustomerRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start update rfq customer {} by {} ===", id, userId);
+
+        RequestPriceHeaderDto response = rfqService.updateCustomer(id, request, userId);
+
+        log.info("=== End update rfq customer {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

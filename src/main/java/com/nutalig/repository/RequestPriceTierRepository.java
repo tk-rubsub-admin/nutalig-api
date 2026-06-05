@@ -1,13 +1,13 @@
 package com.nutalig.repository;
 
-import com.nutalig.entity.RequestPriceTierEntity;
+import com.nutalig.entity.RfqTierEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public interface RequestPriceTierRepository extends JpaRepository<RequestPriceTierEntity, Long> {
+public interface RequestPriceTierRepository extends JpaRepository<RfqTierEntity, Long> {
 
-    List<RequestPriceTierEntity> findByRequestPriceDetailIdOrderBySortOrderAscIdAsc(Long requestPriceDetailId);
+    List<RfqTierEntity> findByRequestPriceDetailIdOrderBySortOrderAscIdAsc(Long requestPriceDetailId);
 }

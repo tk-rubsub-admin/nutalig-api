@@ -14,8 +14,8 @@ import java.util.List;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @Entity
-@Table(name = "request_price_detail")
-public class RequestPriceDetailEntity extends AuditDateEntity {
+@Table(name = "rfq_detail")
+public class RfqDetailEntity extends AuditDateEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,9 +24,9 @@ public class RequestPriceDetailEntity extends AuditDateEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "request_price_header_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "rfq_header_id", referencedColumnName = "id", nullable = false)
     @ToString.Exclude
-    private RequestPriceHeaderEntity requestPriceHeader;
+    private RfqHeaderEntity requestPriceHeader;
 
     @Column(name = "option_name", length = 255)
     private String optionName;
@@ -40,6 +40,12 @@ public class RequestPriceDetailEntity extends AuditDateEntity {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "supplier_id", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private SupplierEntity supplier;
+
     @Column(name = "created_by")
     @ToString.Include
     private String createdBy;
@@ -49,14 +55,14 @@ public class RequestPriceDetailEntity extends AuditDateEntity {
     private String updatedBy;
 
     @OneToMany(mappedBy = "requestPriceDetail", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RequestPriceTierEntity> tiers = new ArrayList<>();
+    private List<RfqTierEntity> tiers = new ArrayList<>();
 
-    public void addTier(RequestPriceTierEntity tier) {
+    public void addTier(RfqTierEntity tier) {
         tiers.add(tier);
         tier.setRequestPriceDetail(this);
     }
 
-    public void removeTier(RequestPriceTierEntity tier) {
+    public void removeTier(RfqTierEntity tier) {
         tiers.remove(tier);
         tier.setRequestPriceDetail(null);
     }

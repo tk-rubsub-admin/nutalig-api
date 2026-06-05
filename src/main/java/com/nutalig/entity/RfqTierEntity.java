@@ -14,15 +14,15 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @Entity
 @Table(
-        name = "request_price_tier",
+        name = "rfq_tier",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_request_price_tier_detail_qty",
-                        columnNames = {"request_price_detail_id", "quantity"}
+                        name = "uk_rfq_tier_detail_qty",
+                        columnNames = {"rfq_detail_id", "quantity"}
                 )
         }
 )
-public class RequestPriceTierEntity extends AuditDateEntity {
+public class RfqTierEntity extends AuditDateEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,9 +31,14 @@ public class RequestPriceTierEntity extends AuditDateEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "request_price_detail_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "rfq_detail_id", referencedColumnName = "id", nullable = false)
     @ToString.Exclude
-    private RequestPriceDetailEntity requestPriceDetail;
+    private RfqDetailEntity requestPriceDetail;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "supplier_id", referencedColumnName = "id")
+    @ToString.Exclude
+    private SupplierEntity supplier;
 
     @Column(name = "quantity", precision = 18, scale = 0, nullable = false)
     @ToString.Include
