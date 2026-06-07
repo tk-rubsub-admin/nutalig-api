@@ -2,22 +2,27 @@ package com.nutalig.controller.user;
 
 import com.nutalig.controller.user.request.CreateUserRequest;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.dto.RolePermissionDto;
 import com.nutalig.dto.UserDto;
 import com.nutalig.dto.UserRoleDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.UserRoleRepository;
+import com.nutalig.service.PermissionService;
 import com.nutalig.service.UserProfileService;
 import com.nutalig.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.nutalig.constant.ResponseStatus.SUCCESS;
 
@@ -29,8 +34,10 @@ public class UserController {
     private final UserProfileService userProfileService;
     private final UserService userService;
     private final UserRoleRepository userRoleRepository;
+    private final PermissionService permissionService;
 
     @PostMapping("/v1/users")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public GeneralResponse<UserDto> createUser(@RequestBody CreateUserRequest request)
             throws InvalidRequestException, DataNotFoundException {
         log.info("===== Start create user for employee {} role {} =====", request.getEmployeeId(), request.getRoleCode());
@@ -52,7 +59,19 @@ public class UserController {
         return new GeneralResponse<>(SUCCESS, userDto);
     }
 
+    @GetMapping("/v1/me/permissions")
+    public GeneralResponse<List<String>> getMyPermissions(Authentication authentication) throws DataNotFoundException {
+        log.info("===== Start get my permissions =====");
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+        log.info("===== End get my permissions size {} =====", userDto.getPermissions().size());
+        return new GeneralResponse<>(SUCCESS, userDto.getPermissions());
+    }
+
     @GetMapping("/v1/user/roles")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public GeneralResponse<List<UserRoleDto>> getUserRoles() {
         log.info("===== Start get user roles =====");
 
@@ -67,6 +86,30 @@ public class UserController {
                 .toList();
 
         log.info("===== End get user roles size {} =====", response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/admin/role-permissions")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public GeneralResponse<List<RolePermissionDto>> getAllRolePermissions() {
+        log.info("===== Start get all role permissions =====");
+
+        List<RolePermissionDto> response = permissionService.getAllRolePermissions();
+
+        log.info("===== End get all role permissions size {} =====", response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/v1/admin/role-permissions")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public GeneralResponse<List<RolePermissionDto>> updateRolePermissions(
+            @RequestBody Map<String, Map<String, Boolean>> request
+    ) throws InvalidRequestException {
+        log.info("===== Start update role permissions =====");
+
+        List<RolePermissionDto> response = permissionService.updateRolePermissions(request);
+
+        log.info("===== End update role permissions size {} =====", response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

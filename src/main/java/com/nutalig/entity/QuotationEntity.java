@@ -98,6 +98,9 @@ public class QuotationEntity extends AuditDateEntity {
     @ToString.Exclude
     private UserEntity updatedBy;
 
+    @Column(name = "rev_no")
+    private Integer revNo;
+
     public void addItem(QuotationDetailEntity item) {
         if (item == null) return;
         items.add(item);

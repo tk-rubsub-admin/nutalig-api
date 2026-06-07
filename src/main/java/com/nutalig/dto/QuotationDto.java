@@ -24,6 +24,8 @@ public class QuotationDto {
     private BigDecimal freight;
     private BigDecimal subTotal;
     private BigDecimal vat;
+    private BigDecimal vatRate;
     private BigDecimal grandTotal;
     private List<QuotationItemRequestDto> items;
+    private Integer revNo;
 }

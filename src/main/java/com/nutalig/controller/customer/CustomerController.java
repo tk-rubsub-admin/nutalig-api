@@ -24,11 +24,12 @@ import static com.nutalig.constant.ResponseStatus.SUCCESS;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/v1/customers")
 public class CustomerController {
 
     private final CustomerService customerService;
 
-    @PostMapping("/v1/customers")
+    @PostMapping
     public GeneralResponse createCustomer(@RequestBody CreateCustomerRequest request, @RequestHeader("userId") String createdBy)
             throws InvalidRequestException {
         log.info("=== Start create customer ===");
@@ -42,7 +43,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, new CreateCustomerResponse(customerId));
     }
 
-    @GetMapping("/v1/customers/{id}")
+    @GetMapping("/{id}")
     public GeneralResponse<CustomerDto> getCustomer(@PathVariable("id") String custId) throws DataNotFoundException {
         log.info("=== Start get customer ===");
 
@@ -52,7 +53,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, customerDto);
     }
 
-    @PatchMapping("/v1/customers/{customerId}")
+    @PatchMapping("/{customerId}")
     public GeneralResponse<CustomerDto> updateCustomer(
             @PathVariable String customerId,
             @RequestBody UpdateCustomerRequest request,
@@ -66,7 +67,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @GetMapping("/v1/customers")
+    @GetMapping
     public GeneralResponse<SearchCustomerResponse> getCustomers(
             SearchCustomerRequest searchCustomerRequest,
             @Valid PageableRequest pageableRequest
@@ -79,7 +80,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PostMapping("/v1/customers/search")
+    @PostMapping("/search")
     public GeneralResponse<SearchCustomerResponse> searchCustomer(
             @RequestBody(required = false) SearchCustomerRequest searchCustomerRequest,
             @Valid PageableRequest pageableRequest
@@ -92,7 +93,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PostMapping("/v1/customers/all")
+    @PostMapping("/all")
     public GeneralResponse<List<CustomerDto>> getAllCustomer(@RequestBody(required = false) SearchCustomerRequest searchCustomerRequest) {
         log.info("=== Start get all customer ===");
 
@@ -102,7 +103,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PostMapping("/v1/customers/{customerId}/addresses")
+    @PostMapping("/{customerId}/addresses")
     public GeneralResponse<CustomerDto> addCustomerAddress(
             @PathVariable String customerId,
             @RequestBody CreateCustomerAddressRequest request
@@ -115,7 +116,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @DeleteMapping("/v1/customers/{customerId}/addresses/{addressId}")
+    @DeleteMapping("/{customerId}/addresses/{addressId}")
     public GeneralResponse<CustomerDto> deleteCustomerAddress(
             @PathVariable String customerId,
             @PathVariable Long addressId
@@ -128,7 +129,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @DeleteMapping("/v1/customers/{customerId}/contacts/{contactId}")
+    @DeleteMapping("/{customerId}/contacts/{contactId}")
     public GeneralResponse<CustomerDto> deleteCustomerContact(
             @PathVariable String customerId,
             @PathVariable Long contactId
@@ -141,7 +142,7 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PostMapping("/v1/customers/{customerId}/contacts")
+    @PostMapping("/{customerId}/contacts")
     public GeneralResponse<CustomerDto> addCustomerContact(
             @PathVariable String customerId,
             @RequestBody CreateCustomerContactRequest request

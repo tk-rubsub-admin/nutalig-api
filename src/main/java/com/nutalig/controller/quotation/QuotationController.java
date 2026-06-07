@@ -6,6 +6,7 @@ import com.nutalig.controller.quotation.response.SearchQuotationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.dto.QuotationDto;
 import com.nutalig.dto.QuotationRequestDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.QuotationEntity;
@@ -52,6 +53,20 @@ public class QuotationController {
         return new GeneralResponse<>(SUCCESS, new CreateQuotationResponse(quotationEntity.getQuotationNo()));
     }
 
+    @PatchMapping
+    public GeneralResponse<QuotationDto> updateQuotation(
+            @RequestParam(name = "id") String id,
+            @RequestBody QuotationRequestDto requestDto,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        log.info("=== Start update quotation {} by {} ===", id, userId);
+
+        QuotationDto response = quotationService.updateQuotation(id, requestDto, userId);
+
+        log.info("=== End update quotation {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/document")
     public ResponseEntity<DownloadDocumentDto> getQuotationDocumentById(
             @RequestParam(name = "id") String id,
@@ -69,6 +84,17 @@ public class QuotationController {
 
         log.info("=== End download quotation document ===");
         return ResponseEntity.ok(doc);
+    }
+
+    @GetMapping
+    public GeneralResponse<QuotationDto> getQuotationDetailById(@RequestParam(name = "id") String id) throws DataNotFoundException {
+        log.info("=== Start get quotation by id ===");
+
+        QuotationDto quotationDto = quotationService.getQuotationDetailById(id);
+
+        log.info("=== End get quotation by id ===");
+
+        return new GeneralResponse<>(SUCCESS, quotationDto);
     }
 
 }

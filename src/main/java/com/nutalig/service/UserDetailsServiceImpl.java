@@ -41,7 +41,7 @@ public class UserDetailsServiceImpl {
         UserDto userDto = userMapper.toDto(userEntity);
 
         Set<String> perms = permissionService.getEffectivePermission(userDto);
-        userDto.setAuthorities(permissionService.toAuthorities(perms));
+        userDto.setAuthorities(permissionService.toAuthorities(perms, userDto.getRole().getRoleCode()));
         userDto.setPermissions(perms.stream().toList());
         return userDto;
     }

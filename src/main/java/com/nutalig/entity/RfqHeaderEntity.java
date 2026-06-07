@@ -145,6 +145,10 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "quoted_date")
     private ZonedDateTime quotedDate;
 
+    @ToString.Include
+    @Column(name = "quotation_no", length = 50)
+    private String quotationNo;
+
     public void addPicture(RfqPicturesEntity picture) {
         pictures.add(picture);
         picture.setRequestPriceHeader(this);

@@ -125,9 +125,7 @@ public class RFQService {
                     "จัดซื้อดูคำขอราคาเลขที่ " + entity.getId(),
                     null
             );
-
         }
-
         return mapToDto(entity);
     }
 

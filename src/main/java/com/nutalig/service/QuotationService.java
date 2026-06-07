@@ -3,7 +3,6 @@ package com.nutalig.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.*;
 import com.nutalig.constant.Currency;
-import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.quotation.request.SearchQuotationRequest;
 import com.nutalig.controller.quotation.response.SearchQuotationResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -18,7 +17,6 @@ import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.repository.*;
-import com.nutalig.repository.specification.QuotationSpecification;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
@@ -54,6 +52,7 @@ public class QuotationService {
     private final LineMessageService lineMessageService;
     private final ReportService reportService;
     private final QuotationRepository quotationRepository;
+    private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
@@ -61,6 +60,7 @@ public class QuotationService {
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
     private final ObjectMapper objectMapper;
+    private final ActivityHistoryService activityHistoryService;
 
     record QuotationSummary(
             BigDecimal subTotal,
@@ -146,7 +146,7 @@ public class QuotationService {
         LocalDate today = LocalDate.now(DateUtil.getTimeZone());
         quotationEntity.setDocDate(requestDto.getDocDate() == null ? today : requestDto.getDocDate());
         quotationEntity.setExpireDate(requestDto.getEffectiveDate() == null ? today.plusDays(7) : requestDto.getEffectiveDate());
-        quotationEntity.setStatus(QuotationStatus.DRAFT);
+        quotationEntity.setStatus(QuotationStatus.ISSUED);
         quotationEntity.setCurrency(Currency.THB);
         quotationEntity.setCustomer(customerEntity);
         quotationEntity.setCustomerAddress(customerAddressEntity);
@@ -154,6 +154,7 @@ public class QuotationService {
         quotationEntity.setSales(saleEntity);
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
+        quotationEntity.setRevNo(1);
 
         QuotationSummary summary = calculate(requestDto);
         quotationEntity.setDiscount(requestDto.getDiscount());
@@ -185,7 +186,7 @@ public class QuotationService {
             detailEntity.setUnitPrice(unitPrice);
             detailEntity.setQuantity(quantity);
             detailEntity.setAmount(amount);
-            detailEntity.setImageUrl(itemRequest.getImageUrl());
+            detailEntity.setImageUrl(itemRequest.getImagePreview());
 
             quotationEntity.getItems().add(detailEntity);
         }
@@ -196,8 +197,188 @@ public class QuotationService {
         quotationEntity.setUpdatedBy(createdByEntity);
 
         quotationRepository.save(quotationEntity);
+        updateRfqQuotationNo(requestDto.getRfqId(), docId);
+        recordCreateQuotationActivity(quotationEntity, requestDto, createdBy);
 
         return quotationEntity;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public QuotationDto updateQuotation(String quotationNo, QuotationRequestDto requestDto, String userId) throws DataNotFoundException {
+        log.info("Update quotation {} by {}", quotationNo, userId);
+
+        QuotationEntity quotationEntity = quotationRepository.findById(quotationNo)
+                .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
+
+        UserEntity updatedByEntity = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        Integer oldRevNo = quotationEntity.getRevNo();
+
+        if (requestDto.getRemark() != null) {
+            quotationEntity.setRemark(requestDto.getRemark());
+        }
+        if (requestDto.getDiscount() != null) {
+            quotationEntity.setDiscount(requestDto.getDiscount());
+        }
+        if (requestDto.getFreight() != null) {
+            quotationEntity.setFreight(requestDto.getFreight());
+        }
+        if (requestDto.getIsVat() != null) {
+            quotationEntity.setVatRate(Boolean.TRUE.equals(requestDto.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
+        }
+        if (requestDto.getItems() != null) {
+            replaceQuotationItems(quotationEntity, requestDto.getItems());
+        }
+
+        List<QuotationItemRequestDto> itemsForCalculate = requestDto.getItems() != null
+                ? requestDto.getItems()
+                : toItemRequests(quotationEntity.getItems());
+        Boolean isVat = requestDto.getIsVat() != null
+                ? requestDto.getIsVat()
+                : quotationEntity.getVatRate() != null && quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) > 0;
+
+        QuotationSummary summary = calculate(
+                itemsForCalculate,
+                quotationEntity.getDiscount(),
+                quotationEntity.getFreight(),
+                isVat
+        );
+        quotationEntity.setSubTotal(summary.subTotal);
+        quotationEntity.setVat(summary.vat);
+        quotationEntity.setGrandTotal(summary.grandTotal);
+        quotationEntity.setRevNo(defaultRevNo(oldRevNo) + 1);
+        quotationEntity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        quotationEntity.setUpdatedBy(updatedByEntity);
+
+        quotationRepository.save(quotationEntity);
+        recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
+
+        return mapToDto(quotationEntity);
+    }
+
+    private void recordCreateQuotationActivity(QuotationEntity quotationEntity, QuotationRequestDto requestDto, String createdBy) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("status", quotationEntity.getStatus());
+        detail.put("customerId", quotationEntity.getCustomer() != null ? quotationEntity.getCustomer().getId() : null);
+        detail.put("salesId", quotationEntity.getSales() != null ? quotationEntity.getSales().getEmployeeId() : null);
+        detail.put("rfqId", requestDto.getRfqId());
+        detail.put("revNo", quotationEntity.getRevNo());
+        detail.put("itemCount", quotationEntity.getItems() != null ? quotationEntity.getItems().size() : 0);
+        detail.put("subTotal", quotationEntity.getSubTotal());
+        detail.put("vat", quotationEntity.getVat());
+        detail.put("grandTotal", quotationEntity.getGrandTotal());
+
+        activityHistoryService.record(
+                ActivityEntityType.QUOTATION,
+                quotationEntity.getQuotationNo(),
+                createdBy,
+                ActivityActorType.USER,
+                ActivityAction.CREATE,
+                ActivitySource.API,
+                "สร้างใบเสนอราคาเลขที่ " + quotationEntity.getQuotationNo(),
+                detail
+        );
+    }
+
+    private void recordUpdateQuotationActivity(QuotationEntity quotationEntity, QuotationRequestDto requestDto, String userId, Integer oldRevNo) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("status", quotationEntity.getStatus());
+        detail.put("customerId", quotationEntity.getCustomer() != null ? quotationEntity.getCustomer().getId() : null);
+        detail.put("salesId", quotationEntity.getSales() != null ? quotationEntity.getSales().getEmployeeId() : null);
+        detail.put("oldRevNo", oldRevNo);
+        detail.put("newRevNo", quotationEntity.getRevNo());
+        detail.put("remarkUpdated", requestDto.getRemark() != null);
+        detail.put("itemsUpdated", requestDto.getItems() != null);
+        detail.put("itemCount", quotationEntity.getItems() != null ? quotationEntity.getItems().size() : 0);
+        detail.put("subTotal", quotationEntity.getSubTotal());
+        detail.put("vat", quotationEntity.getVat());
+        detail.put("grandTotal", quotationEntity.getGrandTotal());
+
+        activityHistoryService.record(
+                ActivityEntityType.QUOTATION,
+                quotationEntity.getQuotationNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "แก้ไขใบเสนอราคาเลขที่ " + quotationEntity.getQuotationNo(),
+                detail
+        );
+    }
+
+    private void replaceQuotationItems(QuotationEntity quotationEntity, List<QuotationItemRequestDto> itemRequests) {
+        Map<String, QuotationDetailEntity> existingItemsById = new HashMap<>();
+        for (QuotationDetailEntity item : quotationEntity.getItems()) {
+            if (item.getId() != null) {
+                existingItemsById.put(item.getId().toString(), item);
+            }
+        }
+
+        quotationEntity.getItems().clear();
+
+        int lineNo = 1;
+        for (QuotationItemRequestDto itemRequest : itemRequests) {
+            QuotationDetailEntity existingItem = StringUtils.isNotBlank(itemRequest.getId())
+                    ? existingItemsById.get(itemRequest.getId())
+                    : null;
+
+            QuotationDetailEntity detailEntity = new QuotationDetailEntity();
+            detailEntity.setQuotation(quotationEntity);
+            detailEntity.setLineNo(lineNo++);
+            detailEntity.setName(itemRequest.getName());
+            detailEntity.setType(itemRequest.getType());
+            detailEntity.setCapacity(itemRequest.getCapacity());
+            detailEntity.setSize(itemRequest.getSize());
+            detailEntity.setSpec(itemRequest.getSpec());
+
+            BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
+            BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
+            detailEntity.setUnitPrice(unitPrice);
+            detailEntity.setQuantity(quantity);
+            detailEntity.setAmount(unitPrice.multiply(quantity).setScale(2, RoundingMode.HALF_UP));
+            detailEntity.setImageUrl(StringUtils.defaultIfBlank(
+                    itemRequest.getImagePreview(),
+                    existingItem != null ? existingItem.getImageUrl() : null
+            ));
+
+            quotationEntity.getItems().add(detailEntity);
+        }
+    }
+
+    private List<QuotationItemRequestDto> toItemRequests(Set<QuotationDetailEntity> details) {
+        List<QuotationItemRequestDto> itemRequests = new ArrayList<>();
+        for (QuotationDetailEntity detail : details) {
+            QuotationItemRequestDto item = new QuotationItemRequestDto();
+            item.setId(detail.getId() != null ? detail.getId().toString() : null);
+            item.setName(detail.getName());
+            item.setType(detail.getType());
+            item.setCapacity(detail.getCapacity());
+            item.setSize(detail.getSize());
+            item.setSpec(detail.getSpec());
+            item.setUnitPrice(detail.getUnitPrice());
+            item.setQuantity(detail.getQuantity());
+            item.setAmount(detail.getAmount());
+            item.setImagePreview(detail.getImageUrl());
+            itemRequests.add(item);
+        }
+        return itemRequests;
+    }
+
+    private int defaultRevNo(Integer revNo) {
+        return revNo == null ? 0 : revNo;
+    }
+
+    private void updateRfqQuotationNo(String rfqId, String quotationNo) throws DataNotFoundException {
+        if (StringUtils.isBlank(rfqId)) {
+            return;
+        }
+
+        RfqHeaderEntity rfq = requestPriceHeaderRepository.findById(rfqId)
+                .orElseThrow(() -> new DataNotFoundException("RFQ " + rfqId + " not found."));
+        rfq.setQuotationNo(quotationNo);
+        rfq.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        requestPriceHeaderRepository.save(rfq);
     }
 
     @Transactional(readOnly = true)
@@ -218,6 +399,16 @@ public class QuotationService {
         response.setPagination(Pagination.build(quotaionDtoPage));
 
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public QuotationDto getQuotationDetailById(String quotationNo) throws DataNotFoundException {
+        log.info("Get quotation detail by {}", quotationNo);
+
+        QuotationEntity quotationEntity = quotationRepository.findById(quotationNo)
+                .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
+
+        return mapToDto(quotationEntity);
     }
 
     @Transactional(readOnly = true)
@@ -385,17 +576,25 @@ public class QuotationService {
     }
 
     private QuotationSummary calculate(QuotationRequestDto request) {
+        return calculate(request.getItems(), request.getDiscount(), request.getFreight(), request.getIsVat());
+    }
 
+    private QuotationSummary calculate(
+            List<QuotationItemRequestDto> items,
+            BigDecimal requestDiscount,
+            BigDecimal requestFreight,
+            Boolean isVat
+    ) {
         BigDecimal subTotal = BigDecimal.ZERO;
 
-        for (QuotationItemRequestDto item : request.getItems()) {
-            BigDecimal lineTotal = item.getUnitPrice()
-                    .multiply(item.getQuantity());
+        for (QuotationItemRequestDto item : Optional.ofNullable(items).orElseGet(List::of)) {
+            BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
+                    .multiply(defaultIfNull(item.getQuantity()));
             subTotal = subTotal.add(lineTotal);
         }
 
-        BigDecimal discount = defaultIfNull(request.getDiscount());
-        BigDecimal freight = defaultIfNull(request.getFreight());
+        BigDecimal discount = defaultIfNull(requestDiscount);
+        BigDecimal freight = defaultIfNull(requestFreight);
 
         BigDecimal taxableAmount = subTotal.subtract(discount);
 
@@ -405,7 +604,7 @@ public class QuotationService {
 
         BigDecimal vat = BigDecimal.ZERO;
 
-        if (Boolean.TRUE.equals(request.getIsVat())) {
+        if (Boolean.TRUE.equals(isVat)) {
             vat = taxableAmount
                     .multiply(VAT_RATE)
                     .setScale(2, RoundingMode.HALF_UP);
@@ -501,20 +700,22 @@ public class QuotationService {
         dto.setFreight(entity.getFreight());
         dto.setSubTotal(entity.getSubTotal());
         dto.setVat(entity.getVat());
+        dto.setVatRate(entity.getVatRate());
         dto.setGrandTotal(entity.getGrandTotal());
-
+        dto.setRevNo(entity.getRevNo());
         List<QuotationItemRequestDto> items = new ArrayList<>();
         for (QuotationDetailEntity detail : entity.getItems()) {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
             item.setId(detail.getId().toString());
             item.setName(detail.getName());
-            item.setImageUrl(detail.getImageUrl());
+            item.setImagePreview(detail.getImageUrl());
             item.setSpec(detail.getSpec());
             item.setSize(detail.getSize());
             item.setType(detail.getType());
             item.setCapacity(detail.getCapacity());
             item.setUnitPrice(detail.getUnitPrice());
             item.setQuantity(detail.getQuantity());
+            item.setAmount(detail.getAmount());
             items.add(item);
         }
         dto.setItems(items);

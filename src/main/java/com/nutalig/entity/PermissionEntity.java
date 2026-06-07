@@ -23,7 +23,7 @@ public class PermissionEntity {
     @Column(name = "name_en")
     private String nameEn;
 
-    @Column(name = "group")
+    @Column(name = "`group`")
     private String group;
 
     @Column(name = "created_at")

@@ -24,6 +24,7 @@ public class AdminUserController {
     private final LineAuthService lineAuthService;
 
     @PostMapping("/{id}/invite-line-registration")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public GeneralResponse<InviteLineRegistrationResponse> inviteLineRegistration(
             @PathVariable("id") String userId
     ) throws InvalidRequestException, DataNotFoundException {
@@ -34,6 +35,7 @@ public class AdminUserController {
     }
 
     @PostMapping("/{id}/reset-line-binding")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public GeneralResponse<Void> resetLineBinding(@PathVariable("id") String userId) throws DataNotFoundException {
         log.info("=== Start reset LINE binding for {} ===", userId);
         lineAuthService.resetLineBinding(userId);

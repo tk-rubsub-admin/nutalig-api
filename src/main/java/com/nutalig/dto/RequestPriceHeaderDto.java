@@ -33,4 +33,5 @@ public class RequestPriceHeaderDto {
     private EmployeeDto procurement;
     private ZonedDateTime slaDate;
     private ZonedDateTime quotedDate;
+    private String quotationNo;
 }

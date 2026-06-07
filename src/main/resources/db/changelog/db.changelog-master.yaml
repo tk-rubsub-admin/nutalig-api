@@ -347,3 +347,191 @@ databaseChangeLog:
             referencedTableName: supplier
             referencedColumnNames: id
             constraintName: fk_rfq_additional_cost_supplier
+
+  - changeSet:
+      id: 20260605-009-create-authorization-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS permission (
+                  code VARCHAR(64) NOT NULL,
+                  name_th VARCHAR(255) DEFAULT NULL,
+                  name_en VARCHAR(255) DEFAULT NULL,
+                  `group` VARCHAR(128) DEFAULT NULL,
+                  created_at DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS role_permission (
+                  role_code VARCHAR(64) NOT NULL,
+                  permission_code VARCHAR(64) NOT NULL,
+                  PRIMARY KEY (role_code, permission_code),
+                  KEY idx_role_permission_role_code (role_code),
+                  KEY idx_role_permission_permission_code (permission_code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS user_permission_override (
+                  user_id VARCHAR(64) NOT NULL,
+                  permission_code VARCHAR(64) NOT NULL,
+                  effect VARCHAR(16) NOT NULL,
+                  created_at DATETIME(6) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  PRIMARY KEY (user_id, permission_code),
+                  KEY idx_user_permission_override_user_id (user_id),
+                  KEY idx_user_permission_override_permission_code (permission_code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260605-010-seed-permissions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at) VALUES
+              ('PERM_DASHBOARD_VIEW', 'ดูแดชบอร์ด', 'View dashboard', 'dashboard', NOW(6)),
+              ('PERM_CUSTOMER_VIEW', 'ดูลูกค้า', 'View customers', 'master_data', NOW(6)),
+              ('PERM_SUPPLIER_VIEW', 'ดูซัพพลายเออร์', 'View suppliers', 'master_data', NOW(6)),
+              ('PERM_PRODUCT_FAMILY_VIEW', 'ดูหมวดหมู่สินค้า', 'View product families', 'master_data', NOW(6)),
+              ('PERM_RFQ_VIEW', 'ดูการขอราคา', 'View RFQs', 'rfq', NOW(6)),
+              ('PERM_RFQ_CREATE', 'สร้างการขอราคา', 'Create RFQs', 'rfq', NOW(6)),
+              ('PERM_PRICE_INQUIRY_VIEW', 'ดูการสอบถามราคา', 'View price inquiries', 'rfq', NOW(6)),
+              ('PERM_EMPLOYEE_VIEW', 'ดูพนักงาน', 'View employees', 'master_data', NOW(6)),
+              ('PERM_SYSTEM_CONFIG_VIEW', 'ดูตั้งค่าระบบ', 'View system configuration', 'system', NOW(6)),
+              ('PERM_QUOTATION_VIEW', 'ดูใบเสนอราคา', 'View quotations', 'document', NOW(6)),
+              ('PERM_QUOTATION_CREATE', 'สร้างใบเสนอราคา', 'Create quotations', 'document', NOW(6)),
+              ('PERM_RECEIVE_PRODUCT_VIEW', 'ดูรับสินค้า', 'View receive products', 'operation', NOW(6)),
+              ('PERM_BUYING_PRODUCT_VIEW', 'ดูซื้อสินค้า', 'View buying products', 'operation', NOW(6)),
+              ('PERM_PURCHASE_ORDER_VIEW', 'ดูใบสั่งซื้อ', 'View purchase orders', 'document', NOW(6)),
+              ('PERM_PURCHASE_ORDER_CREATE', 'สร้างใบสั่งซื้อ', 'Create purchase orders', 'document', NOW(6)),
+              ('PERM_SALE_ORDER_VIEW', 'ดูใบสั่งขาย', 'View sale orders', 'document', NOW(6)),
+              ('PERM_SALE_ORDER_CREATE', 'สร้างใบสั่งขาย', 'Create sale orders', 'document', NOW(6)),
+              ('PERM_BILLING_VIEW', 'ดูใบวางบิล', 'View billings', 'document', NOW(6)),
+              ('PERM_BILLING_CREATE', 'สร้างใบวางบิล', 'Create billings', 'document', NOW(6)),
+              ('PERM_INVOICE_VIEW', 'ดูใบแจ้งหนี้', 'View invoices', 'document', NOW(6)),
+              ('PERM_INVOICE_CREATE', 'สร้างใบแจ้งหนี้', 'Create invoices', 'document', NOW(6)),
+              ('PERM_PRODUCT_VIEW', 'ดูสินค้า', 'View products', 'product', NOW(6)),
+              ('PERM_PRODUCT_PRICE_VIEW', 'ดูราคาสินค้า', 'View product prices', 'product', NOW(6)),
+              ('PERM_PRICE_LIST_VIEW', 'ดูรายการราคา', 'View price lists', 'product', NOW(6)),
+              ('PERM_USER_MANAGE', 'จัดการผู้ใช้งาน', 'Manage users', 'system', NOW(6)),
+              ('PERM_FREIGHT_VIEW', 'ดูค่าขนส่ง', 'View freight', 'freight', NOW(6)),
+              ('PERM_MANUAL_VIEW', 'ดูคู่มือ', 'View manual', 'support', NOW(6)),
+              ('PERM_ACCOUNT_SETTING_VIEW', 'ดูตั้งค่าบัญชี', 'View account settings', 'account', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+  - changeSet:
+      id: 20260605-011-seed-role-permissions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT 'SUPER_ADMIN', code FROM permission WHERE code IN (
+                  'PERM_DASHBOARD_VIEW', 'PERM_CUSTOMER_VIEW', 'PERM_SUPPLIER_VIEW', 'PERM_PRODUCT_FAMILY_VIEW',
+                  'PERM_RFQ_VIEW', 'PERM_RFQ_CREATE', 'PERM_PRICE_INQUIRY_VIEW', 'PERM_EMPLOYEE_VIEW',
+                  'PERM_SYSTEM_CONFIG_VIEW', 'PERM_QUOTATION_VIEW', 'PERM_QUOTATION_CREATE',
+                  'PERM_RECEIVE_PRODUCT_VIEW', 'PERM_BUYING_PRODUCT_VIEW', 'PERM_PURCHASE_ORDER_VIEW',
+                  'PERM_PURCHASE_ORDER_CREATE', 'PERM_SALE_ORDER_VIEW', 'PERM_SALE_ORDER_CREATE',
+                  'PERM_BILLING_VIEW', 'PERM_BILLING_CREATE', 'PERM_INVOICE_VIEW', 'PERM_INVOICE_CREATE',
+                  'PERM_PRODUCT_VIEW', 'PERM_PRODUCT_PRICE_VIEW', 'PERM_PRICE_LIST_VIEW', 'PERM_USER_MANAGE',
+                  'PERM_FREIGHT_VIEW', 'PERM_MANUAL_VIEW', 'PERM_ACCOUNT_SETTING_VIEW'
+              );
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code) VALUES
+              ('ADMIN', 'PERM_DASHBOARD_VIEW'), ('ADMIN', 'PERM_CUSTOMER_VIEW'), ('ADMIN', 'PERM_SUPPLIER_VIEW'),
+              ('ADMIN', 'PERM_PRODUCT_FAMILY_VIEW'), ('ADMIN', 'PERM_RFQ_VIEW'), ('ADMIN', 'PERM_RFQ_CREATE'),
+              ('ADMIN', 'PERM_PRICE_INQUIRY_VIEW'), ('ADMIN', 'PERM_EMPLOYEE_VIEW'), ('ADMIN', 'PERM_QUOTATION_VIEW'),
+              ('ADMIN', 'PERM_QUOTATION_CREATE'), ('ADMIN', 'PERM_MANUAL_VIEW'), ('ADMIN', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('SALES', 'PERM_DASHBOARD_VIEW'), ('SALES', 'PERM_RFQ_VIEW'), ('SALES', 'PERM_RFQ_CREATE'),
+              ('SALES', 'PERM_QUOTATION_VIEW'), ('SALES', 'PERM_QUOTATION_CREATE'), ('SALES', 'PERM_MANUAL_VIEW'),
+              ('SALES', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('SALES_ADMIN', 'PERM_DASHBOARD_VIEW'), ('SALES_ADMIN', 'PERM_RFQ_VIEW'),
+              ('SALES_ADMIN', 'PERM_QUOTATION_VIEW'), ('SALES_ADMIN', 'PERM_QUOTATION_CREATE'),
+              ('SALES_ADMIN', 'PERM_MANUAL_VIEW'), ('SALES_ADMIN', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('PROCUREMENT', 'PERM_DASHBOARD_VIEW'), ('PROCUREMENT', 'PERM_RFQ_VIEW'),
+              ('PROCUREMENT', 'PERM_PRICE_INQUIRY_VIEW'), ('PROCUREMENT', 'PERM_BUYING_PRODUCT_VIEW'),
+              ('PROCUREMENT', 'PERM_PURCHASE_ORDER_VIEW'), ('PROCUREMENT', 'PERM_MANUAL_VIEW'),
+              ('PROCUREMENT', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('PROCUREMENT_ADMIN', 'PERM_DASHBOARD_VIEW'), ('PROCUREMENT_ADMIN', 'PERM_BUYING_PRODUCT_VIEW'),
+              ('PROCUREMENT_ADMIN', 'PERM_PURCHASE_ORDER_VIEW'), ('PROCUREMENT_ADMIN', 'PERM_MANUAL_VIEW'),
+              ('PROCUREMENT_ADMIN', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('RECEIVER', 'PERM_DASHBOARD_VIEW'), ('RECEIVER', 'PERM_RECEIVE_PRODUCT_VIEW'),
+              ('RECEIVER', 'PERM_MANUAL_VIEW'),
+
+              ('RECEIVER_PAK_KLONG', 'PERM_DASHBOARD_VIEW'), ('RECEIVER_PAK_KLONG', 'PERM_RECEIVE_PRODUCT_VIEW'),
+              ('RECEIVER_PAK_KLONG', 'PERM_MANUAL_VIEW'),
+
+              ('ADMIN_BKK', 'PERM_DASHBOARD_VIEW'), ('ADMIN_BKK', 'PERM_SALE_ORDER_VIEW'),
+              ('ADMIN_BKK', 'PERM_SALE_ORDER_CREATE'), ('ADMIN_BKK', 'PERM_BILLING_VIEW'),
+              ('ADMIN_BKK', 'PERM_BILLING_CREATE'), ('ADMIN_BKK', 'PERM_INVOICE_VIEW'),
+              ('ADMIN_BKK', 'PERM_INVOICE_CREATE'), ('ADMIN_BKK', 'PERM_PRODUCT_VIEW'),
+              ('ADMIN_BKK', 'PERM_MANUAL_VIEW'), ('ADMIN_BKK', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('ADMIN_PROVINCE', 'PERM_DASHBOARD_VIEW'), ('ADMIN_PROVINCE', 'PERM_SALE_ORDER_VIEW'),
+              ('ADMIN_PROVINCE', 'PERM_SALE_ORDER_CREATE'), ('ADMIN_PROVINCE', 'PERM_BILLING_VIEW'),
+              ('ADMIN_PROVINCE', 'PERM_BILLING_CREATE'), ('ADMIN_PROVINCE', 'PERM_INVOICE_VIEW'),
+              ('ADMIN_PROVINCE', 'PERM_INVOICE_CREATE'), ('ADMIN_PROVINCE', 'PERM_PRODUCT_VIEW'),
+              ('ADMIN_PROVINCE', 'PERM_MANUAL_VIEW'), ('ADMIN_PROVINCE', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('ORDER_BKK', 'PERM_DASHBOARD_VIEW'), ('ORDER_BKK', 'PERM_SALE_ORDER_VIEW'),
+              ('ORDER_BKK', 'PERM_MANUAL_VIEW'), ('ORDER_BKK', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('ORDER_PROVINCE', 'PERM_DASHBOARD_VIEW'), ('ORDER_PROVINCE', 'PERM_SALE_ORDER_VIEW'),
+              ('ORDER_PROVINCE', 'PERM_MANUAL_VIEW'), ('ORDER_PROVINCE', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('ACCOUNT', 'PERM_DASHBOARD_VIEW'), ('ACCOUNT', 'PERM_BILLING_VIEW'),
+              ('ACCOUNT', 'PERM_BILLING_CREATE'), ('ACCOUNT', 'PERM_INVOICE_VIEW'),
+              ('ACCOUNT', 'PERM_INVOICE_CREATE'), ('ACCOUNT', 'PERM_PRODUCT_PRICE_VIEW'),
+              ('ACCOUNT', 'PERM_FREIGHT_VIEW'), ('ACCOUNT', 'PERM_MANUAL_VIEW'),
+              ('ACCOUNT', 'PERM_ACCOUNT_SETTING_VIEW'),
+
+              ('ACCOUNT_ADMIN', 'PERM_DASHBOARD_VIEW'), ('ACCOUNT_ADMIN', 'PERM_BILLING_VIEW'),
+              ('ACCOUNT_ADMIN', 'PERM_BILLING_CREATE'), ('ACCOUNT_ADMIN', 'PERM_INVOICE_VIEW'),
+              ('ACCOUNT_ADMIN', 'PERM_INVOICE_CREATE'), ('ACCOUNT_ADMIN', 'PERM_PRODUCT_PRICE_VIEW'),
+              ('ACCOUNT_ADMIN', 'PERM_FREIGHT_VIEW'), ('ACCOUNT_ADMIN', 'PERM_MANUAL_VIEW'),
+              ('ACCOUNT_ADMIN', 'PERM_ACCOUNT_SETTING_VIEW');
+
+  - changeSet:
+      id: 20260606-001-add-rfq-header-quotation-no
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: quotation_no
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: quotation_no
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 20260607-001-add-quotations-rev-no
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: rev_no
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: rev_no
+                  type: INT

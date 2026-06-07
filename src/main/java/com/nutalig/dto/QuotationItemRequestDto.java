@@ -14,5 +14,6 @@ public class QuotationItemRequestDto {
     private String spec;
     private BigDecimal unitPrice;
     private BigDecimal quantity;
-    private String imageUrl;
+    private BigDecimal amount;
+    private String imagePreview;
 }

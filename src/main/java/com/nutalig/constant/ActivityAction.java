@@ -11,5 +11,6 @@ public enum ActivityAction {
     UPLOAD_PICTURE,
     DELETE_PICTURE,
     REPLACE_PICTURE,
-    REORDER_PICTURE
+    REORDER_PICTURE,
+
 }
