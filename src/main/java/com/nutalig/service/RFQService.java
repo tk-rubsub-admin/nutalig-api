@@ -1,13 +1,7 @@
 package com.nutalig.service;
 
-import com.nutalig.constant.ActivityAction;
-import com.nutalig.constant.ActivityActorType;
-import com.nutalig.constant.ActivityEntityType;
-import com.nutalig.constant.ActivitySource;
-import com.nutalig.constant.RFQStatus;
-import com.nutalig.constant.RfqSupplierQuoteStatus;
-import com.nutalig.constant.RfqSupplierInquiryStatus;
-import com.nutalig.constant.SystemConstant;
+import com.nutalig.constant.*;
+import com.nutalig.constant.RfqStatus;
 import com.nutalig.config.PromptTemplateEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.controller.file.response.UploadFileResponse;
@@ -110,7 +104,7 @@ public class RFQService {
         RfqHeaderEntity entity = getEntityById(id);
 
         if (shouldMoveToInProgressOnView(entity, userId)) {
-            entity.setStatus(RFQStatus.IN_PROGRESS);
+            entity.setStatus(RfqStatus.IN_PROGRESS);
             entity.setUpdatedBy(userProfileService.getNameFromId(userId));
             entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
             entity = requestPriceHeaderRepository.save(entity);
@@ -334,7 +328,7 @@ public class RFQService {
     public RequestPriceHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
         entity.setRequestedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-        entity.setStatus(RFQStatus.NEW);
+        entity.setStatus(RfqStatus.NEW);
         entity.setCreatedBy(userProfileService.getNameFromId(userId));
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
 
@@ -406,8 +400,8 @@ public class RFQService {
             addedDetails.add(addedDetail);
         }
 
-        if (entity.getStatus() == RFQStatus.IN_PROGRESS) {
-            entity.setStatus(RFQStatus.QUOTED);
+        if (entity.getStatus() == RfqStatus.IN_PROGRESS) {
+            entity.setStatus(RfqStatus.QUOTED);
             entity.setQuotedDate(now);
         }
 
@@ -498,6 +492,75 @@ public class RFQService {
         entity.setUpdatedBy(updatedBy);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         requestPriceHeaderRepository.save(entity);
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RequestPriceHeaderDto linkSalesOrder(
+            String rfqId,
+            LinkRfqSalesOrderRequest request,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        if (request == null || StringUtils.isBlank(request.getSaleOrderId())) {
+            throw new InvalidRequestException("saleOrderId is required");
+        }
+        if (request.getDetailId() == null) {
+            throw new InvalidRequestException("detailId is required");
+        }
+        if (request.getTierId() == null) {
+            throw new InvalidRequestException("tierId is required");
+        }
+        if (StringUtils.isNotBlank(entity.getSaleOrderId())
+                && !entity.getSaleOrderId().equals(request.getSaleOrderId().trim())) {
+            throw new InvalidRequestException("RFQ " + rfqId + " already linked to sale order " + entity.getSaleOrderId());
+        }
+
+        RfqDetailEntity detail = getDetailFromHeader(entity, request.getDetailId());
+        RfqTierEntity tier = detail.getTiers().stream()
+                .filter(item -> Objects.equals(item.getId(), request.getTierId()))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Tier " + request.getTierId() + " not found."));
+
+        String shippingMethod = StringUtils.trimToNull(request.getShippingMethod());
+        if (!"LAND".equalsIgnoreCase(shippingMethod) && !"SEA".equalsIgnoreCase(shippingMethod)) {
+            throw new InvalidRequestException("shippingMethod must be LAND or SEA");
+        }
+
+        BigDecimal confirmedPrice = request.getPrice();
+        if (confirmedPrice == null) {
+            confirmedPrice = "SEA".equalsIgnoreCase(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
+        }
+
+        entity.setSaleOrderId(request.getSaleOrderId().trim());
+        entity.setConfirmedDetailId(detail.getId());
+        entity.setConfirmedTierId(tier.getId());
+        entity.setConfirmedShippingMethod(shippingMethod.toUpperCase(Locale.ROOT));
+        entity.setConfirmedPrice(confirmedPrice);
+        entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setStatus(RfqStatus.COMPLETED);
+        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> activityDetail = new LinkedHashMap<>();
+        activityDetail.put("saleOrderId", entity.getSaleOrderId());
+        activityDetail.put("detailId", entity.getConfirmedDetailId());
+        activityDetail.put("tierId", entity.getConfirmedTierId());
+        activityDetail.put("shippingMethod", entity.getConfirmedShippingMethod());
+        activityDetail.put("price", entity.getConfirmedPrice());
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "สร้าง Sales Order จากคำขอราคาเลขที่ " + entity.getId(),
+                activityDetail
+        );
 
         return mapToDto(entity);
     }
@@ -1035,12 +1098,13 @@ public class RFQService {
     }
 
     private boolean shouldMoveToInProgressOnView(RfqHeaderEntity entity, String userId) {
-        if (entity == null || userId == null || entity.getStatus() != RFQStatus.NEW) {
+        if (entity == null || userId == null || entity.getStatus() != RfqStatus.NEW) {
             return false;
         }
 
         String roleCode = userProfileService.getRoleCodeFromId(userId);
-        return PROCUREMENT_ROLE_CODE.equalsIgnoreCase(roleCode) || SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(roleCode);
+        return PROCUREMENT_ROLE_CODE.equalsIgnoreCase(roleCode)
+                || SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(roleCode);
     }
 
     private void extractChangedDetails(
@@ -1615,7 +1679,7 @@ public class RFQService {
             return Specification.where(null);
         }
 
-        List<RFQStatus> statuses = request.getStatuses();
+        List<RfqStatus> statuses = request.getStatuses();
         if (statuses == null || statuses.isEmpty()) {
             statuses = request.getStatus() == null ? null : List.of(request.getStatus());
         }

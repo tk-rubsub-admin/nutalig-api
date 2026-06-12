@@ -39,10 +39,13 @@ public class PermissionService {
     private final UserPermissionOverrideRepository userPermissionOverrideRepository;
 
     public Set<String> getEffectivePermission(UserDto user) {
-        log.info("Get Effective Permission for user : {}, role : {}", user.getId(), user.getRole().getRoleCode());
-        String roleCode = user.getRole().getRoleCode();
+        String roleCode = getRoleCode(user);
+        log.info("Get Effective Permission for user : {}, role : {}", user.getId(), roleCode);
 
-        Set<String> perms = new HashSet<>(rolePermissionRepository.findPermissionCodesByRoleCode(roleCode));
+        Set<String> perms = new HashSet<>();
+        if (roleCode != null && !roleCode.isBlank()) {
+            perms.addAll(rolePermissionRepository.findPermissionCodesByRoleCode(roleCode));
+        }
 
         List<UserPermissionOverrideEntity> uop = userPermissionOverrideRepository.findByUserId(user.getId());
         Set<String> userAllow = uop.stream()
@@ -59,6 +62,13 @@ public class PermissionService {
         perms.removeAll(userDeny);
 
         return perms;
+    }
+
+    public String getRoleCode(UserDto user) {
+        if (user.getRole() == null || user.getRole().getRoleCode() == null || user.getRole().getRoleCode().isBlank()) {
+            return null;
+        }
+        return user.getRole().getRoleCode();
     }
 
     public List<GrantedAuthority> toAuthorities(Set<String> perms) {

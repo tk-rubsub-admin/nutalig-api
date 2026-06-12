@@ -13,6 +13,7 @@ import com.nutalig.service.UserProfileService;
 import com.nutalig.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -112,5 +113,19 @@ public class UserController {
         log.info("===== End update role permissions size {} =====", response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
+
+//    @PostMapping("/api/users/notification-token")
+//    public ResponseEntity<?> saveToken(@RequestBody NotificationTokenRequest request) {
+//
+//        notificationTokenService.save(
+//                request.getUserId(),
+//                request.getToken(),
+//                request.getPlatform()
+//
+//        );
+//
+//        return ResponseEntity.ok().build();
+//
+//    }
 
 }

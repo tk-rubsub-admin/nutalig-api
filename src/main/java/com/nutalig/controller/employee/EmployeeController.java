@@ -1,13 +1,17 @@
 package com.nutalig.controller.employee;
 
 import com.nutalig.controller.employee.request.CreateEmployeeRequest;
+import com.nutalig.controller.employee.request.SearchEmployeeRequest;
 import com.nutalig.controller.employee.request.UpdateEmployeeRequest;
+import com.nutalig.controller.employee.response.SearchEmployeeResponse;
+import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.dto.EmployeeDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.EmployeeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +50,19 @@ public class EmployeeController {
         Pageable<EmployeeDto> response = employeeService.searchEmployees(page, size, keyword);
 
         log.info("=== End search employees page {} size {} ===", page, size);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/search")
+    public GeneralResponse<SearchEmployeeResponse> searchEmployees(
+            @RequestBody(required = false) SearchEmployeeRequest request,
+            @Valid PageableRequest pageableRequest
+    ) {
+        log.info("=== Start search employees page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+
+        SearchEmployeeResponse response = employeeService.searchEmployee(request, pageableRequest);
+
+        log.info("=== End search employees page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

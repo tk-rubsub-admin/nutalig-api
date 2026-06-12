@@ -20,6 +20,7 @@ public class UserEntity extends AuditDateEntity {
             },
             strategy = "com.nutalig.repository.jpa.IdGenerator")
     @GeneratedValue(generator = "userIdGenerator")
+    @Column(name = "id", length = 100)
     private String id;
 
     @Column(name = "username")

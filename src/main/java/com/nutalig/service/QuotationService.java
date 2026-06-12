@@ -39,14 +39,13 @@ import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.*;
 
+import static com.nutalig.constant.BusinessConstant.VAT_RATE;
 import static com.nutalig.repository.specification.QuotationSpecification.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class QuotationService {
-
-    private static final BigDecimal VAT_RATE = new BigDecimal("0.07");
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final LineMessageService lineMessageService;

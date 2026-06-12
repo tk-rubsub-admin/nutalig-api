@@ -1,6 +1,6 @@
 package com.nutalig.controller.rfq.request;
 
-import com.nutalig.constant.RFQStatus;
+import com.nutalig.constant.RfqStatus;
 import lombok.Data;
 
 import java.util.List;
@@ -9,8 +9,8 @@ import java.util.List;
 public class SearchRFQRequest {
 
     private String id;
-    private RFQStatus status;
-    private List<RFQStatus> statuses;
+    private RfqStatus status;
+    private List<RfqStatus> statuses;
     private String customerId;
     private String salesId;
     private String orderTypeCode;

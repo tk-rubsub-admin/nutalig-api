@@ -1,6 +1,6 @@
 package com.nutalig.entity;
 
-import com.nutalig.constant.RFQStatus;
+import com.nutalig.constant.RfqStatus;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -41,7 +41,7 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     @ToString.Include
-    private RFQStatus status;
+    private RfqStatus status;
 
     @ToString.Include
     @Column(name = "contact_name")
@@ -148,6 +148,26 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @ToString.Include
     @Column(name = "quotation_no", length = 50)
     private String quotationNo;
+
+    @ToString.Include
+    @Column(name = "sale_order_id", length = 100)
+    private String saleOrderId;
+
+    @Column(name = "confirmed_detail_id")
+    private Long confirmedDetailId;
+
+    @Column(name = "confirmed_tier_id")
+    private Long confirmedTierId;
+
+    @Column(name = "confirmed_shipping_method", length = 20)
+    private String confirmedShippingMethod;
+
+    @Column(name = "confirmed_price", precision = 18, scale = 4)
+    private java.math.BigDecimal confirmedPrice;
+
+    @ToString.Include
+    @Column(name = "confirmed_date")
+    private ZonedDateTime confirmedDate;
 
     public void addPicture(RfqPicturesEntity picture) {
         pictures.add(picture);

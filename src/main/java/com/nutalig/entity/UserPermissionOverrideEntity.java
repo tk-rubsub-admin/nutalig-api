@@ -14,7 +14,7 @@ import java.time.ZonedDateTime;
 public class UserPermissionOverrideEntity {
 
     @Id
-    @Column(name = "user_id", length = 64)
+    @Column(name = "user_id", length = 100)
     private String userId;
 
     @Id

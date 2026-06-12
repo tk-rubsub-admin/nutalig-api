@@ -22,8 +22,8 @@ public interface UserRepository extends JpaRepository<UserEntity, String>, JpaSp
     boolean existsByLineUserId(String lineUserId);
 
     @Query("""
-       SELECT u 
-       FROM User u 
+       SELECT DISTINCT u 
+       FROM User u
        WHERE u.userRoleEntity.roleCode IN :roleCodes
        """)
     List<UserEntity> findByRoleIn(@Param("roleCodes") List<String> roleCodes);

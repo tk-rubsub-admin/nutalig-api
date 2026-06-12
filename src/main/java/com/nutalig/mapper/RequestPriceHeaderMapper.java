@@ -49,6 +49,12 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
+    @Mapping(target = "saleOrderId", ignore = true)
+    @Mapping(target = "confirmedDetailId", ignore = true)
+    @Mapping(target = "confirmedTierId", ignore = true)
+    @Mapping(target = "confirmedShippingMethod", ignore = true)
+    @Mapping(target = "confirmedPrice", ignore = true)
+    @Mapping(target = "confirmedDate", ignore = true)
     RfqHeaderEntity toEntity(CreateRequestPriceHeaderRequest request);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -67,6 +73,12 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
+    @Mapping(target = "saleOrderId", ignore = true)
+    @Mapping(target = "confirmedDetailId", ignore = true)
+    @Mapping(target = "confirmedTierId", ignore = true)
+    @Mapping(target = "confirmedShippingMethod", ignore = true)
+    @Mapping(target = "confirmedPrice", ignore = true)
+    @Mapping(target = "confirmedDate", ignore = true)
     void updateEntityFromRequest(UpdateRequestPriceHeaderRequest request, @MappingTarget RfqHeaderEntity entity);
 
     RequestPricePicturesDto toPictureDto(RfqPicturesEntity entity);

@@ -58,8 +58,8 @@ public class UserProfileService {
     @Transactional(readOnly = true)
     public String getRoleCodeFromId(String userId) {
         return userRepository.findById(userId)
-                .map(UserEntity::getUserRoleEntity)
-                .map(role -> role.getRoleCode())
+                .flatMap(user -> Optional.ofNullable(user.getUserRoleEntity())
+                        .map(role -> role.getRoleCode()))
                 .orElse(null);
     }
 

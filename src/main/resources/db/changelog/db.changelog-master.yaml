@@ -535,3 +535,258 @@ databaseChangeLog:
               - column:
                   name: rev_no
                   type: INT
+
+  - changeSet:
+      id: 20260609-001-create-user-role-mapping
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS user_role_mapping (
+                  user_id VARCHAR(64) NOT NULL,
+                  role_code VARCHAR(64) NOT NULL,
+                  PRIMARY KEY (user_id, role_code),
+                  KEY idx_user_role_mapping_user_id (user_id),
+                  KEY idx_user_role_mapping_role_code (role_code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT IGNORE INTO user_role_mapping (user_id, role_code)
+              SELECT id, role_code
+              FROM `user`
+              WHERE role_code IS NOT NULL AND role_code <> '';
+
+  - changeSet:
+      id: 20260609-002-expand-user-id-columns-to-100
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              SET @drop_uop_fk = (
+                  SELECT IF(
+                      COUNT(*) > 0,
+                      'ALTER TABLE user_permission_override DROP FOREIGN KEY fk_uop_user',
+                      'SELECT 1'
+                  )
+                  FROM information_schema.TABLE_CONSTRAINTS
+                  WHERE CONSTRAINT_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'user_permission_override'
+                    AND CONSTRAINT_NAME = 'fk_uop_user'
+                    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+              );
+              PREPARE stmt FROM @drop_uop_fk;
+              EXECUTE stmt;
+              DEALLOCATE PREPARE stmt;
+
+              SET @drop_user_role_mapping_fk = (
+                  SELECT IF(
+                      COUNT(*) > 0,
+                      'ALTER TABLE user_role_mapping DROP FOREIGN KEY fk_user_role_mapping_user',
+                      'SELECT 1'
+                  )
+                  FROM information_schema.TABLE_CONSTRAINTS
+                  WHERE CONSTRAINT_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'user_role_mapping'
+                    AND CONSTRAINT_NAME = 'fk_user_role_mapping_user'
+                    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+              );
+              PREPARE stmt FROM @drop_user_role_mapping_fk;
+              EXECUTE stmt;
+              DEALLOCATE PREPARE stmt;
+
+              ALTER TABLE user_permission_override
+                MODIFY COLUMN user_id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
+
+              ALTER TABLE user_role_mapping
+                MODIFY COLUMN user_id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
+
+              ALTER TABLE `user`
+                MODIFY COLUMN id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
+
+              ALTER TABLE user_permission_override
+                ADD CONSTRAINT fk_uop_user FOREIGN KEY (user_id) REFERENCES `user` (id);
+
+              ALTER TABLE user_role_mapping
+                ADD CONSTRAINT fk_user_role_mapping_user FOREIGN KEY (user_id) REFERENCES `user` (id);
+
+  - changeSet:
+      id: 20260609-003-add-user-role-mapping-primary-role
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: user_role_mapping
+                columnName: primary_role
+      changes:
+        - addColumn:
+            tableName: user_role_mapping
+            columns:
+              - column:
+                  name: primary_role
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 20260609-004-seed-user-role-mapping-primary-role
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              UPDATE user_role_mapping
+              SET primary_role = false
+              WHERE primary_role IS NULL;
+
+              UPDATE user_role_mapping urm
+              JOIN `user` u ON u.id = urm.user_id AND u.role_code = urm.role_code
+              SET urm.primary_role = true;
+
+              UPDATE user_role_mapping urm
+              JOIN (
+                  SELECT user_id, MIN(role_code) AS role_code
+                  FROM user_role_mapping
+                  GROUP BY user_id
+              ) first_role ON first_role.user_id = urm.user_id AND first_role.role_code = urm.role_code
+              LEFT JOIN (
+                  SELECT user_id
+                  FROM user_role_mapping
+                  WHERE primary_role = true
+                  GROUP BY user_id
+              ) primary_role_user ON primary_role_user.user_id = urm.user_id
+              SET urm.primary_role = true
+              WHERE primary_role_user.user_id IS NULL;
+
+  - changeSet:
+      id: 20260610-001-drop-user-role-mapping
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: user_role_mapping
+      changes:
+        - dropTable:
+            tableName: user_role_mapping
+
+  - changeSet:
+      id: 20260610-002-add-rfq-sales-order-link
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: sale_order_id
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: sale_order_id
+                  type: VARCHAR(100)
+              - column:
+                  name: confirmed_detail_id
+                  type: BIGINT
+              - column:
+                  name: confirmed_tier_id
+                  type: BIGINT
+              - column:
+                  name: confirmed_shipping_method
+                  type: VARCHAR(20)
+              - column:
+                  name: confirmed_price
+                  type: DECIMAL(18,4)
+              - column:
+                  name: confirmed_date
+                  type: DATETIME
+
+  - changeSet:
+      id: 20260612-001-create-search-field-visibility-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS search_screen (
+                  screen_code VARCHAR(64) NOT NULL,
+                  name_th VARCHAR(255) DEFAULT NULL,
+                  name_en VARCHAR(255) DEFAULT NULL,
+                  module_code VARCHAR(64) DEFAULT NULL,
+                  active BOOLEAN NOT NULL DEFAULT TRUE,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (screen_code),
+                  KEY idx_search_screen_module_code (module_code),
+                  KEY idx_search_screen_active (active)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS search_field (
+                  screen_code VARCHAR(64) NOT NULL,
+                  field_code VARCHAR(64) NOT NULL,
+                  label_th VARCHAR(255) DEFAULT NULL,
+                  label_en VARCHAR(255) DEFAULT NULL,
+                  input_type VARCHAR(32) NOT NULL,
+                  sort_order INT DEFAULT NULL,
+                  active BOOLEAN NOT NULL DEFAULT TRUE,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (screen_code, field_code),
+                  KEY idx_search_field_screen_active_sort (screen_code, active, sort_order)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS role_search_field_visibility (
+                  role_code VARCHAR(64) NOT NULL,
+                  screen_code VARCHAR(64) NOT NULL,
+                  field_code VARCHAR(64) NOT NULL,
+                  visible BOOLEAN NOT NULL DEFAULT FALSE,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (role_code, screen_code, field_code),
+                  KEY idx_role_search_field_role_screen_visible (role_code, screen_code, visible),
+                  KEY idx_role_search_field_screen_field (screen_code, field_code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260612-002-seed-search-fields
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO search_screen (screen_code, name_th, name_en, module_code, active, created_date, updated_date) VALUES
+              ('SALE_ORDER_LIST', 'รายการใบยืนยันสั่งซื้อ', 'Sales order list', 'SALE_ORDER', TRUE, NOW(6), NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  module_code = VALUES(module_code),
+                  active = VALUES(active),
+                  updated_date = NOW(6);
+
+              INSERT INTO search_field (screen_code, field_code, label_th, label_en, input_type, sort_order, active, created_date, updated_date) VALUES
+              ('SALE_ORDER_LIST', 'salesOrderNo', 'เลขที่เอกสาร', 'Sales order no.', 'TEXT', 10, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'customerId', 'รหัสลูกค้า', 'Customer ID', 'TEXT', 20, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'salesId', 'รหัสเซลล์', 'Sales ID', 'TEXT', 30, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'status', 'สถานะ', 'Status', 'SELECT', 40, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'docDateStart', 'วันที่เอกสารเริ่มต้น', 'Document date from', 'DATE', 50, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'docDateEnd', 'วันที่เอกสารสิ้นสุด', 'Document date to', 'DATE', 60, TRUE, NOW(6), NOW(6)),
+              ('SALE_ORDER_LIST', 'keyword', 'คำค้นหา', 'Keyword', 'TEXT', 70, TRUE, NOW(6), NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  label_th = VALUES(label_th),
+                  label_en = VALUES(label_en),
+                  input_type = VALUES(input_type),
+                  sort_order = VALUES(sort_order),
+                  active = VALUES(active),
+                  updated_date = NOW(6);
+
+              INSERT INTO role_search_field_visibility (role_code, screen_code, field_code, visible, updated_by, created_date, updated_date)
+              SELECT 'SUPER_ADMIN', sf.screen_code, sf.field_code, TRUE, 'SYSTEM', NOW(6), NOW(6)
+              FROM search_field sf
+              WHERE sf.screen_code = 'SALE_ORDER_LIST'
+              ON DUPLICATE KEY UPDATE
+                  visible = VALUES(visible),
+                  updated_by = VALUES(updated_by),
+                  updated_date = NOW(6);

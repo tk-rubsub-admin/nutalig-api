@@ -1,6 +1,6 @@
 package com.nutalig.dto;
 
-import com.nutalig.constant.RFQStatus;
+import com.nutalig.constant.RfqStatus;
 import lombok.Data;
 
 import java.time.ZonedDateTime;
@@ -11,7 +11,7 @@ public class RequestPriceHeaderDto {
 
     private String id;
     private ZonedDateTime requestedDate;
-    private RFQStatus status;
+    private RfqStatus status;
     private String contactName;
     private String contactPhone;
     private EmployeeDto sales;
@@ -34,4 +34,10 @@ public class RequestPriceHeaderDto {
     private ZonedDateTime slaDate;
     private ZonedDateTime quotedDate;
     private String quotationNo;
+    private String saleOrderId;
+    private Long confirmedDetailId;
+    private Long confirmedTierId;
+    private String confirmedShippingMethod;
+    private java.math.BigDecimal confirmedPrice;
+    private ZonedDateTime confirmedDate;
 }

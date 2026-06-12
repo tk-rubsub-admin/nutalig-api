@@ -1,6 +1,6 @@
 package com.nutalig.repository.specification;
 
-import com.nutalig.constant.RFQStatus;
+import com.nutalig.constant.RfqStatus;
 import com.nutalig.entity.*;
 import com.nutalig.entity.RfqHeaderEntity;
 import jakarta.persistence.criteria.Join;
@@ -20,7 +20,7 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> cb.equal(cb.lower(root.get("id")), id.trim().toLowerCase());
     }
 
-    public static Specification<RfqHeaderEntity> statusEqual(RFQStatus status) {
+    public static Specification<RfqHeaderEntity> statusEqual(RfqStatus status) {
         if (status == null) {
             return null;
         }
@@ -28,7 +28,7 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> cb.equal(root.get("status"), status);
     }
 
-    public static Specification<RfqHeaderEntity> statusIn(List<RFQStatus> statuses) {
+    public static Specification<RfqHeaderEntity> statusIn(List<RfqStatus> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return null;
         }

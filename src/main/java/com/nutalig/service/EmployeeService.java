@@ -76,6 +76,13 @@ public class EmployeeService {
 
     @Transactional(readOnly = true)
     public SearchEmployeeResponse searchEmployee(SearchEmployeeRequest searchRequest, PageableRequest pageableRequest) {
+        if (pageableRequest.getPage() == null || pageableRequest.getPage() < 1) {
+            pageableRequest.setPage(1);
+        }
+        if (pageableRequest.getSize() == null || pageableRequest.getSize() < 1) {
+            pageableRequest.setSize(10);
+        }
+
         log.info("Search employee by criteria {} page {} size {}", searchRequest, pageableRequest.getPage(), pageableRequest.getSize());
 
         pageableRequest.setSortBy("employeeId");

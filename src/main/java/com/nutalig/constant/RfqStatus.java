@@ -1,6 +1,6 @@
 package com.nutalig.constant;
 
-public enum RFQStatus {
+public enum RfqStatus {
     NEW,
     IN_PROGRESS,
     QUOTED,

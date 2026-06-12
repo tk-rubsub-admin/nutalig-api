@@ -251,6 +251,20 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PatchMapping("/{id}/sales-order")
+    public GeneralResponse<RequestPriceHeaderDto> linkSalesOrder(
+            @PathVariable("id") String id,
+            @RequestBody LinkRfqSalesOrderRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start link rfq {} to sale order {} by {} ===", id, request == null ? null : request.getSaleOrderId(), userId);
+
+        RequestPriceHeaderDto response = rfqService.linkSalesOrder(id, request, userId);
+
+        log.info("=== End link rfq {} to sale order {} ===", id, response.getSaleOrderId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/{id}/details/{detailId}")
     public GeneralResponse<RequestPriceHeaderDto> updateRFQDetail(
             @PathVariable("id") String id,

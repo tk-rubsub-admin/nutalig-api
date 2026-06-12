@@ -10,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
-
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -40,8 +38,8 @@ public class UserDetailsServiceImpl {
     private UserDto enrichUser(UserEntity userEntity) {
         UserDto userDto = userMapper.toDto(userEntity);
 
-        Set<String> perms = permissionService.getEffectivePermission(userDto);
-        userDto.setAuthorities(permissionService.toAuthorities(perms, userDto.getRole().getRoleCode()));
+        var perms = permissionService.getEffectivePermission(userDto);
+        userDto.setAuthorities(permissionService.toAuthorities(perms, permissionService.getRoleCode(userDto)));
         userDto.setPermissions(perms.stream().toList());
         return userDto;
     }

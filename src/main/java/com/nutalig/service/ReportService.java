@@ -5,6 +5,7 @@ import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.SystemConstant;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.QuotationDocumentDto;
+import com.nutalig.dto.document.SalesOrderDocumentDto;
 import com.nutalig.utils.JasperReportUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +36,8 @@ public class ReportService {
     private static final String SIGNATURE = "report/signature.jpg";
     private static final String INVOICE_TEMPLATE = "report/invoice.jrxml";
     private static final String QUOTATION_TEMPLATE = "report/quotation.jrxml";
+    private static final String SALES_ORDER_TEMPLATE = "report/salesOrder.jrxml";
 
-    private final SystemConfigService systemConfigService;
     private final ObjectMapper objectMapper;
 
     /* ======================= PUBLIC APIs ======================= */
@@ -71,6 +72,52 @@ public class ReportService {
 
         JasperPrint jasperPrint = buildJasperPrint(
                 QUOTATION_TEMPLATE,
+                parameters,
+                new JRBeanCollectionDataSource(dto.getItems())
+        );
+
+        if (format == ExportFileFormat.PDF) {
+            return JasperReportUtil.exportJasperToPdf(jasperPrint);
+        }
+
+        if (format == ExportFileFormat.JPG) {
+            return exportImages(jasperPrint);
+        }
+
+        return null;
+    }
+
+    public Object getSalesOrderDocument(SalesOrderDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+
+        parameters.put("docNo", dto.getDocNo());
+        parameters.put("docDate", dto.getDocDate());
+        parameters.put("custName", dto.getCustName());
+        parameters.put("custTaxId", dto.getCustTaxId());
+        parameters.put("custAddress", dto.getCustAddress());
+        parameters.put("custMobileNo", dto.getCustMobileNo());
+
+        parameters.put("salesId", dto.getSalesId());
+        parameters.put("salesName", dto.getSalesName());
+        parameters.put("salesNickname", dto.getSalesNickname());
+        parameters.put("salesMobileNo", dto.getSalesMobileNo());
+        parameters.put("coSalesId", dto.getCoSalesId());
+
+        parameters.put("subTotal", dto.getSubTotal());
+        parameters.put("discount", dto.getDiscount());
+        parameters.put("freight", dto.getFreight());
+        parameters.put("vat", dto.getVat());
+        parameters.put("grandTotal", dto.getGrandTotal());
+        parameters.put("remark", dto.getRemark());
+        parameters.put("thaiBahtText", dto.getThaiBahtText());
+        parameters.put("logo", loadResource(NUTALIG_LOGO));
+
+        parameters.put("bankName", dto.getBankName());
+        parameters.put("accountName", dto.getAccountName());
+        parameters.put("accountNo", dto.getAccountNo());
+
+        JasperPrint jasperPrint = buildJasperPrint(
+                SALES_ORDER_TEMPLATE,
                 parameters,
                 new JRBeanCollectionDataSource(dto.getItems())
         );

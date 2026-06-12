@@ -1,7 +1,9 @@
 package com.nutalig.mapper;
 
 import com.nutalig.dto.UserDto;
+import com.nutalig.dto.UserRoleDto;
 import com.nutalig.entity.UserEntity;
+import com.nutalig.entity.UserRoleEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -15,10 +17,12 @@ import java.util.stream.Collectors;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserMapper {
 
-    @Mapping(target = "authorities", source = "userRoleEntity.roleCode")
+    @Mapping(target = "authorities", ignore = true)
     @Mapping(target = "role", source = "userRoleEntity")
     @Mapping(target = "employeeId", source = "employeeEntity.employeeId")
     UserDto toDto(UserEntity entity);
+
+    UserRoleDto toRoleDto(UserRoleEntity entity);
 
 //    @Mapping(target = "username", source = "email")
 //    UserEntity toEntity(CreateNewUserRequest request);

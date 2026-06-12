@@ -3,5 +3,6 @@ package com.nutalig.constant;
 public enum ActivityEntityType {
     RFQ,
     CUSTOMER,
-    QUOTATION
+    QUOTATION,
+    SALES_ORDER
 }
