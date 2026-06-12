@@ -29,13 +29,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-import static com.nutalig.repository.specification.EmployeeSpecification.employeeIdEqual;
-import static com.nutalig.repository.specification.EmployeeSpecification.keywordContain;
-import static com.nutalig.repository.specification.EmployeeSpecification.nameContain;
-import static com.nutalig.repository.specification.EmployeeSpecification.positionEqual;
-import static com.nutalig.repository.specification.EmployeeSpecification.statusEqual;
+import static com.nutalig.repository.specification.EmployeeSpecification.*;
 
 @Slf4j
 @Service

@@ -1,10 +1,7 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.EmployeeStatus;
-import com.nutalig.constant.Status;
 import lombok.Data;
-
-import java.time.ZonedDateTime;
 
 @Data
 public class EmployeeDto {

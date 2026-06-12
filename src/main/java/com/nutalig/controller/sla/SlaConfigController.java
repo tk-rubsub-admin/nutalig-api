@@ -1,8 +1,8 @@
 package com.nutalig.controller.sla;
 
+import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.sla.request.CreateSlaConfigRequest;
 import com.nutalig.controller.sla.request.UpdateSlaConfigRequest;
-import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.dto.SlaConfigDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;

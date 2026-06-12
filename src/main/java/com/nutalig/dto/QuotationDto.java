@@ -1,11 +1,9 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.QuotationStatus;
-import jakarta.persistence.Column;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 @Data

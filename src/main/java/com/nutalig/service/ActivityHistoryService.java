@@ -2,11 +2,7 @@ package com.nutalig.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nutalig.constant.ActivityAction;
-import com.nutalig.constant.ActivityActorType;
-import com.nutalig.constant.ActivityEntityType;
-import com.nutalig.constant.ActivitySource;
-import com.nutalig.constant.RequestHeader;
+import com.nutalig.constant.*;
 import com.nutalig.dto.ActivityHistoryDto;
 import com.nutalig.entity.ActivityHistoryEntity;
 import com.nutalig.entity.UserEntity;

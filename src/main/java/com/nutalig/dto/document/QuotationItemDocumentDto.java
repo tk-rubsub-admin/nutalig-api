@@ -2,7 +2,6 @@ package com.nutalig.dto.document;
 
 import lombok.Data;
 
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 

@@ -15,4 +15,5 @@ public class SearchRFQRequest {
     private String salesId;
     private String orderTypeCode;
     private String keyword;
+
 }

@@ -12,14 +12,14 @@ import com.nutalig.entity.SalesEntity;
 import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
+import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.repository.SalesRepository;
 import com.nutalig.repository.SystemConfigRepository;
-import com.nutalig.mapper.SystemConfigMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -27,9 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static com.nutalig.repository.specification.SalesSpecification.keywordContain;
-import static com.nutalig.repository.specification.SalesSpecification.salesIdEqual;
-import static com.nutalig.repository.specification.SalesSpecification.typeEqual;
+import static com.nutalig.repository.specification.SalesSpecification.*;
 
 @Slf4j
 @Service

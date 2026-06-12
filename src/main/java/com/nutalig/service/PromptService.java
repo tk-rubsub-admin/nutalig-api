@@ -1,7 +1,6 @@
 package com.nutalig.service;
 
 import com.nutalig.entity.AiPromptEntity;
-import com.nutalig.exception.AiException;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.AiPromptRepository;
 import lombok.RequiredArgsConstructor;

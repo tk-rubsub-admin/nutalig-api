@@ -13,7 +13,6 @@ import com.nutalig.entity.QuotationEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.service.QuotationService;
 import jakarta.validation.Valid;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

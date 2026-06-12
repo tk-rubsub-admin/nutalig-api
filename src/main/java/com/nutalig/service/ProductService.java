@@ -1,11 +1,6 @@
 package com.nutalig.service;
 
-import com.nutalig.controller.product.request.CreateProductFamilyRequest;
-import com.nutalig.controller.product.request.CreateProductSubtype1Request;
-import com.nutalig.controller.product.request.CreateProductSubtype2Request;
-import com.nutalig.controller.product.request.UpdateProductFamilyRequest;
-import com.nutalig.controller.product.request.UpdateProductSubtype1Request;
-import com.nutalig.controller.product.request.UpdateProductSubtype2Request;
+import com.nutalig.controller.product.request.*;
 import com.nutalig.dto.ProductFamilyDto;
 import com.nutalig.dto.ProductMaterialDto;
 import com.nutalig.dto.ProductSubtype1Dto;

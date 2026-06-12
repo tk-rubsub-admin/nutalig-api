@@ -1,25 +1,13 @@
 package com.nutalig.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nutalig.config.LineConfiguration;
-import com.nutalig.dto.line.Msg;
-import com.nutalig.dto.line.SendMessageRequest;
 import com.nutalig.entity.KeywordMappingPromptEntity;
-import com.nutalig.entity.UserEntity;
-import com.nutalig.exception.DataNotFoundException;
-import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.registry.PromptResultDispatcher;
 import com.nutalig.repository.KeywordMappingPromptRepository;
-import com.nutalig.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;

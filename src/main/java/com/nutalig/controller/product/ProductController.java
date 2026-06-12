@@ -1,11 +1,6 @@
 package com.nutalig.controller.product;
 
-import com.nutalig.controller.product.request.CreateProductFamilyRequest;
-import com.nutalig.controller.product.request.CreateProductSubtype1Request;
-import com.nutalig.controller.product.request.CreateProductSubtype2Request;
-import com.nutalig.controller.product.request.UpdateProductFamilyRequest;
-import com.nutalig.controller.product.request.UpdateProductSubtype1Request;
-import com.nutalig.controller.product.request.UpdateProductSubtype2Request;
+import com.nutalig.controller.product.request.*;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.dto.ProductFamilyDto;
 import com.nutalig.dto.ProductMaterialDto;
@@ -16,14 +11,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 

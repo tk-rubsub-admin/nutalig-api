@@ -1,7 +1,7 @@
 package com.nutalig.service;
 
-import com.nutalig.constant.*;
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.*;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pageable;
@@ -12,7 +12,9 @@ import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
 import com.nutalig.dto.SalesOrderDetailDto;
 import com.nutalig.dto.SalesOrderDto;
 import com.nutalig.dto.SystemConfigDto;
-import com.nutalig.dto.document.*;
+import com.nutalig.dto.document.DownloadDocumentDto;
+import com.nutalig.dto.document.SalesOrderDocumentDto;
+import com.nutalig.dto.document.SalesOrderItemDocumentDto;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -20,12 +22,7 @@ import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.mapper.UserMapper;
-import com.nutalig.repository.CustomerRepository;
-import com.nutalig.repository.EmployeeRepository;
-import com.nutalig.repository.RequestPriceHeaderRepository;
-import com.nutalig.repository.SalesOrderRepository;
-import com.nutalig.repository.SupplierRepository;
-import com.nutalig.repository.UserRepository;
+import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
@@ -49,13 +46,7 @@ import java.util.*;
 
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.SALES_ORDER_PREFIX;
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
-import static com.nutalig.repository.specification.SalesOrderSpecification.customerIdEqual;
-import static com.nutalig.repository.specification.SalesOrderSpecification.docDateBetween;
-import static com.nutalig.repository.specification.SalesOrderSpecification.keywordContains;
-import static com.nutalig.repository.specification.SalesOrderSpecification.salesIdEqual;
-import static com.nutalig.repository.specification.SalesOrderSpecification.salesOrderNoEqual;
-import static com.nutalig.repository.specification.SalesOrderSpecification.statusEqual;
-import static com.nutalig.repository.specification.SalesOrderSpecification.statusIn;
+import static com.nutalig.repository.specification.SalesOrderSpecification.*;
 
 @Slf4j
 @Service

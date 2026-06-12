@@ -3,9 +3,9 @@ package com.nutalig.controller.rfq;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.rfq.request.*;
+import com.nutalig.dto.RequestPriceHeaderDto;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
-import com.nutalig.dto.RequestPriceHeaderDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -36,6 +36,20 @@ public class RFQController {
         com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> response = rfqService.getAllRFQ(searchRequest, pageableRequest);
 
         log.info("=== End get all rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/search")
+    public GeneralResponse<com.nutalig.controller.response.Pageable<RequestPriceHeaderDto>> searchRFQ(
+            @RequestBody(required = false) SearchRFQRequest searchRequest,
+            @Valid PageableRequest pageableRequest
+    ) {
+        log.info("=== Start search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+
+        com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> response =
+                rfqService.getAllRFQ(searchRequest, pageableRequest);
+
+        log.info("=== End search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

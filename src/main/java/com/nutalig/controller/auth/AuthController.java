@@ -1,9 +1,12 @@
 package com.nutalig.controller.auth;
 
-import com.nutalig.controller.auth.request.LoginRequest;
 import com.nutalig.controller.auth.request.LineLoginRequest;
 import com.nutalig.controller.auth.request.LineRegisterRequest;
-import com.nutalig.controller.auth.response.*;
+import com.nutalig.controller.auth.request.LoginRequest;
+import com.nutalig.controller.auth.response.LineAuthorizeUrlResponse;
+import com.nutalig.controller.auth.response.LineLoginResponse;
+import com.nutalig.controller.auth.response.LineRegisterResponse;
+import com.nutalig.controller.auth.response.LineRegisterValidationResponse;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -14,12 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 

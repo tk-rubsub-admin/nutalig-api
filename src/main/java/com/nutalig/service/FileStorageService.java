@@ -2,6 +2,7 @@ package com.nutalig.service;
 
 import com.nutalig.config.AppProperties;
 import com.nutalig.controller.file.response.UploadFileResponse;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -10,7 +11,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import lombok.RequiredArgsConstructor;
 
 import java.io.InputStream;
 import java.nio.file.Files;

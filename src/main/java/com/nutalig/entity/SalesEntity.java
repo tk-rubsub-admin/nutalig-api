@@ -1,6 +1,5 @@
 package com.nutalig.entity;
 
-import com.nutalig.constant.SalesType;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

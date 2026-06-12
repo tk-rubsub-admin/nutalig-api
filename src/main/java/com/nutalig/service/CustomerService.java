@@ -2,11 +2,7 @@ package com.nutalig.service;
 
 import com.nutalig.constant.Status;
 import com.nutalig.constant.SystemConstant;
-import com.nutalig.controller.customer.request.CreateCustomerAddressRequest;
-import com.nutalig.controller.customer.request.CreateCustomerContactRequest;
-import com.nutalig.controller.customer.request.CreateCustomerRequest;
-import com.nutalig.controller.customer.request.SearchCustomerRequest;
-import com.nutalig.controller.customer.request.UpdateCustomerRequest;
+import com.nutalig.controller.customer.request.*;
 import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;

@@ -1,10 +1,6 @@
 package com.nutalig.controller.customer;
 
-import com.nutalig.controller.customer.request.CreateCustomerRequest;
-import com.nutalig.controller.customer.request.CreateCustomerAddressRequest;
-import com.nutalig.controller.customer.request.CreateCustomerContactRequest;
-import com.nutalig.controller.customer.request.SearchCustomerRequest;
-import com.nutalig.controller.customer.request.UpdateCustomerRequest;
+import com.nutalig.controller.customer.request.*;
 import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;

@@ -24,9 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-import static com.nutalig.repository.specification.SystemConfigSpecification.codeEqual;
-import static com.nutalig.repository.specification.SystemConfigSpecification.groupCodeEqual;
-import static com.nutalig.repository.specification.SystemConfigSpecification.keywordContain;
+import static com.nutalig.repository.specification.SystemConfigSpecification.*;
 
 @Slf4j
 @Service

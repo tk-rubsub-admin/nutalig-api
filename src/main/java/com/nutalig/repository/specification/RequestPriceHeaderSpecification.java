@@ -2,7 +2,6 @@ package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.entity.*;
-import com.nutalig.entity.RfqHeaderEntity;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;

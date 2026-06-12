@@ -4,14 +4,7 @@ import com.nutalig.constant.ActivityAction;
 import com.nutalig.constant.ActivityActorType;
 import com.nutalig.constant.ActivityEntityType;
 import com.nutalig.constant.ActivitySource;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.ZonedDateTime;
