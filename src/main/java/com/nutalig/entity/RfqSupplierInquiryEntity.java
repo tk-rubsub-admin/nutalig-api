@@ -38,10 +38,6 @@ public class RfqSupplierInquiryEntity extends AuditDateEntity {
     @JoinColumn(name = "rfq_header_id", referencedColumnName = "id", nullable = false)
     private RfqHeaderEntity requestPriceHeader;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "supplier_id", referencedColumnName = "id", nullable = false)
-    private SupplierEntity supplier;
-
     @Column(name = "version_no", nullable = false)
     private Integer versionNo;
 

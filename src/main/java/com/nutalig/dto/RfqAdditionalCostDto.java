@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.ZonedDateTime;
 
 @Data
-public class RequestPriceAdditionalCostDto {
+public class RfqAdditionalCostDto {
 
     private Long id;
     private SupplierDto supplier;

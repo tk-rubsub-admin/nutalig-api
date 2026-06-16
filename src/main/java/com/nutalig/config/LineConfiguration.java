@@ -14,9 +14,13 @@ public class LineConfiguration {
     private final Channel channel = new Channel();
     private final Login login = new Login();
 
-    public String getLineMessageApiUrl() {
-        return message.getApi();
-    }
+    public String getLineMessageApiUrl() { return message.getApi(); }
+
+    public String getLineMessageChannelId() { return message.getChannel().getId(); }
+
+    public String getLineMessageChannelSecret() { return message.getChannel().getSecret(); }
+
+    public String getLineMessageAccessToken() { return message.getChannel().getAccessToken(); }
 
     public String getLineChannelAccessToken() {
         return channel.getAccessToken();
@@ -26,17 +30,13 @@ public class LineConfiguration {
         return channel.getSecret();
     }
 
-    public String getLineChannelId() {
-        return channel.getId();
-    }
+    public String getLineChannelId() { return channel.getId(); }
 
     public String getVerifyAccessTokenUrl() {
         return login.getVerifyAccessTokenUrl();
     }
 
-    public String getAuthorizeUrl() {
-        return login.getAuthorizeUrl();
-    }
+    public String getAuthorizeUrl() { return login.getAuthorizeUrl(); }
 
     public String getTokenUrl() {
         return login.getTokenUrl();
@@ -78,6 +78,8 @@ public class LineConfiguration {
     @Setter
     public static class Message {
         private String api;
+        private Channel channel;
+
     }
 
     @Getter
@@ -108,6 +110,9 @@ public class LineConfiguration {
     public void test() {
         System.out.println("=== LINE CONFIG ===");
         System.out.println("line.message.api = " + getLineMessageApiUrl());
+        System.out.println("line.message.channel.id = " + getLineMessageChannelId());
+        System.out.println("line.message.channel.secret = " + getLineMessageChannelSecret());
+        System.out.println("line.message.access-token = " + getLineMessageAccessToken());
         System.out.println("line.channel.id = " + getLineChannelId());
         System.out.println("line.channel.secret = " + getLineChannelSecret());
         System.out.println("line.channel.access-token = " + getLineChannelAccessToken());

@@ -10,7 +10,6 @@ public class RfqSupplierInquiryDto {
 
     private String id;
     private String rfqId;
-    private String supplierId;
     private Integer versionNo;
     private RfqSupplierInquiryStatus status;
     private String thaiMessage;

@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
 @Data
-public class RequestPriceTierDto {
+public class RfqTierDto {
 
     private Long id;
     private SupplierDto supplier;

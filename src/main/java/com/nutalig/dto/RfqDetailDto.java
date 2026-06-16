@@ -6,15 +6,19 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 @Data
-public class RequestPriceDetailDto {
+public class RfqDetailDto {
 
     private Long id;
     private String optionName;
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String recommend;
+    private String packageDimension;
+    private String packageWeight;
+    private String packageCapacity;
     private SupplierDto supplier;
-    private List<RequestPriceTierDto> tiers;
+    private List<RfqTierDto> tiers;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;
     private String createdBy;

@@ -40,7 +40,7 @@ public class LineMessageService {
         RestTemplate restTemplate = new RestTemplate();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + lineConfiguration.getLineChannelAccessToken());
+        headers.set("Authorization", "Bearer " + lineConfiguration.getLineMessageAccessToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         SendMessageRequest sendMessageRequest = new SendMessageRequest();

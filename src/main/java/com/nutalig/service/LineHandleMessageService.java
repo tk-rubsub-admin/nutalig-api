@@ -5,12 +5,14 @@ import com.nutalig.registry.PromptResultDispatcher;
 import com.nutalig.repository.KeywordMappingPromptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.StreamSupport;
 
 @Slf4j
 @Service
@@ -27,11 +29,22 @@ public class LineHandleMessageService {
             String[] lines = message.split("\\r?\\n");
             log.info("Message have {} lines", lines.length);
 
-            String keyword = lines[0].trim();
-            Optional<KeywordMappingPromptEntity> opt =
-                    KeywordMappingPromptRepository.findById(keyword);
+            if (lines.length == 0 || StringUtils.isBlank(lines[0])) {
+                log.info("Skip line message because first line is blank");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            String firstLine = lines[0].trim();
+            Optional<KeywordMappingPromptEntity> opt = StreamSupport.stream(
+                            KeywordMappingPromptRepository.findAll().spliterator(), false)
+                    .filter(mapping -> matchesPrefix(firstLine, mapping))
+                    .max((left, right) -> Integer.compare(
+                            prefixLength(right.getKeyword()),
+                            prefixLength(left.getKeyword())
+                    ));
 
             if (opt.isEmpty()) {
+                log.info("Skip line message because no keyword mapping matched first line: {}", firstLine);
                 return CompletableFuture.completedFuture(null);
             }
 
@@ -60,5 +73,27 @@ public class LineHandleMessageService {
             return s.substring(start, end + 1);
         }
         return s; // fallback
+    }
+
+    private boolean matchesPrefix(String firstLine, KeywordMappingPromptEntity mapping) {
+        if (mapping == null || StringUtils.isBlank(mapping.getKeyword())) {
+            return false;
+        }
+
+        String prefix = normalizeKeywordPrefix(mapping.getKeyword());
+        return StringUtils.isNotBlank(prefix) && firstLine.startsWith(prefix);
+    }
+
+    private String normalizeKeywordPrefix(String keyword) {
+        String normalized = StringUtils.trimToEmpty(keyword);
+        int wildcardIndex = normalized.indexOf('%');
+        if (wildcardIndex >= 0) {
+            normalized = normalized.substring(0, wildcardIndex);
+        }
+        return StringUtils.trimToEmpty(normalized);
+    }
+
+    private int prefixLength(String keyword) {
+        return normalizeKeywordPrefix(keyword).length();
     }
 }

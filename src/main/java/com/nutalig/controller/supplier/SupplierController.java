@@ -5,6 +5,7 @@ import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.supplier.request.AddSupplierMaterialCapabilityRequest;
 import com.nutalig.controller.supplier.request.CreateSupplierRequest;
 import com.nutalig.controller.supplier.request.SearchSupplierRequest;
+import com.nutalig.controller.supplier.request.SuggestSupplierCapabilitiesRequest;
 import com.nutalig.controller.supplier.response.SearchSupplierResponse;
 import com.nutalig.dto.SupplierCapabilityDto;
 import com.nutalig.dto.SupplierDto;
@@ -69,6 +70,24 @@ public class SupplierController {
         java.util.List<SupplierCapabilityDto> response = supplierService.addSupplierMaterialCapability(supplierId, request);
 
         log.info("=== End add supplier material capability batch {} size {} ===", supplierId, response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/v1/suppliers/suggest-suppliers")
+    public GeneralResponse<java.util.List<SupplierCapabilityDto>> suggestSupplierCapabilities(
+            @RequestBody SuggestSupplierCapabilitiesRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start suggest supplier capabilities supplier {} size {} ===",
+                request == null ? null : request.getSupplierId(),
+                request == null || request.getCapabilities() == null ? 0 : request.getCapabilities().size());
+
+        java.util.List<SupplierCapabilityDto> response = supplierService.suggestSupplierCapabilities(
+                request == null ? null : request.getSupplierId(),
+                request == null ? null : request.getCapabilities()
+        );
+
+        log.info("=== End suggest supplier capabilities supplier {} size {} ===",
+                request == null ? null : request.getSupplierId(), response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

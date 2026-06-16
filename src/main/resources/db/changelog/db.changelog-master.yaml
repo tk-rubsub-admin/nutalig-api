@@ -2,6 +2,9 @@ databaseChangeLog:
   - changeSet:
       id: 20260604-001-create-rfq-supplier-quote-tables
       author: codex
+      validCheckSum:
+        - 9:632d496aae24b64d72257b7240c5cd73
+        - 9:70ec8e0ba13e9f6dd801e9f5eaa660eb
       changes:
         - sql:
             splitStatements: true
@@ -23,7 +26,6 @@ databaseChangeLog:
                   KEY idx_rfq_supplier_quote_supplier (supplier_id),
                   KEY idx_rfq_supplier_quote_inquiry (inquiry_id)
               ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
               CREATE TABLE IF NOT EXISTS rfq_supplier_quote_detail (
                   id BIGINT NOT NULL AUTO_INCREMENT,
                   quote_id VARCHAR(255) NOT NULL,
@@ -217,6 +219,106 @@ databaseChangeLog:
             referencedTableName: supplier
             referencedColumnNames: id
             constraintName: fk_rfq_detail_supplier
+
+  - changeSet:
+      id: 20260605-004-add-rfq-detail-recommend
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: recommend
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: recommend
+                  type: TEXT
+
+  - changeSet:
+      id: 20260615-001-add-rfq-detail-package-fields
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: package_dimension
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: package_dimension
+                  type: TEXT
+              - column:
+                  name: package_weight
+                  type: TEXT
+              - column:
+                  name: package_capacity
+                  type: TEXT
+
+  - changeSet:
+      id: 20260615-002-add-rfq-supplier-quote-detail-package-fields
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote_detail
+                columnName: package_dimension
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_detail
+            columns:
+              - column:
+                  name: package_dimension
+                  type: TEXT
+              - column:
+                  name: package_weight
+                  type: TEXT
+              - column:
+                  name: package_capacity
+                  type: TEXT
+
+  - changeSet:
+      id: 20260615-003-update-rfq-supplier-quote-tier-shipping-cost
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - or:
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: land_freight_cost
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: sea_freight_cost
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: land_total_price
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: sea_total_price
+      changes:
+        - dropColumn:
+            tableName: rfq_supplier_quote_tier
+            columns:
+              - column:
+                  name: land_freight_cost
+              - column:
+                  name: sea_freight_cost
+              - column:
+                  name: land_total_price
+              - column:
+                  name: sea_total_price
+        - addColumn:
+            tableName: rfq_supplier_quote_tier
+            columns:
+              - column:
+                  name: shipping_cost
+                  type: DECIMAL(18,4)
 
   - changeSet:
       id: 20260605-003-add-rfq-tier-supplier
@@ -790,3 +892,64 @@ databaseChangeLog:
                   visible = VALUES(visible),
                   updated_by = VALUES(updated_by),
                   updated_date = NOW(6);
+
+  - changeSet:
+      id: 20260613-001-create-calendar-event-table
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS calendar_event (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  title VARCHAR(255) NOT NULL,
+                  description TEXT DEFAULT NULL,
+                  event_type VARCHAR(50) NOT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  start_at DATETIME(6) NOT NULL,
+                  end_at DATETIME(6) NOT NULL,
+                  all_day BOOLEAN NOT NULL DEFAULT FALSE,
+                  color_code VARCHAR(32) DEFAULT NULL,
+                  source_module VARCHAR(64) DEFAULT NULL,
+                  source_id VARCHAR(255) DEFAULT NULL,
+                  customer_id VARCHAR(255) DEFAULT NULL,
+                  supplier_id VARCHAR(255) DEFAULT NULL,
+                  assigned_to_employee_id VARCHAR(255) DEFAULT NULL,
+                  location VARCHAR(255) DEFAULT NULL,
+                  remark TEXT DEFAULT NULL,
+                  active BOOLEAN NOT NULL DEFAULT TRUE,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_calendar_event_start_at (start_at),
+                  KEY idx_calendar_event_end_at (end_at),
+                  KEY idx_calendar_event_type_status (event_type, status),
+                  KEY idx_calendar_event_source (source_module, source_id),
+                  KEY idx_calendar_event_active (active),
+                  KEY idx_calendar_event_customer (customer_id),
+                  KEY idx_calendar_event_supplier (supplier_id),
+                  KEY idx_calendar_event_employee (assigned_to_employee_id),
+                  CONSTRAINT fk_calendar_event_customer FOREIGN KEY (customer_id) REFERENCES customer (id),
+                  CONSTRAINT fk_calendar_event_supplier FOREIGN KEY (supplier_id) REFERENCES supplier (id),
+                  CONSTRAINT fk_calendar_event_employee FOREIGN KEY (assigned_to_employee_id) REFERENCES employee (employee_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260616-001-add-rfq-header-shipping-method
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: shipping_method
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: shipping_method
+                  type: VARCHAR(20)
+                  defaultValue: ALL

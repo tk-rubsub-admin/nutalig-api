@@ -150,6 +150,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "sale_order_id", length = 100)
     private String saleOrderId;
 
+    @Column(name = "shipping_method", length = 20)
+    private String shippingMethod;
+
     @Column(name = "confirmed_detail_id")
     private Long confirmedDetailId;
 

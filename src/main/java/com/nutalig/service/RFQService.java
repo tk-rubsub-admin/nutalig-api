@@ -1,7 +1,6 @@
 package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nutalig.config.PromptTemplateEngine;
 import com.nutalig.constant.*;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
@@ -13,7 +12,6 @@ import com.nutalig.entity.id.ProductMaterialId;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
-import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -43,18 +41,13 @@ public class RFQService {
     private final static String OTHER_FILE_TYPE = "OTHER";
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
-    private final RequestPriceDetailRepository requestPriceDetailRepository;
-    private final RequestPriceTierRepository requestPriceTierRepository;
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
-    private final SalesRepository salesRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final ProductFamilyRepository productFamilyEntityRepository;
     private final ProductSubtype1Repository productSubtype1Repository;
     private final ProductSubtype2Repository productSubtype2Repository;
     private final ProductMaterialRepository productMaterialRepository;
-    private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
-    private final RfqSupplierQuoteRepository rfqSupplierQuoteRepository;
     private final SupplierRepository supplierRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
@@ -62,24 +55,20 @@ public class RFQService {
     private final UserProfileService userProfileService;
     private final SlaConfigService slaConfigService;
     private final SupplierService supplierService;
-    private final OpenAiService openAiService;
-    private final PromptService promptService;
-    private final PromptTemplateEngine promptTemplateEngine;
+    private final LineMessageService lineMessageService;
     private final ObjectMapper objectMapper;
-    private final SupplierMapper supplierMapper;
-    private static final String RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE = "RFQ_SUPPLIER_INQUIRY_TH";
 
     @Transactional(readOnly = true)
-    public com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
+    public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
         if (pageableRequest.getSortBy() == null || pageableRequest.getSortDirection() == null) {
             pageableRequest.setSortBy("requestedDate");
             pageableRequest.setSortDirection(Sort.Direction.DESC);
         }
 
-        Page<RequestPriceHeaderDto> page = requestPriceHeaderRepository.findAll(buildSearchCriteria(searchRequest), pageableRequest.build())
+        Page<RfqHeaderDto> page = requestPriceHeaderRepository.findAll(buildSearchCriteria(searchRequest), pageableRequest.build())
                 .map(requestPriceHeaderMapper::toDto);
 
-        com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> response =
+        com.nutalig.controller.response.Pageable<RfqHeaderDto> response =
                 new com.nutalig.controller.response.Pageable<>();
         response.setRecords(page.getContent());
         response.setPagination(Pagination.build(page));
@@ -87,7 +76,7 @@ public class RFQService {
     }
 
     @Transactional
-    public RequestPriceHeaderDto getRFQById(String id, String userId) throws DataNotFoundException {
+    public RfqHeaderDto getRFQById(String id, String userId) throws DataNotFoundException {
         RfqHeaderEntity entity = getEntityById(id);
 
         if (shouldMoveToInProgressOnView(entity, userId)) {
@@ -124,198 +113,11 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RfqSupplierInquiryDto generateInquiry(
-            String rfqId,
-            GenerateRfqSupplierInquiryRequest request,
-            String userId
-    )
-            throws Exception {
-        RfqHeaderEntity rfq = getEntityById(rfqId);
-
-        if (request == null || StringUtils.isBlank(request.getSupplierId())) {
-            throw new InvalidRequestException("Supplier id is required.");
-        }
-        SupplierEntity supplier = supplierRepository.findById(request.getSupplierId())
-                .orElseThrow(() -> new DataNotFoundException("Supplier " + request.getSupplierId() + " not found."));
-
-        Optional<RfqSupplierInquiryEntity> existingInquiry =
-                rfqSupplierInquiryRepository.findFirstByRequestPriceHeader_IdAndSupplier_IdOrderByVersionNoDesc(
-                        rfqId,
-                        supplier.getId()
-                );
-        if (existingInquiry.isPresent()) {
-            return toInquiryDto(existingInquiry.get());
-        }
-
-        Integer maxVersionNo = rfqSupplierInquiryRepository.findMaxVersionNoByRfqId(rfqId);
-        int nextVersionNo = (maxVersionNo == null ? 0 : maxVersionNo) + 1;
-
-        String thaiMessage = buildThaiInquiryMessage(rfq);
-        String chineseMessage = null;
-        RfqSupplierInquiryStatus status = RfqSupplierInquiryStatus.DRAFT;
-        try {
-            chineseMessage = translateToChinese(thaiMessage);
-            if (StringUtils.isNotBlank(chineseMessage)) {
-                status = RfqSupplierInquiryStatus.TRANSLATED;
-            }
-        } catch (Exception exception) {
-            log.warn("Translate inquiry to Chinese failed for rfq {}", rfqId, exception);
-        }
-
-        String actorName = userProfileService.getNameFromId(userId);
-
-        RfqSupplierInquiryEntity inquiry = new RfqSupplierInquiryEntity();
-        inquiry.setRequestPriceHeader(rfq);
-        inquiry.setSupplier(supplier);
-        inquiry.setVersionNo(nextVersionNo);
-        inquiry.setStatus(status);
-        inquiry.setThaiMessage(thaiMessage);
-        inquiry.setChineseMessage(StringUtils.trimToNull(chineseMessage));
-        inquiry.setSourceSnapshot(buildInquirySourceSnapshot(rfq));
-        inquiry.setCreatedBy(actorName);
-        inquiry.setUpdatedBy(actorName);
-
-        inquiry = rfqSupplierInquiryRepository.save(inquiry);
-        return toInquiryDto(inquiry);
-    }
-
-    @Transactional(readOnly = true)
-    public List<RfqSupplierInquiryDto> getInquiries(String rfqId) throws DataNotFoundException {
-        getEntityById(rfqId);
-        List<RfqSupplierInquiryDto> inquiries = new ArrayList<>();
-        for (RfqSupplierInquiryEntity inquiry : rfqSupplierInquiryRepository
-                .findAllByRequestPriceHeader_IdOrderByVersionNoDesc(rfqId)) {
-            inquiries.add(toInquiryDto(inquiry));
-        }
-        return inquiries;
-    }
-
-    @Transactional(readOnly = true)
-    public RfqSupplierInquiryDto getInquiry(String rfqId, String inquiryId) throws DataNotFoundException {
-        return toInquiryDto(getInquiryEntity(rfqId, inquiryId));
-    }
-
-    @Transactional
-    public RfqSupplierInquiryDto updateInquiry(
-            String rfqId,
-            String inquiryId,
-            UpdateRfqSupplierInquiryRequest request,
-            String userId
-    ) throws DataNotFoundException, InvalidRequestException {
-        RfqSupplierInquiryEntity inquiry = getInquiryEntity(rfqId, inquiryId);
-
-        if (request == null) {
-            throw new InvalidRequestException("Request is required.");
-        }
-        if (request.getThaiMessage() != null) {
-            inquiry.setThaiMessage(trimRequiredMessage(request.getThaiMessage(), "Thai message"));
-        }
-        if (request.getChineseMessage() != null) {
-            inquiry.setChineseMessage(StringUtils.trimToNull(request.getChineseMessage()));
-        }
-
-        inquiry.setStatus(determineInquiryStatus(inquiry.getChineseMessage(), inquiry.getStatus()));
-        inquiry.setUpdatedBy(userProfileService.getNameFromId(userId));
-        inquiry = rfqSupplierInquiryRepository.save(inquiry);
-        return toInquiryDto(inquiry);
-    }
-
-    @Transactional
-    public RfqSupplierInquiryDto finalizeInquiry(String rfqId, String inquiryId, String userId)
-            throws DataNotFoundException, InvalidRequestException {
-        RfqSupplierInquiryEntity inquiry = getInquiryEntity(rfqId, inquiryId);
-        if (StringUtils.isBlank(inquiry.getThaiMessage())) {
-            throw new InvalidRequestException("Thai message is required before finalize.");
-        }
-        if (StringUtils.isBlank(inquiry.getChineseMessage())) {
-            throw new InvalidRequestException("Chinese message is required before finalize.");
-        }
-
-        inquiry.setStatus(RfqSupplierInquiryStatus.FINAL);
-        inquiry.setUpdatedBy(userProfileService.getNameFromId(userId));
-        inquiry = rfqSupplierInquiryRepository.save(inquiry);
-        return toInquiryDto(inquiry);
-    }
-
-    @Transactional(readOnly = true)
-    public List<RfqSupplierQuoteDto> getSupplierQuotes(String rfqId) throws DataNotFoundException {
-        getEntityById(rfqId);
-        return rfqSupplierQuoteRepository.findAllByRequestPriceHeader_IdOrderByUpdatedDateDesc(rfqId)
-                .stream()
-                .map(this::toSupplierQuoteDto)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public RfqSupplierQuoteDto getSupplierQuote(String rfqId, String quoteId) throws DataNotFoundException {
-        return toSupplierQuoteDto(getSupplierQuoteEntity(rfqId, quoteId));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public RfqSupplierQuoteDto createSupplierQuote(
-            String rfqId,
-            UpsertRfqSupplierQuoteRequest request,
-            String userId
-    ) throws DataNotFoundException, InvalidRequestException {
-        RfqHeaderEntity rfq = getEntityById(rfqId);
-        if (request == null || StringUtils.isBlank(request.getSupplierId())) {
-            throw new InvalidRequestException("Supplier id is required.");
-        }
-        SupplierEntity supplier = getSupplierEntity(request.getSupplierId());
-        if (rfqSupplierQuoteRepository.findByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId()).isPresent()) {
-            throw new InvalidRequestException("Supplier quote already exists for supplier " + supplier.getId() + ".");
-        }
-
-        RfqSupplierQuoteEntity quote = new RfqSupplierQuoteEntity();
-        quote.setRequestPriceHeader(rfq);
-        quote.setSupplier(supplier);
-        quote.setStatus(request.getStatus() == null ? RfqSupplierQuoteStatus.RESPONDED : request.getStatus());
-        quote.setCreatedBy(userProfileService.getNameFromId(userId));
-        applySupplierQuoteRequest(rfq, quote, request, userId);
-
-        return toSupplierQuoteDto(rfqSupplierQuoteRepository.save(quote));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public RfqSupplierQuoteDto updateSupplierQuote(
-            String rfqId,
-            String quoteId,
-            UpsertRfqSupplierQuoteRequest request,
-            String userId
-    ) throws DataNotFoundException, InvalidRequestException {
-        RfqHeaderEntity rfq = getEntityById(rfqId);
-        RfqSupplierQuoteEntity quote = getSupplierQuoteEntity(rfqId, quoteId);
-        if (request == null) {
-            throw new InvalidRequestException("Supplier quote is required.");
-        }
-        if (StringUtils.isNotBlank(request.getSupplierId())
-                && !Objects.equals(request.getSupplierId(), quote.getSupplier().getId())) {
-            SupplierEntity supplier = getSupplierEntity(request.getSupplierId());
-            Optional<RfqSupplierQuoteEntity> existingQuote =
-                    rfqSupplierQuoteRepository.findByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId());
-            if (existingQuote.isPresent() && !Objects.equals(existingQuote.get().getId(), quote.getId())) {
-                throw new InvalidRequestException("Supplier quote already exists for supplier " + supplier.getId() + ".");
-            }
-            quote.setSupplier(supplier);
-        }
-
-        quote.getDetails().clear();
-        quote.getAdditionalCosts().clear();
-        applySupplierQuoteRequest(rfq, quote, request, userId);
-        return toSupplierQuoteDto(rfqSupplierQuoteRepository.save(quote));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void deleteSupplierQuote(String rfqId, String quoteId) throws DataNotFoundException {
-        RfqSupplierQuoteEntity quote = getSupplierQuoteEntity(rfqId, quoteId);
-        rfqSupplierQuoteRepository.delete(quote);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
+    public RfqHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
         entity.setRequestedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         entity.setStatus(RfqStatus.NEW);
+        entity.setShippingMethod(normalizeRfqShippingMethod(request.getShippingMethod()));
         entity.setCreatedBy(userProfileService.getNameFromId(userId));
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
 
@@ -347,6 +149,7 @@ public class RFQService {
         detail.put("status", entity.getStatus());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
+        detail.put("shippingMethod", entity.getShippingMethod());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
 
         activityHistoryService.record(
@@ -364,7 +167,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto addRFQDetail(
+    public RfqHeaderDto addRFQDetail(
             String rfqId,
             List<CreateRequestPriceDetailRequest> requests,
             String userId
@@ -415,7 +218,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto addRFQAdditionalCosts(
+    public RfqHeaderDto addRFQAdditionalCosts(
             String rfqId,
             List<CreateRequestPriceAdditionalCostRequest> requests,
             String userId
@@ -461,7 +264,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto updateCustomer(
+    public RfqHeaderDto updateCustomer(
         String rfqId,
         UpdateRfqCustomerRequest request,
         String userId
@@ -484,7 +287,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto linkSalesOrder(
+    public RfqHeaderDto linkSalesOrder(
             String rfqId,
             LinkRfqSalesOrderRequest request,
             String userId
@@ -553,7 +356,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto updateRFQDetail(
+    public RfqHeaderDto updateRFQDetail(
             String rfqId,
             Long detailId,
             UpdateRequestPriceDetailRequest request,
@@ -571,6 +374,10 @@ public class RFQService {
         detailEntity.setSpec(updatedDetail.getSpec());
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
         detailEntity.setRemark(updatedDetail.getRemark());
+        detailEntity.setRecommend(updatedDetail.getRecommend());
+        detailEntity.setPackageDimension(updatedDetail.getPackageDimension());
+        detailEntity.setPackageWeight(updatedDetail.getPackageWeight());
+        detailEntity.setPackageCapacity(updatedDetail.getPackageCapacity());
         detailEntity.setUpdatedBy(updatedDetail.getUpdatedBy());
         detailEntity.getTiers().clear();
         updatedDetail
@@ -601,7 +408,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto updateRFQAdditionalCost(
+    public RfqHeaderDto updateRFQAdditionalCost(
             String rfqId,
             Long additionalCostId,
             UpdateRequestPriceAdditionalCostRequest request,
@@ -640,7 +447,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto deleteRFQDetail(
+    public RfqHeaderDto deleteRFQDetail(
             String rfqId,
             Long detailId,
             String userId
@@ -673,7 +480,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto deleteRFQAdditionalCost(
+    public RfqHeaderDto deleteRFQAdditionalCost(
             String rfqId,
             Long additionalCostId,
             String userId
@@ -706,7 +513,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto updateRFQ(String id, UpdateRequestPriceHeaderRequest request, String userId) throws Exception {
+    public RfqHeaderDto updateRFQ(String id, UpdateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = getEntityById(id);
         java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
 
@@ -783,16 +590,26 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto deletePicture(String rfqId, Long pictureId, String userId) throws DataNotFoundException {
+    public RfqHeaderDto deletePicture(String rfqId, Long pictureId, String userId) throws DataNotFoundException {
         return deleteStoredAttachment(rfqId, pictureId, userId, "ลบรูปภาพของคำขอราคาเลขที่ ");
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto deleteAttachment(String rfqId, Long attachmentId, String userId) throws DataNotFoundException {
+    public RfqHeaderDto deleteAttachment(String rfqId, Long attachmentId, String userId) throws DataNotFoundException {
         return deleteStoredAttachment(rfqId, attachmentId, userId, "ลบไฟล์แนบของคำขอราคาเลขที่ ");
     }
 
-    private RequestPriceHeaderDto deleteStoredAttachment(String rfqId, Long attachmentId, String userId, String activityMessagePrefix) throws DataNotFoundException {
+    @Transactional(rollbackFor = Exception.class)
+    public void finalRfqFromLine(String userId, String jsonStr) throws Exception {
+        log.info("Final RFQ from line by {}", userId);
+        lineMessageService.sendTextMessage(userId, "ระบบกำลังประมวลผล");
+
+        FinalRfqFromLineDto finalRfqFromLineDto = objectMapper.readValue(jsonStr, FinalRfqFromLineDto.class);
+
+        log.info("Final RFQ {} from line", finalRfqFromLineDto.getRfqId());
+    }
+
+    private RfqHeaderDto deleteStoredAttachment(String rfqId, Long attachmentId, String userId, String activityMessagePrefix) throws DataNotFoundException {
         RfqHeaderEntity entity = getEntityById(rfqId);
         RfqPicturesEntity picture = getPictureFromHeader(entity, attachmentId);
 
@@ -816,7 +633,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto replacePicture(String rfqId, Long pictureId, MultipartFile pictureFile, String userId) throws Exception {
+    public RfqHeaderDto replacePicture(String rfqId, Long pictureId, MultipartFile pictureFile, String userId) throws Exception {
         if (pictureFile == null || pictureFile.isEmpty()) {
             throw new InvalidRequestException("Picture file is required");
         }
@@ -838,7 +655,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto addPictures(String rfqId, List<MultipartFile> pictures, String userId) throws Exception {
+    public RfqHeaderDto addPictures(String rfqId, List<MultipartFile> pictures, String userId) throws Exception {
         if (pictures == null || pictures.isEmpty()) {
             throw new InvalidRequestException("Pictures are required");
         }
@@ -865,7 +682,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto addAttachments(String rfqId, List<MultipartFile> attachments, String userId) throws Exception {
+    public RfqHeaderDto addAttachments(String rfqId, List<MultipartFile> attachments, String userId) throws Exception {
         if (attachments == null || attachments.isEmpty()) {
             throw new InvalidRequestException("Attachments are required");
         }
@@ -892,7 +709,7 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RequestPriceHeaderDto reorderPictures(String rfqId, ReorderRFQPicturesRequest request, String userId)
+    public RfqHeaderDto reorderPictures(String rfqId, ReorderRFQPicturesRequest request, String userId)
             throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity entity = getEntityById(rfqId);
 
@@ -924,145 +741,11 @@ public class RFQService {
         return mapToDto(entity);
     }
 
-    public RequestPriceHeaderDto mapToDto(RfqHeaderEntity entity) throws DataNotFoundException {
+    public RfqHeaderDto mapToDto(RfqHeaderEntity entity) throws DataNotFoundException {
         return requestPriceHeaderMapper.toDto(entity);
 //        dto.setServiceLevelAgreement(slaConfigService.getSlaConfigById(SLA));
 //        dto.getServiceLevelAgreement().setDayLeft(slaConfigService.calculateDayLeft(dto.getServiceLevelAgreement(), dto.getRequestedDate().toLocalDate()));
 //        return dto;
-    }
-
-    private RfqSupplierInquiryDto toInquiryDto(RfqSupplierInquiryEntity entity) throws DataNotFoundException {
-        RfqSupplierInquiryDto dto = new RfqSupplierInquiryDto();
-        dto.setId(entity.getId());
-        dto.setRfqId(entity.getRequestPriceHeader().getId());
-        dto.setSupplierId(entity.getSupplier().getId());
-        dto.setVersionNo(entity.getVersionNo());
-        dto.setStatus(entity.getStatus());
-        dto.setThaiMessage(entity.getThaiMessage());
-        dto.setChineseMessage(entity.getChineseMessage());
-        dto.setSourceSnapshot(entity.getSourceSnapshot());
-        dto.setCreatedBy(entity.getCreatedBy());
-        dto.setUpdatedBy(entity.getUpdatedBy());
-        dto.setCreatedDate(entity.getCreatedDate());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-        return dto;
-    }
-
-    private RfqSupplierQuoteDto toSupplierQuoteDto(RfqSupplierQuoteEntity entity) {
-        RfqSupplierQuoteDto dto = new RfqSupplierQuoteDto();
-        dto.setId(entity.getId());
-        dto.setRfqId(entity.getRequestPriceHeader().getId());
-        dto.setSupplier(supplierMapper.toDto(entity.getSupplier()));
-        dto.setInquiryId(entity.getInquiry() == null ? null : entity.getInquiry().getId());
-        dto.setStatus(entity.getStatus());
-        dto.setRemark(entity.getRemark());
-        dto.setDetails(entity.getDetails().stream()
-                .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(RfqSupplierQuoteDetailEntity::getId, Comparator.nullsLast(Long::compareTo)))
-                .map(this::toSupplierQuoteDetailDto)
-                .toList());
-        dto.setAdditionalCosts(entity.getAdditionalCosts().stream()
-                .sorted(Comparator.comparing(RfqSupplierQuoteAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(RfqSupplierQuoteAdditionalCostEntity::getId, Comparator.nullsLast(Long::compareTo)))
-                .map(this::toSupplierQuoteAdditionalCostDto)
-                .toList());
-        dto.setCreatedBy(entity.getCreatedBy());
-        dto.setUpdatedBy(entity.getUpdatedBy());
-        dto.setCreatedDate(entity.getCreatedDate());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-        return dto;
-    }
-
-    private RfqSupplierQuoteDetailDto toSupplierQuoteDetailDto(RfqSupplierQuoteDetailEntity entity) {
-        RfqSupplierQuoteDetailDto dto = new RfqSupplierQuoteDetailDto();
-        dto.setId(entity.getId());
-        dto.setRfqDetailId(entity.getRequestPriceDetail() == null ? null : entity.getRequestPriceDetail().getId());
-        dto.setOptionName(entity.getOptionName());
-        dto.setSpec(entity.getSpec());
-        dto.setSortOrder(entity.getSortOrder());
-        dto.setRemark(entity.getRemark());
-        dto.setTiers(entity.getTiers().stream()
-                .sorted(Comparator.comparing(RfqSupplierQuoteTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(RfqSupplierQuoteTierEntity::getId, Comparator.nullsLast(Long::compareTo)))
-                .map(this::toSupplierQuoteTierDto)
-                .toList());
-        dto.setCreatedDate(entity.getCreatedDate());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-        return dto;
-    }
-
-    private RfqSupplierQuoteTierDto toSupplierQuoteTierDto(RfqSupplierQuoteTierEntity entity) {
-        RfqSupplierQuoteTierDto dto = new RfqSupplierQuoteTierDto();
-        dto.setId(entity.getId());
-        dto.setQuantity(entity.getQuantity());
-        dto.setProductPrice(entity.getProductPrice());
-        dto.setLandFreightCost(entity.getLandFreightCost());
-        dto.setSeaFreightCost(entity.getSeaFreightCost());
-        dto.setLandTotalPrice(entity.getLandTotalPrice());
-        dto.setSeaTotalPrice(entity.getSeaTotalPrice());
-        dto.setSortOrder(entity.getSortOrder());
-        dto.setCreatedDate(entity.getCreatedDate());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-        return dto;
-    }
-
-    private RfqSupplierQuoteAdditionalCostDto toSupplierQuoteAdditionalCostDto(
-            RfqSupplierQuoteAdditionalCostEntity entity
-    ) {
-        RfqSupplierQuoteAdditionalCostDto dto = new RfqSupplierQuoteAdditionalCostDto();
-        dto.setId(entity.getId());
-        dto.setDescription(entity.getDescription());
-        dto.setUnit(entity.getUnit());
-        dto.setValue(entity.getValue());
-        dto.setSortOrder(entity.getSortOrder());
-        dto.setCreatedDate(entity.getCreatedDate());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-        return dto;
-    }
-
-    private String buildThaiInquiryMessage(RfqHeaderEntity rfq) throws DataNotFoundException {
-        String template = promptService.getActivePrompt(RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE).getUserPromptTemplate();
-        Map<String, String> variables = new LinkedHashMap<>();
-        variables.put("rfqId", safeValue(rfq.getId()));
-        variables.put("productFamily", displayProductFamily(rfq));
-        variables.put("productSubtype1", displayProductSubtype1(rfq));
-        variables.put("productSubtype2", displayProductSubtype2(rfq));
-        variables.put("material", displayProductMaterial(rfq));
-        variables.put("capacity", safeValue(rfq.getCapacity()));
-        variables.put("description", safeValue(rfq.getDescription()));
-        variables.put("detailSection", buildInquiryDetailSection(rfq));
-        variables.put("additionalCostSection", buildInquiryAdditionalCostSection(rfq));
-        return promptTemplateEngine.render(template, variables).trim();
-    }
-
-    private String translateToChinese(String thaiMessage) {
-        String prompt = """
-                Translate the following Thai procurement inquiry into Simplified Chinese for a supplier WeChat group.
-                Keep the structure, bullet points, quantities, units, and business meaning accurate.
-                Return only the Chinese translation.
-
-                %s
-                """.formatted(thaiMessage);
-        return StringUtils.trimToNull(openAiService.chat(prompt));
-    }
-
-    private String buildInquirySourceSnapshot(RfqHeaderEntity rfq) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("rfqId", rfq.getId());
-        snapshot.put("productFamily", rfq.getProductFamily());
-        snapshot.put("productSubtype1", rfq.getProductUsage() == null ? null : rfq.getProductUsage().getCode());
-        snapshot.put("productSubtype2", rfq.getSystemMechanic() == null ? null : rfq.getSystemMechanic().getCode());
-        snapshot.put("material", rfq.getMaterialCode());
-        snapshot.put("capacity", rfq.getCapacity());
-        snapshot.put("description", rfq.getDescription());
-        snapshot.put("detailCount", rfq.getDetails() == null ? 0 : rfq.getDetails().size());
-
-        try {
-            return objectMapper.writeValueAsString(snapshot);
-        } catch (Exception exception) {
-            log.warn("Serialize inquiry source snapshot failed for rfq {}", rfq.getId(), exception);
-            return null;
-        }
     }
 
     private java.util.Map<String, Object> buildActivityDetail(RfqHeaderEntity entity) {
@@ -1074,6 +757,7 @@ public class RFQService {
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("orderTypeCode", entity.getOrderType() != null ? entity.getOrderType().getId().getCode() : null);
+        detail.put("shippingMethod", entity.getShippingMethod());
         detail.put("productFamily", entity.getProductFamily());
         detail.put("productUsage", entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null);
         detail.put("systemMechanic", entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null);
@@ -1128,6 +812,10 @@ public class RFQService {
         detailEntity.setSpec(request.getSpec().trim());
         detailEntity.setSortOrder(request.getSortOrder());
         detailEntity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        detailEntity.setRecommend(StringUtils.trimToNull(request.getRecommend()));
+        detailEntity.setPackageDimension(StringUtils.trimToNull(request.getPackageDimension()));
+        detailEntity.setPackageWeight(StringUtils.trimToNull(request.getPackageWeight()));
+        detailEntity.setPackageCapacity(StringUtils.trimToNull(request.getPackageCapacity()));
         SupplierEntity supplier = null;
         if (StringUtils.isNotBlank(request.getSupplierId())) {
             supplier = getSupplierEntity(request.getSupplierId().trim());
@@ -1175,9 +863,6 @@ public class RFQService {
         }
 
         RfqAdditionalCostEntity additionalCostEntity = new RfqAdditionalCostEntity();
-        if (StringUtils.isNotBlank(request.getSupplierId())) {
-            additionalCostEntity.setSupplier(getSupplierEntity(request.getSupplierId().trim()));
-        }
         additionalCostEntity.setDescription(request.getDescription().trim());
         additionalCostEntity.setUnit(StringUtils.trimToNull(request.getUnit()));
         additionalCostEntity.setValue(request.getValue());
@@ -1190,167 +875,9 @@ public class RFQService {
                 .orElseThrow(() -> new DataNotFoundException("RFQ " + id + " not found."));
     }
 
-    private RfqSupplierInquiryEntity getInquiryEntity(String rfqId, String inquiryId) throws DataNotFoundException {
-        return rfqSupplierInquiryRepository.findByIdAndRequestPriceHeader_Id(inquiryId, rfqId)
-                .orElseThrow(() -> new DataNotFoundException("Inquiry " + inquiryId + " not found in RFQ " + rfqId + "."));
-    }
-
-    private RfqSupplierQuoteEntity getSupplierQuoteEntity(String rfqId, String quoteId) throws DataNotFoundException {
-        return rfqSupplierQuoteRepository.findByIdAndRequestPriceHeader_Id(quoteId, rfqId)
-                .orElseThrow(() -> new DataNotFoundException("Supplier quote " + quoteId + " not found in RFQ " + rfqId + "."));
-    }
-
     private SupplierEntity getSupplierEntity(String supplierId) throws DataNotFoundException {
         return supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new DataNotFoundException("Supplier " + supplierId + " not found."));
-    }
-
-    private void applySupplierQuoteRequest(
-            RfqHeaderEntity rfq,
-            RfqSupplierQuoteEntity quote,
-            UpsertRfqSupplierQuoteRequest request,
-            String userId
-    ) throws DataNotFoundException, InvalidRequestException {
-        if (request.getDetails() == null || request.getDetails().isEmpty()) {
-            throw new InvalidRequestException("Supplier quote details are required.");
-        }
-
-        if (StringUtils.isNotBlank(request.getInquiryId())) {
-            RfqSupplierInquiryEntity inquiry = getInquiryEntity(rfq.getId(), request.getInquiryId());
-            if (!Objects.equals(inquiry.getSupplier().getId(), quote.getSupplier().getId())) {
-                throw new InvalidRequestException("Inquiry supplier does not match quote supplier.");
-            }
-            quote.setInquiry(inquiry);
-        } else {
-            quote.setInquiry(null);
-        }
-
-        quote.setStatus(request.getStatus() == null ? quote.getStatus() : request.getStatus());
-        if (quote.getStatus() == null) {
-            quote.setStatus(RfqSupplierQuoteStatus.RESPONDED);
-        }
-        quote.setRemark(StringUtils.trimToNull(request.getRemark()));
-        quote.setUpdatedBy(userProfileService.getNameFromId(userId));
-
-        int detailSortOrder = 1;
-        for (UpsertRfqSupplierQuoteRequest.DetailRequest detailRequest : request.getDetails()) {
-            quote.addDetail(buildSupplierQuoteDetailEntity(
-                    rfq,
-                    detailRequest,
-                    detailRequest.getSortOrder() == null ? detailSortOrder : detailRequest.getSortOrder()
-            ));
-            detailSortOrder++;
-        }
-
-        int additionalCostSortOrder = 1;
-        for (UpsertRfqSupplierQuoteRequest.AdditionalCostRequest additionalCostRequest :
-                Optional.ofNullable(request.getAdditionalCosts()).orElse(List.of())) {
-            quote.addAdditionalCost(buildSupplierQuoteAdditionalCostEntity(
-                    additionalCostRequest,
-                    additionalCostRequest.getSortOrder() == null ? additionalCostSortOrder : additionalCostRequest.getSortOrder()
-            ));
-            additionalCostSortOrder++;
-        }
-    }
-
-    private RfqSupplierQuoteDetailEntity buildSupplierQuoteDetailEntity(
-            RfqHeaderEntity rfq,
-            UpsertRfqSupplierQuoteRequest.DetailRequest request,
-            Integer sortOrder
-    ) throws DataNotFoundException, InvalidRequestException {
-        if (request == null) {
-            throw new InvalidRequestException("Supplier quote detail is required.");
-        }
-        if (StringUtils.isBlank(request.getSpec())) {
-            throw new InvalidRequestException("Supplier quote detail spec is required.");
-        }
-        if (request.getTiers() == null || request.getTiers().isEmpty()) {
-            throw new InvalidRequestException("Supplier quote detail tiers are required.");
-        }
-
-        RfqSupplierQuoteDetailEntity entity = new RfqSupplierQuoteDetailEntity();
-        if (request.getRfqDetailId() != null) {
-            entity.setRequestPriceDetail(getDetailFromHeader(rfq, request.getRfqDetailId()));
-        }
-        entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
-        entity.setSpec(request.getSpec().trim());
-        entity.setRemark(StringUtils.trimToNull(request.getRemark()));
-        entity.setSortOrder(sortOrder);
-
-        int tierSortOrder = 1;
-        for (UpsertRfqSupplierQuoteRequest.TierRequest tierRequest : request.getTiers()) {
-            entity.addTier(buildSupplierQuoteTierEntity(
-                    tierRequest,
-                    tierRequest.getSortOrder() == null ? tierSortOrder : tierRequest.getSortOrder()
-            ));
-            tierSortOrder++;
-        }
-        return entity;
-    }
-
-    private RfqSupplierQuoteTierEntity buildSupplierQuoteTierEntity(
-            UpsertRfqSupplierQuoteRequest.TierRequest request,
-            Integer sortOrder
-    ) throws InvalidRequestException {
-        if (request == null) {
-            throw new InvalidRequestException("Supplier quote tier is required.");
-        }
-        validatePositive(request.getQuantity(), "tier.quantity");
-        validatePositive(request.getProductPrice(), "tier.productPrice");
-        validateNonNegative(request.getLandFreightCost(), "tier.landFreightCost");
-        validateNonNegative(request.getSeaFreightCost(), "tier.seaFreightCost");
-
-        BigDecimal landFreightCost = defaultZero(request.getLandFreightCost());
-        BigDecimal seaFreightCost = defaultZero(request.getSeaFreightCost());
-
-        RfqSupplierQuoteTierEntity entity = new RfqSupplierQuoteTierEntity();
-        entity.setQuantity(request.getQuantity());
-        entity.setProductPrice(request.getProductPrice());
-        entity.setLandFreightCost(landFreightCost);
-        entity.setSeaFreightCost(seaFreightCost);
-        entity.setLandTotalPrice(request.getLandTotalPrice() == null
-                ? request.getProductPrice().add(landFreightCost)
-                : request.getLandTotalPrice());
-        entity.setSeaTotalPrice(request.getSeaTotalPrice() == null
-                ? request.getProductPrice().add(seaFreightCost)
-                : request.getSeaTotalPrice());
-        entity.setSortOrder(sortOrder);
-        return entity;
-    }
-
-    private RfqSupplierQuoteAdditionalCostEntity buildSupplierQuoteAdditionalCostEntity(
-            UpsertRfqSupplierQuoteRequest.AdditionalCostRequest request,
-            Integer sortOrder
-    ) throws InvalidRequestException {
-        if (request == null) {
-            throw new InvalidRequestException("Supplier quote additional cost is required.");
-        }
-        if (StringUtils.isBlank(request.getDescription())) {
-            throw new InvalidRequestException("Supplier quote additional cost description is required.");
-        }
-
-        RfqSupplierQuoteAdditionalCostEntity entity = new RfqSupplierQuoteAdditionalCostEntity();
-        entity.setDescription(request.getDescription().trim());
-        entity.setUnit(StringUtils.trimToNull(request.getUnit()));
-        entity.setValue(StringUtils.trimToNull(request.getValue()));
-        entity.setSortOrder(sortOrder);
-        return entity;
-    }
-
-    private void validatePositive(BigDecimal value, String fieldName) throws InvalidRequestException {
-        if (value == null || value.signum() <= 0) {
-            throw new InvalidRequestException(fieldName + " must be greater than 0.");
-        }
-    }
-
-    private void validateNonNegative(BigDecimal value, String fieldName) throws InvalidRequestException {
-        if (value != null && value.signum() < 0) {
-            throw new InvalidRequestException(fieldName + " must be 0 or greater.");
-        }
-    }
-
-    private BigDecimal defaultZero(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
     }
 
     private void applyRelations(RfqHeaderEntity entity, String salesId, String customerId, String orderTypeCode, String procurementId)
@@ -1469,104 +996,6 @@ public class RFQService {
                 ));
     }
 
-    private RfqSupplierInquiryStatus determineInquiryStatus(String chineseMessage, RfqSupplierInquiryStatus currentStatus) {
-        if (currentStatus == RfqSupplierInquiryStatus.FINAL) {
-            return RfqSupplierInquiryStatus.FINAL;
-        }
-        return StringUtils.isNotBlank(chineseMessage) ? RfqSupplierInquiryStatus.TRANSLATED : RfqSupplierInquiryStatus.DRAFT;
-    }
-
-    private String trimRequiredMessage(String message, String fieldName) throws InvalidRequestException {
-        String trimmedMessage = StringUtils.trimToNull(message);
-        if (trimmedMessage == null) {
-            throw new InvalidRequestException(fieldName + " is required.");
-        }
-        return trimmedMessage;
-    }
-
-    private String displayProductFamily(RfqHeaderEntity rfq) {
-        if (rfq.getProductFamilyEntity() != null) {
-            return safeValue(rfq.getProductFamilyEntity().getNameEn() != null ? rfq.getProductFamilyEntity().getNameEn() : rfq.getProductFamilyEntity().getNameTh())
-                    + " (" + safeValue(rfq.getProductFamilyEntity().getCode()) + ")";
-        }
-        return safeValue(rfq.getProductFamily());
-    }
-
-    private String displayProductSubtype1(RfqHeaderEntity rfq) {
-        if (rfq.getProductUsage() != null) {
-            return safeValue(rfq.getProductUsage().getNameEn() != null ? rfq.getProductUsage().getNameEn() : rfq.getProductUsage().getNameTh())
-                    + " (" + safeValue(rfq.getProductUsage().getCode()) + ")";
-        }
-        return "-";
-    }
-
-    private String displayProductSubtype2(RfqHeaderEntity rfq) {
-        if (rfq.getSystemMechanic() != null) {
-            return safeValue(rfq.getSystemMechanic().getNameEn() != null ? rfq.getSystemMechanic().getNameEn() : rfq.getSystemMechanic().getNameTh())
-                    + " (" + safeValue(rfq.getSystemMechanic().getCode()) + ")";
-        }
-        return "-";
-    }
-
-    private String displayProductMaterial(RfqHeaderEntity rfq) {
-        if (rfq.getMaterial() != null) {
-            return safeValue(rfq.getMaterial().getNameEn() != null ? rfq.getMaterial().getNameEn() : rfq.getMaterial().getNameTh())
-                    + " (" + safeValue(rfq.getMaterial().getCode()) + ")";
-        }
-        return safeValue(rfq.getMaterialCode());
-    }
-
-    private String buildInquiryDetailSection(RfqHeaderEntity rfq) {
-        if (rfq.getDetails().isEmpty()) {
-            return "-";
-        }
-
-        List<String> lines = new ArrayList<>();
-        int index = 1;
-        for (RfqDetailEntity detail : rfq.getDetails().stream()
-                .sorted(Comparator.comparing(RfqDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(RfqDetailEntity::getId))
-                .toList()) {
-            lines.add(index + ". " + safeValue(detail.getOptionName()));
-            lines.add("Spec: " + safeValue(detail.getSpec()));
-            if (StringUtils.isNotBlank(detail.getRemark())) {
-                lines.add("Remark: " + detail.getRemark().trim());
-            }
-            if (!detail.getTiers().isEmpty()) {
-                lines.add("Quantity tiers:");
-                for (RfqTierEntity tier : detail.getTiers().stream()
-                        .sorted(Comparator.comparing(RfqTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                                .thenComparing(RfqTierEntity::getId))
-                        .toList()) {
-                    lines.add("- " + tier.getQuantity().toPlainString() + " units");
-                }
-            }
-            index++;
-        }
-        return String.join("\n", lines);
-    }
-
-    private String buildInquiryAdditionalCostSection(RfqHeaderEntity rfq) {
-        if (rfq.getAdditionalCosts().isEmpty()) {
-            return "-";
-        }
-
-        List<String> lines = new ArrayList<>();
-        for (RfqAdditionalCostEntity additionalCost : rfq.getAdditionalCosts().stream()
-                .sorted(Comparator.comparing(RfqAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(RfqAdditionalCostEntity::getId))
-                .toList()) {
-            lines.add("- " + safeValue(additionalCost.getDescription())
-                    + (StringUtils.isNotBlank(additionalCost.getValue()) ? ": " + additionalCost.getValue().trim() : ""));
-        }
-        return String.join("\n", lines);
-    }
-
-    private String safeValue(String value) {
-        String trimmedValue = StringUtils.trimToNull(value);
-        return trimmedValue == null ? "-" : trimmedValue;
-    }
-
     private CustomerEntity resolveCustomer(String customerId) throws DataNotFoundException {
         if (StringUtils.isBlank(customerId)) {
             return null;
@@ -1586,6 +1015,14 @@ public class RFQService {
             throw new DataNotFoundException("Order type " + orderTypeCode + " not found.");
         }
         return orderType;
+    }
+
+    private String normalizeRfqShippingMethod(String shippingMethod) throws InvalidRequestException {
+        String normalized = StringUtils.defaultIfBlank(shippingMethod, "ALL").trim().toUpperCase(Locale.ROOT);
+        if (!List.of("ALL", "LAND", "SEA").contains(normalized)) {
+            throw new InvalidRequestException("shippingMethod must be ALL, LAND, or SEA");
+        }
+        return normalized;
     }
 
     private SystemConfigEntity resolveCostType(String costTypeCode) throws DataNotFoundException {

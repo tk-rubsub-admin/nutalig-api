@@ -32,7 +32,7 @@ public class LineController {
     public ResponseEntity<String> handleLineWebhook(@RequestBody String requestBody, @RequestHeader("X-Line-Signature") String signature) {
         log.info("Handle Line webhook");
         boolean isValid = LineSignatureValidator.validate(
-                lineConfiguration.getLineChannelSecret(),
+                lineConfiguration.getLineMessageChannelSecret(),
                 requestBody,
                 signature
         );

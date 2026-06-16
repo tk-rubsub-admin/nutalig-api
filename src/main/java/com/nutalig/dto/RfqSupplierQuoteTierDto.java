@@ -1,5 +1,6 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.Currency;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -11,10 +12,8 @@ public class RfqSupplierQuoteTierDto {
     private Long id;
     private BigDecimal quantity;
     private BigDecimal productPrice;
-    private BigDecimal landFreightCost;
-    private BigDecimal seaFreightCost;
-    private BigDecimal landTotalPrice;
-    private BigDecimal seaTotalPrice;
+    private BigDecimal shippingCost;
+    private Currency currency;
     private Integer sortOrder;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;

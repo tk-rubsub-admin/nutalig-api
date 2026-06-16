@@ -43,6 +43,15 @@ public class RfqSupplierQuoteDetailEntity extends AuditDateEntity {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
+    @Column(name = "package_dimension", columnDefinition = "TEXT")
+    private String packageDimension;
+
+    @Column(name = "package_weight", columnDefinition = "TEXT")
+    private String packageWeight;
+
+    @Column(name = "package_capacity", columnDefinition = "TEXT")
+    private String packageCapacity;
+
     @OneToMany(mappedBy = "quoteDetail", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqSupplierQuoteTierEntity> tiers = new ArrayList<>();
 

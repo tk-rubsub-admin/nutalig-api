@@ -14,6 +14,9 @@ public class RfqSupplierQuoteDetailDto {
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String packageDimension;
+    private String packageWeight;
+    private String packageCapacity;
     private List<RfqSupplierQuoteTierDto> tiers;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;

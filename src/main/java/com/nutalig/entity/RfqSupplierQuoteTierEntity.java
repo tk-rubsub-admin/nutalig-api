@@ -1,10 +1,12 @@
 package com.nutalig.entity;
 
+import com.nutalig.constant.Currency;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.checkerframework.checker.units.qual.C;
 
 import java.math.BigDecimal;
 
@@ -32,18 +34,13 @@ public class RfqSupplierQuoteTierEntity extends AuditDateEntity {
     @Column(name = "product_price", precision = 18, scale = 4, nullable = false)
     private BigDecimal productPrice;
 
-    @Column(name = "land_freight_cost", precision = 18, scale = 4)
-    private BigDecimal landFreightCost;
-
-    @Column(name = "sea_freight_cost", precision = 18, scale = 4)
-    private BigDecimal seaFreightCost;
-
-    @Column(name = "land_total_price", precision = 18, scale = 4)
-    private BigDecimal landTotalPrice;
-
-    @Column(name = "sea_total_price", precision = 18, scale = 4)
-    private BigDecimal seaTotalPrice;
+    @Column(name = "shipping_cost", precision = 18, scale = 4)
+    private BigDecimal shippingCost;
 
     @Column(name = "sort_order")
     private Integer sortOrder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency")
+    private Currency currency;
 }

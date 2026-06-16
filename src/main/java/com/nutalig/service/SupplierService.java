@@ -255,6 +255,23 @@ public class SupplierService {
     }
 
     @Transactional
+    public List<SupplierCapabilityDto> suggestSupplierCapabilities(
+            String supplierId,
+            List<AddSupplierMaterialCapability> capabilities
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("Suggest supplier capabilities supplier id {} size {}", supplierId,
+                CollectionUtils.isEmpty(capabilities) ? 0 : capabilities.size());
+
+        if (StringUtils.isBlank(supplierId)) {
+            throw new InvalidRequestException("Supplier id is required.");
+        }
+
+        AddSupplierMaterialCapabilityRequest request = new AddSupplierMaterialCapabilityRequest();
+        request.setCapabilities(capabilities);
+        return addSupplierMaterialCapability(supplierId.trim(), request);
+    }
+
+    @Transactional
     public List<SupplierCapabilityDto> deleteSupplierFamilyCapability(String supplierId, String productFamilyCode)
             throws DataNotFoundException {
         log.info("Delete supplier family capability supplier id {} family {}", supplierId, productFamilyCode);
@@ -373,6 +390,8 @@ public class SupplierService {
 
     private List<SupplierCapabilityDto> buildCapabilityDtos(List<SupplierCapabilityEntity> capabilities) {
         Map<String, SupplierCapabilityDto> capabilityMap = new LinkedHashMap<>();
+        Map<String, List<ProductMaterialEntity>> familyMaterialsMap = new HashMap<>();
+        Map<String, Boolean> familyAllMaterialsMap = new HashMap<>();
 
         for (SupplierCapabilityEntity capability : capabilities) {
             if (capability == null || capability.getStatus() != Status.ACTIVE) {
@@ -390,7 +409,24 @@ public class SupplierService {
             );
 
             if (capability.getProductMaterialCode() == null) {
-                capabilityDto.setCoversAllMaterials(true);
+                capabilityDto.setCoversAllMaterials(false);
+                capabilityDto.getMaterials().clear();
+                List<ProductMaterialEntity> familyMaterials = familyMaterialsMap.computeIfAbsent(
+                        capability.getProductFamilyCode(),
+                        productFamilyCode -> productMaterialRepository
+                                .findAllByProductFamilyCodeOrderByCodeAsc(productFamilyCode)
+                );
+                for (ProductMaterialEntity productMaterial : familyMaterials) {
+                    SupplierCapabilityMaterialDto materialDto = new SupplierCapabilityMaterialDto();
+                    materialDto.setProductMaterialCode(productMaterial.getCode());
+                    materialDto.setProductMaterial(toProductMaterialDto(productMaterial));
+                    capabilityDto.getMaterials().add(materialDto);
+                }
+                familyAllMaterialsMap.put(capability.getProductFamilyCode(), true);
+                continue;
+            }
+
+            if (Boolean.TRUE.equals(familyAllMaterialsMap.get(capability.getProductFamilyCode()))) {
                 continue;
             }
 

@@ -40,6 +40,18 @@ public class RfqDetailEntity extends AuditDateEntity {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
+    @Column(name = "recommend", columnDefinition = "TEXT")
+    private String recommend;
+
+    @Column(name = "package_dimension", columnDefinition = "TEXT")
+    private String packageDimension;
+
+    @Column(name = "package_weight", columnDefinition = "TEXT")
+    private String packageWeight;
+
+    @Column(name = "package_capacity", columnDefinition = "TEXT")
+    private String packageCapacity;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "supplier_id", referencedColumnName = "id")
     @EqualsAndHashCode.Exclude

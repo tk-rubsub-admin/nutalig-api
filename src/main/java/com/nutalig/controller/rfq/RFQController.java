@@ -3,13 +3,14 @@ package com.nutalig.controller.rfq;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.rfq.request.*;
-import com.nutalig.dto.RequestPriceHeaderDto;
+import com.nutalig.dto.RfqHeaderDto;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.RFQService;
+import com.nutalig.service.RFQSupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,28 +26,29 @@ import static com.nutalig.constant.ResponseStatus.SUCCESS;
 public class RFQController {
 
     private final RFQService rfqService;
+    private final RFQSupplierService rfqSupplierService;
 
     @GetMapping
-    public GeneralResponse<com.nutalig.controller.response.Pageable<RequestPriceHeaderDto>> getAllRFQ(
+    public GeneralResponse<com.nutalig.controller.response.Pageable<RfqHeaderDto>> getAllRFQ(
             SearchRFQRequest searchRequest,
             @Valid PageableRequest pageableRequest
     ) {
         log.info("=== Start get all rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
 
-        com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> response = rfqService.getAllRFQ(searchRequest, pageableRequest);
+        com.nutalig.controller.response.Pageable<RfqHeaderDto> response = rfqService.getAllRFQ(searchRequest, pageableRequest);
 
         log.info("=== End get all rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/search")
-    public GeneralResponse<com.nutalig.controller.response.Pageable<RequestPriceHeaderDto>> searchRFQ(
+    public GeneralResponse<com.nutalig.controller.response.Pageable<RfqHeaderDto>> searchRFQ(
             @RequestBody(required = false) SearchRFQRequest searchRequest,
             @Valid PageableRequest pageableRequest
     ) {
         log.info("=== Start search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
 
-        com.nutalig.controller.response.Pageable<RequestPriceHeaderDto> response =
+        com.nutalig.controller.response.Pageable<RfqHeaderDto> response =
                 rfqService.getAllRFQ(searchRequest, pageableRequest);
 
         log.info("=== End search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
@@ -54,13 +56,13 @@ public class RFQController {
     }
 
     @GetMapping("/{id}")
-    public GeneralResponse<RequestPriceHeaderDto> getRFQById(
+    public GeneralResponse<RfqHeaderDto> getRFQById(
             @PathVariable("id") String id,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException {
         log.info("=== Start get rfq {} ===", id);
 
-        RequestPriceHeaderDto response = rfqService.getRFQById(id, userId);
+        RfqHeaderDto response = rfqService.getRFQById(id, userId);
 
         log.info("=== End get rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -80,12 +82,11 @@ public class RFQController {
     @PostMapping("/{id}/inquiries/generate")
     public GeneralResponse<RfqSupplierInquiryDto> generateInquiry(
             @PathVariable("id") String id,
-            @RequestBody GenerateRfqSupplierInquiryRequest request,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start generate inquiry rfq {} by {} ===", id, userId);
 
-        RfqSupplierInquiryDto response = rfqService.generateInquiry(id, request, userId);
+        RfqSupplierInquiryDto response = rfqSupplierService.generateInquiry(id, userId);
 
         log.info("=== End generate inquiry {} for rfq {} ===", response.getId(), id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -96,7 +97,7 @@ public class RFQController {
             throws DataNotFoundException {
         log.info("=== Start get inquiries rfq {} ===", id);
 
-        java.util.List<RfqSupplierInquiryDto> response = rfqService.getInquiries(id);
+        java.util.List<RfqSupplierInquiryDto> response = rfqSupplierService.getInquiries(id);
 
         log.info("=== End get inquiries rfq {} size {} ===", id, response.size());
         return new GeneralResponse<>(SUCCESS, response);
@@ -109,7 +110,7 @@ public class RFQController {
     ) throws DataNotFoundException {
         log.info("=== Start get inquiry {} rfq {} ===", inquiryId, id);
 
-        RfqSupplierInquiryDto response = rfqService.getInquiry(id, inquiryId);
+        RfqSupplierInquiryDto response = rfqSupplierService.getInquiry(id, inquiryId);
 
         log.info("=== End get inquiry {} rfq {} ===", inquiryId, id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -124,7 +125,7 @@ public class RFQController {
     ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start update inquiry {} rfq {} by {} ===", inquiryId, id, userId);
 
-        RfqSupplierInquiryDto response = rfqService.updateInquiry(id, inquiryId, request, userId);
+        RfqSupplierInquiryDto response = rfqSupplierService.updateInquiry(id, inquiryId, request, userId);
 
         log.info("=== End update inquiry {} rfq {} ===", inquiryId, id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -138,7 +139,7 @@ public class RFQController {
     ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start finalize inquiry {} rfq {} by {} ===", inquiryId, id, userId);
 
-        RfqSupplierInquiryDto response = rfqService.finalizeInquiry(id, inquiryId, userId);
+        RfqSupplierInquiryDto response = rfqSupplierService.finalizeInquiry(id, inquiryId, userId);
 
         log.info("=== End finalize inquiry {} rfq {} ===", inquiryId, id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -149,7 +150,7 @@ public class RFQController {
             throws DataNotFoundException {
         log.info("=== Start get supplier quotes rfq {} ===", id);
 
-        java.util.List<RfqSupplierQuoteDto> response = rfqService.getSupplierQuotes(id);
+        java.util.List<RfqSupplierQuoteDto> response = rfqSupplierService.getSupplierQuotes(id);
 
         log.info("=== End get supplier quotes rfq {} size {} ===", id, response.size());
         return new GeneralResponse<>(SUCCESS, response);
@@ -162,7 +163,7 @@ public class RFQController {
     ) throws DataNotFoundException {
         log.info("=== Start get supplier quote {} rfq {} ===", quoteId, id);
 
-        RfqSupplierQuoteDto response = rfqService.getSupplierQuote(id, quoteId);
+        RfqSupplierQuoteDto response = rfqSupplierService.getSupplierQuote(id, quoteId);
 
         log.info("=== End get supplier quote {} rfq {} ===", quoteId, id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -176,7 +177,7 @@ public class RFQController {
     ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start create supplier quote rfq {} by {} ===", id, userId);
 
-        RfqSupplierQuoteDto response = rfqService.createSupplierQuote(id, request, userId);
+        RfqSupplierQuoteDto response = rfqSupplierService.createSupplierQuote(id, request, userId);
 
         log.info("=== End create supplier quote {} rfq {} ===", response.getId(), id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -191,7 +192,7 @@ public class RFQController {
     ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start update supplier quote {} rfq {} by {} ===", quoteId, id, userId);
 
-        RfqSupplierQuoteDto response = rfqService.updateSupplierQuote(id, quoteId, request, userId);
+        RfqSupplierQuoteDto response = rfqSupplierService.updateSupplierQuote(id, quoteId, request, userId);
 
         log.info("=== End update supplier quote {} rfq {} ===", quoteId, id);
         return new GeneralResponse<>(SUCCESS, response);
@@ -204,83 +205,83 @@ public class RFQController {
     ) throws DataNotFoundException {
         log.info("=== Start delete supplier quote {} rfq {} ===", quoteId, id);
 
-        rfqService.deleteSupplierQuote(id, quoteId);
+        rfqSupplierService.deleteSupplierQuote(id, quoteId);
 
         log.info("=== End delete supplier quote {} rfq {} ===", quoteId, id);
         return new GeneralResponse<>(SUCCESS);
     }
 
     @PostMapping
-    public GeneralResponse<RequestPriceHeaderDto> createRFQ(
+    public GeneralResponse<RfqHeaderDto> createRFQ(
             @ModelAttribute CreateRequestPriceHeaderRequest request,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start create rfq by {} ===", userId);
 
-        RequestPriceHeaderDto response = rfqService.createRFQ(request, userId);
+        RfqHeaderDto response = rfqService.createRFQ(request, userId);
 
         log.info("=== End create rfq {} ===", response.getId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/{id}/details")
-    public GeneralResponse<RequestPriceHeaderDto> addRFQDetail(
+    public GeneralResponse<RfqHeaderDto> addRFQDetail(
             @PathVariable("id") String id,
             @RequestBody java.util.List<CreateRequestPriceDetailRequest> requests,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start add rfq detail {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.addRFQDetail(id, requests, userId);
+        RfqHeaderDto response = rfqService.addRFQDetail(id, requests, userId);
 
         log.info("=== End add rfq detail {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/{id}/additional-costs")
-    public GeneralResponse<RequestPriceHeaderDto> addRFQAdditionalCosts(
+    public GeneralResponse<RfqHeaderDto> addRFQAdditionalCosts(
             @PathVariable("id") String id,
             @RequestBody java.util.List<CreateRequestPriceAdditionalCostRequest> requests,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start add rfq additional costs {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.addRFQAdditionalCosts(id, requests, userId);
+        RfqHeaderDto response = rfqService.addRFQAdditionalCosts(id, requests, userId);
 
         log.info("=== End add rfq additional costs {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/{id}/customers")
-    public GeneralResponse<RequestPriceHeaderDto> updateCustomer(
+    public GeneralResponse<RfqHeaderDto> updateCustomer(
             @PathVariable("id") String id,
             @RequestBody UpdateRfqCustomerRequest request,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start update rfq customer {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.updateCustomer(id, request, userId);
+        RfqHeaderDto response = rfqService.updateCustomer(id, request, userId);
 
         log.info("=== End update rfq customer {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PatchMapping("/{id}/sales-order")
-    public GeneralResponse<RequestPriceHeaderDto> linkSalesOrder(
+    public GeneralResponse<RfqHeaderDto> linkSalesOrder(
             @PathVariable("id") String id,
             @RequestBody LinkRfqSalesOrderRequest request,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start link rfq {} to sale order {} by {} ===", id, request == null ? null : request.getSaleOrderId(), userId);
 
-        RequestPriceHeaderDto response = rfqService.linkSalesOrder(id, request, userId);
+        RfqHeaderDto response = rfqService.linkSalesOrder(id, request, userId);
 
         log.info("=== End link rfq {} to sale order {} ===", id, response.getSaleOrderId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PatchMapping("/{id}/details/{detailId}")
-    public GeneralResponse<RequestPriceHeaderDto> updateRFQDetail(
+    public GeneralResponse<RfqHeaderDto> updateRFQDetail(
             @PathVariable("id") String id,
             @PathVariable("detailId") Long detailId,
             @RequestBody UpdateRequestPriceDetailRequest request,
@@ -288,14 +289,14 @@ public class RFQController {
     ) throws Exception {
         log.info("=== Start update rfq detail {} from {} by {} ===", detailId, id, userId);
 
-        RequestPriceHeaderDto response = rfqService.updateRFQDetail(id, detailId, request, userId);
+        RfqHeaderDto response = rfqService.updateRFQDetail(id, detailId, request, userId);
 
         log.info("=== End update rfq detail {} from {} ===", detailId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PatchMapping("/{id}/additional-costs/{additionalCostId}")
-    public GeneralResponse<RequestPriceHeaderDto> updateRFQAdditionalCost(
+    public GeneralResponse<RfqHeaderDto> updateRFQAdditionalCost(
             @PathVariable("id") String id,
             @PathVariable("additionalCostId") Long additionalCostId,
             @RequestBody UpdateRequestPriceAdditionalCostRequest request,
@@ -303,105 +304,105 @@ public class RFQController {
     ) throws Exception {
         log.info("=== Start update rfq additional cost {} from {} by {} ===", additionalCostId, id, userId);
 
-        RequestPriceHeaderDto response = rfqService.updateRFQAdditionalCost(id, additionalCostId, request, userId);
+        RfqHeaderDto response = rfqService.updateRFQAdditionalCost(id, additionalCostId, request, userId);
 
         log.info("=== End update rfq additional cost {} from {} ===", additionalCostId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @DeleteMapping("/{id}/details/{detailId}")
-    public GeneralResponse<RequestPriceHeaderDto> deleteRFQDetail(
+    public GeneralResponse<RfqHeaderDto> deleteRFQDetail(
             @PathVariable("id") String id,
             @PathVariable("detailId") Long detailId,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start delete rfq detail {} from {} by {} ===", detailId, id, userId);
 
-        RequestPriceHeaderDto response = rfqService.deleteRFQDetail(id, detailId, userId);
+        RfqHeaderDto response = rfqService.deleteRFQDetail(id, detailId, userId);
 
         log.info("=== End delete rfq detail {} from {} ===", detailId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @DeleteMapping("/{id}/additional-costs/{additionalCostId}")
-    public GeneralResponse<RequestPriceHeaderDto> deleteRFQAdditionalCost(
+    public GeneralResponse<RfqHeaderDto> deleteRFQAdditionalCost(
             @PathVariable("id") String id,
             @PathVariable("additionalCostId") Long additionalCostId,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start delete rfq additional cost {} from {} by {} ===", additionalCostId, id, userId);
 
-        RequestPriceHeaderDto response = rfqService.deleteRFQAdditionalCost(id, additionalCostId, userId);
+        RfqHeaderDto response = rfqService.deleteRFQAdditionalCost(id, additionalCostId, userId);
 
         log.info("=== End delete rfq additional cost {} from {} ===", additionalCostId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PatchMapping("/{id}")
-    public GeneralResponse<RequestPriceHeaderDto> updateRFQ(
+    public GeneralResponse<RfqHeaderDto> updateRFQ(
             @PathVariable("id") String id,
             @RequestBody UpdateRequestPriceHeaderRequest request,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start update rfq {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.updateRFQ(id, request, userId);
+        RfqHeaderDto response = rfqService.updateRFQ(id, request, userId);
 
         log.info("=== End update rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @DeleteMapping("/{id}/pictures/{pictureId}")
-    public GeneralResponse<RequestPriceHeaderDto> deletePicture(
+    public GeneralResponse<RfqHeaderDto> deletePicture(
             @PathVariable("id") String id,
             @PathVariable("pictureId") Long pictureId,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException {
         log.info("=== Start delete rfq picture {} from {} ===", pictureId, id);
 
-        RequestPriceHeaderDto response = rfqService.deletePicture(id, pictureId, userId);
+        RfqHeaderDto response = rfqService.deletePicture(id, pictureId, userId);
 
         log.info("=== End delete rfq picture {} from {} ===", pictureId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @DeleteMapping("/{id}/attachments/{attachmentId}")
-    public GeneralResponse<RequestPriceHeaderDto> deleteAttachment(
+    public GeneralResponse<RfqHeaderDto> deleteAttachment(
             @PathVariable("id") String id,
             @PathVariable("attachmentId") Long attachmentId,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException {
         log.info("=== Start delete rfq attachment {} from {} ===", attachmentId, id);
 
-        RequestPriceHeaderDto response = rfqService.deleteAttachment(id, attachmentId, userId);
+        RfqHeaderDto response = rfqService.deleteAttachment(id, attachmentId, userId);
 
         log.info("=== End delete rfq attachment {} from {} ===", attachmentId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/{id}/pictures")
-    public GeneralResponse<RequestPriceHeaderDto> addPictures(
+    public GeneralResponse<RfqHeaderDto> addPictures(
             @PathVariable("id") String id,
             @RequestPart("pictures") java.util.List<MultipartFile> pictures,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start add rfq pictures {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.addPictures(id, pictures, userId);
+        RfqHeaderDto response = rfqService.addPictures(id, pictures, userId);
 
         log.info("=== End add rfq pictures {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
     @PostMapping("/{id}/attachments")
-    public GeneralResponse<RequestPriceHeaderDto> addAttachments(
+    public GeneralResponse<RfqHeaderDto> addAttachments(
             @PathVariable("id") String id,
             @RequestPart("attachments") java.util.List<MultipartFile> attachments,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start add rfq attachments {} by {} ===", id, userId);
 
-        RequestPriceHeaderDto response = rfqService.addAttachments(id, attachments, userId);
+        RfqHeaderDto response = rfqService.addAttachments(id, attachments, userId);
 
         log.info("=== End add rfq attachments {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);

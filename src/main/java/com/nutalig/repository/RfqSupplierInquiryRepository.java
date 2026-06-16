@@ -13,10 +13,7 @@ public interface RfqSupplierInquiryRepository extends JpaRepository<RfqSupplierI
 
     List<RfqSupplierInquiryEntity> findAllByRequestPriceHeader_IdOrderByVersionNoDesc(String rfqId);
 
-    Optional<RfqSupplierInquiryEntity> findFirstByRequestPriceHeader_IdAndSupplier_IdOrderByVersionNoDesc(
-            String rfqId,
-            String supplierId
-    );
+    Optional<RfqSupplierInquiryEntity> findFirstByRequestPriceHeader_IdOrderByVersionNoDesc(String rfqId);
 
     Optional<RfqSupplierInquiryEntity> findByIdAndRequestPriceHeader_Id(String inquiryId, String rfqId);
 

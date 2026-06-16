@@ -12,6 +12,10 @@ public class CreateRequestPriceDetailRequest {
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String recommend;
+    private String packageDimension;
+    private String packageWeight;
+    private String packageCapacity;
     private String supplierId;
     private List<CreateRequestPriceTierRequest> tiers;
 
@@ -25,4 +29,6 @@ public class CreateRequestPriceDetailRequest {
         private BigDecimal seaTotalPrice;
         private Integer sortOrder;
     }
+
+
 }

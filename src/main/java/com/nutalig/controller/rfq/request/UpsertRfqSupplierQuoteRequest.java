@@ -1,5 +1,6 @@
 package com.nutalig.controller.rfq.request;
 
+import com.nutalig.constant.Currency;
 import com.nutalig.constant.RfqSupplierQuoteStatus;
 import lombok.Data;
 
@@ -23,6 +24,9 @@ public class UpsertRfqSupplierQuoteRequest {
         private String spec;
         private Integer sortOrder;
         private String remark;
+        private String packageDimension;
+        private String packageWeight;
+        private String packageCapacity;
         private List<TierRequest> tiers;
     }
 
@@ -30,10 +34,8 @@ public class UpsertRfqSupplierQuoteRequest {
     public static class TierRequest {
         private BigDecimal quantity;
         private BigDecimal productPrice;
-        private BigDecimal landFreightCost;
-        private BigDecimal seaFreightCost;
-        private BigDecimal landTotalPrice;
-        private BigDecimal seaTotalPrice;
+        private BigDecimal shippingCost;
+        private Currency currency;
         private Integer sortOrder;
     }
 

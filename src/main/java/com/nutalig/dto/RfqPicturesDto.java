@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.ZonedDateTime;
 
 @Data
-public class RequestPricePicturesDto {
+public class RfqPicturesDto {
 
     private Long id;
     private String pictureUrl;

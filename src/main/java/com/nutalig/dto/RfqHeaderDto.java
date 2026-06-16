@@ -7,7 +7,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 @Data
-public class RequestPriceHeaderDto {
+public class RfqHeaderDto {
 
     private String id;
     private ZonedDateTime requestedDate;
@@ -17,9 +17,9 @@ public class RequestPriceHeaderDto {
     private EmployeeDto sales;
     private CustomerDto customer;
     private SystemConfigDto orderType;
-    private List<RequestPricePicturesDto> pictures;
-    private List<RequestPriceDetailDto> details;
-    private List<RequestPriceAdditionalCostDto> additionalCosts;
+    private List<RfqPicturesDto> pictures;
+    private List<RfqDetailDto> details;
+    private List<RfqAdditionalCostDto> additionalCosts;
     private ProductFamilyDto productFamily;
     private ProductSubtype1Dto productSubtype1;
     private ProductSubtype2Dto productSubType2;
@@ -35,6 +35,7 @@ public class RequestPriceHeaderDto {
     private ZonedDateTime quotedDate;
     private String quotationNo;
     private String saleOrderId;
+    private String shippingMethod;
     private Long confirmedDetailId;
     private Long confirmedTierId;
     private String confirmedShippingMethod;
