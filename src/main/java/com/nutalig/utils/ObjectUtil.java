@@ -33,4 +33,14 @@ public class ObjectUtil {
         return oldVal;
     }
 
+    public static String extractJsonObject(String raw) {
+        String s = raw.trim();
+        int start = s.indexOf('{');
+        int end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return s.substring(start, end + 1);
+        }
+        return s; // fallback
+    }
+
 }

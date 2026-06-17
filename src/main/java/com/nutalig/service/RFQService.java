@@ -1,6 +1,8 @@
 package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.config.PromptTemplateEngine;
+import com.nutalig.config.TemplateProperties;
 import com.nutalig.constant.*;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
@@ -26,8 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_NOT_FOUND_TH;
+import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_TRACKING_STATUS_TH;
 import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.*;
 
 @Slf4j
@@ -57,6 +62,8 @@ public class RFQService {
     private final SupplierService supplierService;
     private final LineMessageService lineMessageService;
     private final ObjectMapper objectMapper;
+    private final PromptTemplateEngine promptTemplateEngine;
+    private final TemplateProperties templateProperties;
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
@@ -77,6 +84,7 @@ public class RFQService {
 
     @Transactional
     public RfqHeaderDto getRFQById(String id, String userId) throws DataNotFoundException {
+        log.info("Get RFQ by id : {}", id);
         RfqHeaderEntity entity = getEntityById(id);
 
         if (shouldMoveToInProgressOnView(entity, userId)) {
@@ -97,6 +105,32 @@ public class RFQService {
             );
         }
         return mapToDto(entity);
+    }
+
+    @Transactional
+    public void getRFQAndSendMessageToLine(String userId, String message) throws Exception {
+        log.info("Get RFQ detail line message for id {}", message);
+
+        try {
+            RfqHeaderDto rfqHeader = mapToDto(getEntityById(message));
+
+            Map<String, String> variables = new LinkedHashMap<>();
+            variables.put("rfqId", StringUtils.defaultString(rfqHeader.getId(), "-"));
+            variables.put("status", displayRfqStatus(rfqHeader.getStatus()));
+            variables.put("updatedDate", formatRfqUpdatedDate(rfqHeader.getUpdatedDate()));
+
+            String msg = promptTemplateEngine.render(templateProperties.getTexts().get(RFQ_TRACKING_STATUS_TH), variables);
+
+            log.info("Send message {} to user {}", msg, userId);
+
+            lineMessageService.sendTextMessage(userId, msg);
+        } catch (DataNotFoundException ex) {
+            Map<String, String> variables = new LinkedHashMap<>();
+            variables.put("rfqId", message);
+
+            String notFoundMsg = promptTemplateEngine.render(templateProperties.getTexts().get(RFQ_NOT_FOUND_TH), variables);
+            lineMessageService.sendTextMessage(userId, notFoundMsg);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -1114,5 +1148,29 @@ public class RFQService {
                 .and(salesIdEqual(request.getSalesId()))
                 .and(orderTypeCodeEqual(request.getOrderTypeCode()))
                 .and(keywordContain(request.getKeyword()));
+    }
+
+    private String displayRfqStatus(RfqStatus status) {
+        if (status == null) {
+            return "-";
+        }
+        return switch (status) {
+            case NEW -> "ใหม่";
+            case IN_PROGRESS -> "กำลังดำเนินการ";
+            case SUPPLIER_QUOTED -> "ซัพพลายเออร์ตอบแล้ว";
+            case QUOTED -> "เสนอราคาแล้ว";
+            case CANCELED -> "ยกเลิก";
+            case CLOSED -> "ปิดงาน";
+            case COMPLETED -> "เสร็จสิ้น";
+        };
+    }
+
+    private String formatRfqUpdatedDate(ZonedDateTime updatedDate) {
+        if (updatedDate == null) {
+            return "-";
+        }
+        return updatedDate
+                .withZoneSameInstant(DateUtil.getTimeZone())
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
     }
 }

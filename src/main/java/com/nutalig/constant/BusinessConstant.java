@@ -12,4 +12,9 @@ public class BusinessConstant {
         public static final String SALES_ORDER_PREFIX = "NTL-SO";
         public static final String QUOTATION_PREFIX = "NTL-QT";
     }
+
+    public class MessageTemplateCode {
+        public static final String RFQ_TRACKING_STATUS_TH = "rfqTrackingStatusTh";
+        public static final String RFQ_NOT_FOUND_TH = "rfqNotFoundTh";
+    }
 }

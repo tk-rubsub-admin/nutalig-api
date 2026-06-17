@@ -1,0 +1,28 @@
+template:
+  texts:
+    rfqSupplierInquiryTh: |-
+      สวัสดีคุณ {{supplierName}}
+
+      ขอรบกวนเสนอราคา RFQ เลขที่ {{rfqId}}
+      สินค้า: {{productFamily}}
+      รายละเอียด: {{productDescription}}
+
+      กรุณาส่งกลับภายใน {{dueDate}}
+
+      ขอบคุณครับ
+    rfqSupplierInquiryZh: |-
+      您好 {{supplierName}}
+
+      请为 RFQ 编号 {{rfqId}} 报价。
+      产品: {{productFamily}}
+      详情: {{productDescription}}
+
+      请在 {{dueDate}} 前回复。
+
+      谢谢
+    rfqTrackingStatusTh: |-
+      ติดตามสถานะคำขอราคาเลขที่ {{rfqId}}
+      สถานะปัจจุบัน: {{status}}
+      อัพเดตเมื่อ: {{updatedDate}}
+    rfqNotFoundTh: |-
+      ไม่พบข้อมูลคำขอราคาเลขที่ {{rfqId}} กรุณาตรวจสอบข้อมูลอีกครั้ง

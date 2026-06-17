@@ -1,16 +1,20 @@
 package com.nutalig.controller.user;
 
+import com.nutalig.constant.UserTodoStatus;
+import com.nutalig.constant.UserTodoType;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.user.request.CreateUserRequest;
 import com.nutalig.dto.RolePermissionDto;
 import com.nutalig.dto.UserDto;
 import com.nutalig.dto.UserRoleDto;
+import com.nutalig.dto.UserTodoDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.UserRoleRepository;
 import com.nutalig.service.PermissionService;
 import com.nutalig.service.UserProfileService;
 import com.nutalig.service.UserService;
+import com.nutalig.service.UserTodoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +35,7 @@ public class UserController {
     private final UserService userService;
     private final UserRoleRepository userRoleRepository;
     private final PermissionService permissionService;
+    private final UserTodoService userTodoService;
 
     @PostMapping("/v1/users")
     @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
@@ -106,6 +111,43 @@ public class UserController {
         List<RolePermissionDto> response = permissionService.updateRolePermissions(request);
 
         log.info("===== End update role permissions size {} =====", response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/me/to-dos")
+    public GeneralResponse<List<UserTodoDto>> getMyTodos(
+            Authentication authentication,
+            @RequestParam(required = false) List<UserTodoStatus> statuses,
+            @RequestParam(required = false) UserTodoType todoType
+    ) throws DataNotFoundException {
+        log.info("=== Start get user todos statuses {} todoType {} ===", statuses, todoType);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        List<UserTodoDto> response = userTodoService.getTodosByUser(userDto.getId(), statuses, todoType);
+
+        log.info("=== End get user todos user {} size {} ===", userDto.getId(), response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/v1/me/to-dos/{id}/done")
+    public GeneralResponse<UserTodoDto> markTodoAsDone(
+            Authentication authentication,
+            @PathVariable("id") Long todoId
+    ) throws DataNotFoundException {
+        log.info("=== Start mark user todo {} as done ===", todoId);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        UserTodoDto response = userTodoService.markTodoAsDone(userDto.getId(), todoId);
+
+        log.info("=== End mark user todo {} as done by user {} ===", todoId, userDto.getId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

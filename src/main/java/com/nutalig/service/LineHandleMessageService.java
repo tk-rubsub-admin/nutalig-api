@@ -52,10 +52,7 @@ public class LineHandleMessageService {
             String promptCode = mappingPrompt.getPromptCode();
             log.info("Found AI prompt with code {}", promptCode);
 
-            String json = aiExecutionService.execute(promptCode, Map.of("message", message));
-            String cleaned = extractJsonObject(json);
-
-            promptResultDispatcher.dispatch(promptCode, userId, cleaned);
+            promptResultDispatcher.dispatch(promptCode, userId, message);
 
             return CompletableFuture.completedFuture(null);
 
@@ -63,16 +60,6 @@ public class LineHandleMessageService {
             log.error("handleTextMessage async error", e);
             return CompletableFuture.failedFuture(e);
         }
-    }
-
-    private String extractJsonObject(String raw) {
-        String s = raw.trim();
-        int start = s.indexOf('{');
-        int end = s.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return s.substring(start, end + 1);
-        }
-        return s; // fallback
     }
 
     private boolean matchesPrefix(String firstLine, KeywordMappingPromptEntity mapping) {

@@ -45,28 +45,6 @@ public class AiExecutionService {
         loggingService.logPrompt(promptCode, response, duration);
 
         return response.getContent();
-//        return """
-//        {
-//          "customerId": "บริษัท ทีเค รับทรัพย์ จำกัด",
-//          "salesId": "กาญ",
-//          "coSalesId": null,
-//          "remark": "ลูกค้าได้ราคามา 15000",
-//          "discount": 0,
-//          "freight": 0,
-//          "isVat": true,
-//          "items": [
-//            {
-//              "name": "เครื่องคิ้มขวดน้ำหอม",
-//              "type": null,
-//              "capacity": null,
-//              "size": "",
-//              "spec": "",
-//              "unitPrice": 10.5,
-//              "quantity": 1
-//            }
-//          ]
-//        }
-//        """;
     }
 
 }

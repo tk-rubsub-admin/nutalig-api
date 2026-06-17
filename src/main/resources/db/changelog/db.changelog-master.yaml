@@ -953,3 +953,38 @@ databaseChangeLog:
                   name: shipping_method
                   type: VARCHAR(20)
                   defaultValue: ALL
+
+  - changeSet:
+      id: 20260616-002-create-user-todo-table
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS user_todo (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  owner_user_id VARCHAR(100) NOT NULL,
+                  todo_type VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+                  title VARCHAR(255) NOT NULL,
+                  description TEXT DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL DEFAULT 'TODO',
+                  priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+                  target_module VARCHAR(64) DEFAULT NULL,
+                  target_id VARCHAR(255) DEFAULT NULL,
+                  target_path VARCHAR(512) DEFAULT NULL,
+                  due_date DATETIME(6) DEFAULT NULL,
+                  completed_date DATETIME(6) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  active BOOLEAN NOT NULL DEFAULT TRUE,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_user_todo_owner_status (owner_user_id, status),
+                  KEY idx_user_todo_owner_type_status (owner_user_id, todo_type, status),
+                  KEY idx_user_todo_owner_due_date (owner_user_id, due_date),
+                  KEY idx_user_todo_target (target_module, target_id),
+                  KEY idx_user_todo_owner_active_sort (owner_user_id, active, sort_order),
+                  CONSTRAINT fk_user_todo_owner_user FOREIGN KEY (owner_user_id) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
