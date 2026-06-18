@@ -477,6 +477,7 @@ public class QuotationService {
 
         Map<String, String> variables = new LinkedHashMap<>();
         try {
+            lineMessageService.sendTextMessage(userId, "ระบบกำลังดาวน์โหลดใบเสนอราคา");
             UploadFileResponse uploadFileResponse = resolveQuotationPdfFile(quotationNo);
 
             variables.put("quotationNo", quotationNo);
