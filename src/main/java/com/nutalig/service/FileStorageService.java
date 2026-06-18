@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.InputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -49,6 +50,40 @@ public class FileStorageService {
         return new UploadFileResponse(fileName, url, contentType);
     }
 
+    public UploadFileResponse uploadGeneratedFile(byte[] content, String fileBaseName, String contentType) throws IOException {
+        if (content == null || content.length == 0) {
+            throw new IllegalArgumentException("File content is empty.");
+        }
+
+        String extension = resolveExtension(fileBaseName, contentType);
+        String safeBaseName = sanitizeFileBaseName(fileBaseName);
+        String fileName = safeBaseName +
+                ((extension == null || extension.isBlank()) ? "" : "." + extension);
+
+        Path uploadPath = Paths.get(appProperties.getUpload().getDir()).toAbsolutePath().normalize();
+        Files.createDirectories(uploadPath);
+
+        Path targetPath = uploadPath.resolve(fileName);
+        Files.write(targetPath, content);
+
+        String url = buildPublicFileUrl(fileName);
+
+        return new UploadFileResponse(fileName, url, contentType);
+    }
+
+    public boolean fileExists(String fileName) {
+        if (StringUtils.isBlank(fileName)) {
+            return false;
+        }
+
+        Path uploadPath = Paths.get(appProperties.getUpload().getDir()).toAbsolutePath().normalize();
+        return Files.exists(uploadPath.resolve(fileName));
+    }
+
+    public String getPublicFileUrl(String fileName) {
+        return buildPublicFileUrl(fileName);
+    }
+
     public UploadFileResponse uploadImage(MultipartFile file) throws Exception {
         return uploadFile(file);
     }
@@ -59,6 +94,16 @@ public class FileStorageService {
             return extension;
         }
         return resolveExtensionFromContentType(contentType);
+    }
+
+    private String sanitizeFileBaseName(String fileBaseName) {
+        String sanitized = StringUtils.defaultIfBlank(fileBaseName, UUID.randomUUID().toString());
+        sanitized = sanitized.replaceAll("[\\\\/]+", "_");
+        sanitized = sanitized.replaceAll("[^A-Za-z0-9._-]", "_");
+        sanitized = sanitized.replaceAll("_+", "_");
+        sanitized = StringUtils.removeStart(sanitized, ".");
+        sanitized = StringUtils.removeEnd(sanitized, ".");
+        return StringUtils.defaultIfBlank(sanitized, UUID.randomUUID().toString());
     }
 
     private String resolveExtensionFromContentType(String contentType) {

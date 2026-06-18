@@ -111,10 +111,10 @@ public class RFQService {
     public void getRFQAndSendMessageToLine(String userId, String message) throws Exception {
         log.info("Get RFQ detail line message for id {}", message);
 
+        Map<String, String> variables = new LinkedHashMap<>();
         try {
             RfqHeaderDto rfqHeader = mapToDto(getEntityById(message));
 
-            Map<String, String> variables = new LinkedHashMap<>();
             variables.put("rfqId", StringUtils.defaultString(rfqHeader.getId(), "-"));
             variables.put("status", displayRfqStatus(rfqHeader.getStatus()));
             variables.put("updatedDate", formatRfqUpdatedDate(rfqHeader.getUpdatedDate()));
@@ -125,7 +125,6 @@ public class RFQService {
 
             lineMessageService.sendTextMessage(userId, msg);
         } catch (DataNotFoundException ex) {
-            Map<String, String> variables = new LinkedHashMap<>();
             variables.put("rfqId", message);
 
             String notFoundMsg = promptTemplateEngine.render(templateProperties.getTexts().get(RFQ_NOT_FOUND_TH), variables);

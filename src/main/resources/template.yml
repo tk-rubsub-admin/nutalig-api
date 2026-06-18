@@ -26,3 +26,8 @@ template:
       อัพเดตเมื่อ: {{updatedDate}}
     rfqNotFoundTh: |-
       ไม่พบข้อมูลคำขอราคาเลขที่ {{rfqId}} กรุณาตรวจสอบข้อมูลอีกครั้ง
+    downloadQuotationTh: |-
+      ลิ้งค์สำหรับใบเสนอราคาเลขที่ {{quotationNo}} 
+      {{link}}
+    quotationNotFoundTh: |-
+      ใบเสนอราคาเลขที่ {{quotationNo}} ยังไม่ถูกสร้างในระบบ กรุณาทำการสร้างใบเสนอราคา หรือ ติดต่อแอดมิน

@@ -1,6 +1,8 @@
 package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.config.PromptTemplateEngine;
+import com.nutalig.config.TemplateProperties;
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.*;
 import com.nutalig.controller.quotation.request.SearchQuotationRequest;
@@ -8,12 +10,14 @@ import com.nutalig.controller.quotation.response.SearchQuotationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.dto.*;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.QuotationDocumentDto;
 import com.nutalig.dto.document.QuotationItemDocumentDto;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
+import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.repository.*;
@@ -39,6 +43,7 @@ import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.*;
 
+import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.*;
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
 import static com.nutalig.repository.specification.QuotationSpecification.*;
 
@@ -50,6 +55,7 @@ public class QuotationService {
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final LineMessageService lineMessageService;
     private final ReportService reportService;
+    private final FileStorageService fileStorageService;
     private final QuotationRepository quotationRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final UserRepository userRepository;
@@ -60,6 +66,8 @@ public class QuotationService {
     private final EmployeeMapper employeeMapper;
     private final ObjectMapper objectMapper;
     private final ActivityHistoryService activityHistoryService;
+    private final PromptTemplateEngine promptTemplateEngine;
+    private final TemplateProperties templateProperties;
 
     record QuotationSummary(
             BigDecimal subTotal,
@@ -450,6 +458,56 @@ public class QuotationService {
         }
 
         return null;
+    }
+
+    @Transactional
+    public UploadFileResponse generateQuotationPdfUrl(String quotationNo, DocumentRequest documentRequest) throws Exception {
+        if (documentRequest == null) {
+            documentRequest = new DocumentRequest(ExportFileFormat.PDF, Boolean.TRUE, Boolean.FALSE);
+        }
+        if (!Boolean.TRUE.equals(documentRequest.getIsOriginal()) && !Boolean.TRUE.equals(documentRequest.getIsCopy())) {
+            throw new InvalidRequestException("At least one of isOriginal or isCopy must be true.");
+        }
+        return resolveQuotationPdfFile(quotationNo);
+    }
+
+    @Transactional
+    public void getAndDownloadQuotation(String userId, String quotationNo) throws Exception {
+        log.info("Download quotation for line {}", quotationNo);
+
+        Map<String, String> variables = new LinkedHashMap<>();
+        try {
+            UploadFileResponse uploadFileResponse = resolveQuotationPdfFile(quotationNo);
+
+            variables.put("quotationNo", quotationNo);
+            variables.put("link", uploadFileResponse.getUrl());
+
+            String msg = promptTemplateEngine.render(templateProperties.getTexts().get(DOWNLOAD_QUOTATION_TH), variables);
+
+            log.info("Send message {} to user {}", msg, userId);
+
+            lineMessageService.sendTextMessage(userId, msg);
+        } catch (DataNotFoundException ex) {
+            variables.put("quotationNo", quotationNo);
+
+            String notFoundMsg = promptTemplateEngine.render(templateProperties.getTexts().get(QUOTATION_NOT_FOUND_TH), variables);
+            lineMessageService.sendTextMessage(userId, notFoundMsg);
+        }
+    }
+
+    private UploadFileResponse resolveQuotationPdfFile(String quotationNo) throws Exception {
+        String fileName = quotationNo + ".pdf";
+        if (fileStorageService.fileExists(fileName)) {
+            log.info("{} is exist", fileName);
+            return new UploadFileResponse(fileName, fileStorageService.getPublicFileUrl(fileName), "application/pdf");
+        }
+
+        log.info("Generate quotation {}", quotationNo);
+        DocumentRequest documentRequest = new DocumentRequest(ExportFileFormat.PDF, true, false);
+        DownloadDocumentDto documentDto = getQuotationDocumentById(quotationNo, documentRequest);
+        DownloadDocumentDto.FileItem pdfFile = documentDto.getFiles().getFirst();
+        byte[] content = Base64.getDecoder().decode(pdfFile.getBase64());
+        return fileStorageService.uploadGeneratedFile(content, quotationNo, pdfFile.getContentType());
     }
 
     private QuotationDocumentDto  buildQuotationDocumentDto(QuotationEntity quotationEntity, Boolean aFalse) {

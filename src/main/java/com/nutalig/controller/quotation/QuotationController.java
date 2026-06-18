@@ -6,6 +6,7 @@ import com.nutalig.controller.quotation.response.SearchQuotationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.dto.QuotationDto;
 import com.nutalig.dto.QuotationRequestDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
@@ -83,6 +84,23 @@ public class QuotationController {
 
         log.info("=== End download quotation document ===");
         return ResponseEntity.ok(doc);
+    }
+
+    @PostMapping("/pdf-url")
+    public GeneralResponse<UploadFileResponse> generateQuotationPdfUrl(
+            @RequestParam(name = "id") String id,
+            @RequestParam(name = "isOriginal", defaultValue = "true") Boolean isOriginal,
+            @RequestParam(name = "isCopy", defaultValue = "false") Boolean isCopy
+    ) throws Exception {
+        log.info("=== Start generate quotation pdf url ===");
+
+        UploadFileResponse response = quotationService.generateQuotationPdfUrl(
+                id,
+                new DocumentRequest(ExportFileFormat.PDF, isOriginal, isCopy)
+        );
+
+        log.info("=== End generate quotation pdf url ===");
+        return new GeneralResponse<>(SUCCESS, response);
     }
 
     @GetMapping

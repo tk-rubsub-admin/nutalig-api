@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class GetRFQDetailHandler implements PromptResultHandler {
 
-    private static final String RFQ_DETAIL_PREFIX = "เลขที่ ";
+    private static final String RFQ_DETAIL_PREFIX = "คำขอราคา เลขที่:";
     private final RFQService rfqService;
     @Override
     public String promptCode() {

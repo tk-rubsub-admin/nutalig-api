@@ -16,5 +16,7 @@ public class BusinessConstant {
     public class MessageTemplateCode {
         public static final String RFQ_TRACKING_STATUS_TH = "rfqTrackingStatusTh";
         public static final String RFQ_NOT_FOUND_TH = "rfqNotFoundTh";
+        public static final String QUOTATION_NOT_FOUND_TH = "quotationNotFoundTh";
+        public static final String DOWNLOAD_QUOTATION_TH = "downloadQuotationTh";
     }
 }
