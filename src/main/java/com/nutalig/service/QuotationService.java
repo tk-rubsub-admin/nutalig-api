@@ -24,6 +24,7 @@ import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
+import com.nutalig.utils.RfqAttachmentUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -597,13 +598,13 @@ public class QuotationService {
     }
 
     @NotNull
-    private static List<QuotationItemDocumentDto> getItemDocumentDtos(QuotationEntity quotationEntity) {
+    private List<QuotationItemDocumentDto> getItemDocumentDtos(QuotationEntity quotationEntity) {
         List<QuotationItemDocumentDto> itemDocuments = new ArrayList<>();
         for (QuotationDetailEntity detail : quotationEntity.getItems()) {
             QuotationItemDocumentDto item = new QuotationItemDocumentDto();
 
             if (StringUtils.isNotEmpty(detail.getImageUrl())) {
-                item.setImage(loadImageAsInputStream(detail.getImageUrl()));
+                item.setImage(loadImageAsInputStream(detail.getImageUrl(), fileStorageService));
             }
             item.setNo(detail.getLineNo());
             item.setName(detail.getName());
@@ -624,8 +625,18 @@ public class QuotationService {
         return itemDocuments;
     }
 
-    private static InputStream loadImageAsInputStream(String imageUrl) {
+    private static InputStream loadImageAsInputStream(String imageUrl, FileStorageService fileStorageService) {
         try {
+            String fileName = RfqAttachmentUtil.extractFileName(imageUrl);
+            if (StringUtils.isBlank(fileName)) {
+                return null;
+            }
+
+            InputStream localFile = fileStorageService.openUploadedFile(fileName);
+            if (localFile != null) {
+                return localFile;
+            }
+
             return new URL(imageUrl).openStream();
         } catch (Exception e) {
             log.warn("Cannot load image from url: {}", imageUrl, e);

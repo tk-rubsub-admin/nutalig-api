@@ -14,6 +14,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,6 +83,15 @@ public class FileStorageService {
 
     public String getPublicFileUrl(String fileName) {
         return buildPublicFileUrl(fileName);
+    }
+
+    public InputStream openUploadedFile(String fileName) throws IOException {
+        Path uploadPath = Paths.get(appProperties.getUpload().getDir()).toAbsolutePath().normalize();
+        Path filePath = uploadPath.resolve(fileName).normalize();
+        if (!filePath.startsWith(uploadPath) || !Files.exists(filePath)) {
+            return null;
+        }
+        return new FileInputStream(filePath.toFile());
     }
 
     public UploadFileResponse uploadImage(MultipartFile file) throws Exception {
