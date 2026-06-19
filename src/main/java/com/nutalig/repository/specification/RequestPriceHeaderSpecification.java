@@ -2,11 +2,14 @@ package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.entity.*;
+import com.nutalig.utils.DateUtil;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 public class RequestPriceHeaderSpecification {
@@ -53,7 +56,18 @@ public class RequestPriceHeaderSpecification {
 
         return (root, query, cb) -> {
             Join<RfqHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
-            return cb.equal(cb.lower(salesJoin.get("salesId")), salesId.trim().toLowerCase());
+            return cb.equal(cb.lower(salesJoin.get("id")), salesId.trim().toLowerCase());
+        };
+    }
+
+    public static Specification<RfqHeaderEntity> procurementIdEqual(String procurementId) {
+        if (StringUtils.isBlank(procurementId)) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            Join<RfqHeaderEntity, EmployeeEntity> procurementJoin = root.join("procurement", JoinType.LEFT);
+            return cb.equal(cb.lower(procurementJoin.get("id")), procurementId.trim().toLowerCase());
         };
     }
 
@@ -65,6 +79,40 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> {
             Join<RfqHeaderEntity, SystemConfigEntity> orderTypeJoin = root.join("orderType", JoinType.LEFT);
             return cb.equal(cb.lower(orderTypeJoin.get("id").get("code")), orderTypeCode.trim().toLowerCase());
+        };
+    }
+
+    public static Specification<RfqHeaderEntity> productFamilyEqual(String productFamily) {
+        if (StringUtils.isBlank(productFamily)) {
+            return null;
+        }
+
+        return (root, query, cb) -> cb.equal(cb.lower(root.get("productFamily")), productFamily.trim().toLowerCase());
+    }
+
+    public static Specification<RfqHeaderEntity> requestedDateBetween(LocalDate start, LocalDate end) {
+        if (start == null && end == null) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            ZonedDateTime startDateTime = start == null
+                    ? null
+                    : start.atStartOfDay(DateUtil.getTimeZone()).withZoneSameInstant(DateUtil.getTimeZone());
+            ZonedDateTime endDateTime = end == null
+                    ? null
+                    : end.plusDays(1).atStartOfDay(DateUtil.getTimeZone()).minusNanos(1)
+                    .withZoneSameInstant(DateUtil.getTimeZone());
+
+            if (startDateTime != null && endDateTime != null) {
+                return cb.between(root.get("requestedDate"), startDateTime, endDateTime);
+            }
+
+            if (startDateTime != null) {
+                return cb.greaterThanOrEqualTo(root.get("requestedDate"), startDateTime);
+            }
+
+            return cb.lessThanOrEqualTo(root.get("requestedDate"), endDateTime);
         };
     }
 

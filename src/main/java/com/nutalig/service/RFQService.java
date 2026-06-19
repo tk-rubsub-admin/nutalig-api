@@ -1145,7 +1145,14 @@ public class RFQService {
                 .and(statusIn(statuses))
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
-                .and(orderTypeCodeEqual(request.getOrderTypeCode()))
+                .and(procurementIdEqual(request.getProcurementId()))
+                .and(orderTypeCodeEqual(
+                        request.getOrderTypeCode() != null && !request.getOrderTypeCode().isBlank()
+                                ? request.getOrderTypeCode()
+                                : request.getOrderType()
+                ))
+                .and(productFamilyEqual(request.getProductFamily()))
+                .and(requestedDateBetween(request.getRequestedDateStart(), request.getRequestedDateEnd()))
                 .and(keywordContain(request.getKeyword()));
     }
 
