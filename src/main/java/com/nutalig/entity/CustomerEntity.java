@@ -26,8 +26,8 @@ public class CustomerEntity extends AuditDateEntity {
     @GeneratedValue(generator = "customerIdGenerator")
     @GenericGenerator(name = "customerIdGenerator",
             parameters = {
-                    @org.hibernate.annotations.Parameter(name = "prefix", value = "NTL-RTC"),
-                    @org.hibernate.annotations.Parameter(name = "length", value = "%04d")
+                    @org.hibernate.annotations.Parameter(name = "prefix", value = "NTL-CUST"),
+                    @org.hibernate.annotations.Parameter(name = "length", value = "%05d")
             },
             strategy = "com.nutalig.repository.jpa.IdGenerator")
     @EqualsAndHashCode.Include
@@ -51,6 +51,24 @@ public class CustomerEntity extends AuditDateEntity {
     @EqualsAndHashCode.Exclude
     @ToString.Include
     private SystemConfigEntity customerType;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula= @JoinFormula(value="'CUSTOMER_SEGMENT'", referencedColumnName="group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "customer_segment", referencedColumnName ="code"))
+    })
+    @EqualsAndHashCode.Exclude
+    @ToString.Include
+    private SystemConfigEntity customerSegment;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula= @JoinFormula(value="'CUSTOMER_TIER'", referencedColumnName="group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "customer_tier", referencedColumnName ="code"))
+    })
+    @EqualsAndHashCode.Exclude
+    @ToString.Include
+    private SystemConfigEntity customerTier;
 
     @OneToOne
     @JoinColumnsOrFormulas({

@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Primary;
 
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.TimeZone;
 
 @Configuration
 public class ObjectMapperConfiguration {
@@ -23,6 +24,7 @@ public class ObjectMapperConfiguration {
         objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
+        objectMapper.setTimeZone(TimeZone.getTimeZone(DateUtil.getTimeZone()));
         final SimpleModule zonedDateTimeSerializer = new SimpleModule();
         zonedDateTimeSerializer.addSerializer(ZonedDateTime.class, new JsonSerializer<>() {
             @Override

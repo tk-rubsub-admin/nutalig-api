@@ -1,13 +1,17 @@
 package com.nutalig.service;
 
+import com.nutalig.constant.UserTodoPriority;
 import com.nutalig.constant.UserTodoStatus;
 import com.nutalig.constant.UserTodoType;
 import com.nutalig.dto.UserTodoDto;
 import com.nutalig.entity.UserTodoEntity;
+import com.nutalig.entity.UserEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.UserTodoRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +19,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserTodoService {
@@ -66,6 +71,51 @@ public class UserTodoService {
         entity.setUpdatedBy(userId);
 
         return toDto(userTodoRepository.save(entity));
+    }
+
+    public UserTodoEntity buildUserTodoEntity(
+            UserEntity ownerUser,
+            UserTodoType todoType,
+            String title,
+            String description,
+            UserTodoStatus status,
+            UserTodoPriority priority,
+            String targetModule,
+            String targetId,
+            String targetPath,
+            ZonedDateTime dueDate,
+            Integer sortOrder,
+            String userId
+    ) {
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        log.info("Create to-do {} for user {}", title, ownerUser.getDisplayName());
+
+        UserTodoEntity entity = new UserTodoEntity();
+        entity.setOwnerUser(ownerUser);
+        entity.setTodoType(todoType != null ? todoType : UserTodoType.GENERAL);
+        entity.setTitle(StringUtils.trimToNull(title));
+        entity.setDescription(StringUtils.trimToNull(description));
+        entity.setStatus(status != null ? status : UserTodoStatus.TODO);
+        entity.setPriority(priority != null ? priority : com.nutalig.constant.UserTodoPriority.MEDIUM);
+        entity.setTargetModule(StringUtils.trimToNull(targetModule));
+        entity.setTargetId(StringUtils.trimToNull(targetId));
+        entity.setTargetPath(StringUtils.trimToNull(targetPath));
+        entity.setDueDate(dueDate);
+        entity.setSortOrder(sortOrder);
+        entity.setActive(Boolean.TRUE);
+        entity.setCreatedBy(userId);
+        entity.setUpdatedBy(userId);
+        entity.setCreatedDate(now);
+        entity.setUpdatedDate(now);
+
+        if (entity.getStatus() == UserTodoStatus.DONE) {
+            entity.setCompletedDate(now);
+        }
+
+        userTodoRepository.save(entity);
+
+        return entity;
     }
 
     private UserTodoDto toDto(UserTodoEntity entity) {

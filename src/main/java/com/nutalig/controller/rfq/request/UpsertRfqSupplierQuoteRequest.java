@@ -24,10 +24,21 @@ public class UpsertRfqSupplierQuoteRequest {
         private String spec;
         private Integer sortOrder;
         private String remark;
+        private String packageName;
         private String packageDimension;
         private String packageWeight;
         private String packageCapacity;
+        private List<PackageRequest> packages;
         private List<TierRequest> tiers;
+    }
+
+    @Data
+    public static class PackageRequest {
+        private String packageName;
+        private String packageDimension;
+        private String packageWeight;
+        private String packageCapacity;
+        private Integer sortOrder;
     }
 
     @Data

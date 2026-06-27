@@ -19,6 +19,8 @@ public interface CustomerMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "customerType", ignore = true)
     @Mapping(target = "customerCreditTerm", ignore = true)
+    @Mapping(target = "customerSegment", ignore = true)
+    @Mapping(target = "customerTier", ignore = true)
     @Mapping(target = "contacts", ignore = true)
     CustomerEntity toEntity(CreateCustomerRequest request);
 

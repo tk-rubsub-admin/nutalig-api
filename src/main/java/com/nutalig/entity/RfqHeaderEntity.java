@@ -69,6 +69,11 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqAdditionalCostEntity> additionalCosts = new ArrayList<>();
 
+    @OneToMany(mappedBy = "rfqHeader", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<RfqStatusTimelineEntity> statusTimelines = new ArrayList<>();
+
     @OneToOne
     @JoinColumnsOrFormulas({
             @JoinColumnOrFormula(formula= @JoinFormula(value="'ORDER_TYPE'", referencedColumnName="group_code")),
@@ -153,6 +158,12 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "shipping_method", length = 20)
     private String shippingMethod;
 
+    @Column(name = "request_information", columnDefinition = "TEXT")
+    private String requestInformation;
+
+    @Column(name = "remark", columnDefinition = "TEXT")
+    private String remark;
+
     @Column(name = "confirmed_detail_id")
     private Long confirmedDetailId;
 
@@ -197,5 +208,15 @@ public class RfqHeaderEntity extends AuditDateEntity {
     public void removeAdditionalCost(RfqAdditionalCostEntity additionalCost) {
         additionalCosts.remove(additionalCost);
         additionalCost.setRequestPriceHeader(null);
+    }
+
+    public void addStatusTimeline(RfqStatusTimelineEntity statusTimeline) {
+        statusTimelines.add(statusTimeline);
+        statusTimeline.setRfqHeader(this);
+    }
+
+    public void removeStatusTimeline(RfqStatusTimelineEntity statusTimeline) {
+        statusTimelines.remove(statusTimeline);
+        statusTimeline.setRfqHeader(null);
     }
 }

@@ -2,36 +2,37 @@ package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.config.PromptTemplateEngine;
-import com.nutalig.constant.ActivityAction;
-import com.nutalig.constant.ActivityActorType;
-import com.nutalig.constant.ActivityEntityType;
-import com.nutalig.constant.ActivitySource;
-import com.nutalig.constant.RfqSupplierInquiryStatus;
-import com.nutalig.constant.RfqSupplierQuoteStatus;
+import com.nutalig.constant.*;
 import com.nutalig.controller.rfq.request.UpdateRfqSupplierInquiryRequest;
 import com.nutalig.controller.rfq.request.UpsertRfqSupplierQuoteRequest;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteAdditionalCostDto;
 import com.nutalig.dto.RfqSupplierQuoteDetailDto;
+import com.nutalig.dto.RfqSupplierQuoteDetailPackageDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
 import com.nutalig.dto.RfqSupplierQuoteTierDto;
 import com.nutalig.entity.RfqAdditionalCostEntity;
 import com.nutalig.entity.RfqDetailEntity;
 import com.nutalig.entity.RfqHeaderEntity;
+import com.nutalig.entity.RfqStatusTimelineEntity;
 import com.nutalig.entity.RfqSupplierInquiryEntity;
 import com.nutalig.entity.RfqSupplierQuoteAdditionalCostEntity;
 import com.nutalig.entity.RfqSupplierQuoteDetailEntity;
+import com.nutalig.entity.RfqSupplierQuoteDetailPackageEntity;
 import com.nutalig.entity.RfqSupplierQuoteEntity;
 import com.nutalig.entity.RfqSupplierQuoteTierEntity;
 import com.nutalig.entity.RfqTierEntity;
 import com.nutalig.entity.SupplierEntity;
+import com.nutalig.entity.id.RfqStatusTimelineId;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.RfqSupplierInquiryRepository;
 import com.nutalig.repository.RfqSupplierQuoteRepository;
+import com.nutalig.repository.RfqStatusTimelineRepository;
 import com.nutalig.repository.SupplierRepository;
+import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -56,6 +58,7 @@ public class RFQSupplierService {
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
     private final RfqSupplierQuoteRepository rfqSupplierQuoteRepository;
+    private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
     private final SupplierRepository supplierRepository;
     private final ActivityHistoryService activityHistoryService;
     private final UserProfileService userProfileService;
@@ -102,6 +105,19 @@ public class RFQSupplierService {
         inquiry.setUpdatedBy(userId);
 
         inquiry = rfqSupplierInquiryRepository.save(inquiry);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                rfq.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.GENERATE_INQUIRY_MESSAGE,
+                ActivitySource.API,
+                "จัดซื้อทำการ generate ข้อความถามราคากับซัพพลายเออร์ของคำขอราคาเลขที่ " + rfq.getId(),
+                null
+        );
+
+
         return toInquiryDto(inquiry);
     }
 
@@ -129,6 +145,7 @@ public class RFQSupplierService {
             String userId
     ) throws DataNotFoundException, InvalidRequestException {
         RfqSupplierInquiryEntity inquiry = getInquiryEntity(rfqId, inquiryId);
+        Map<String, Object> beforeDetail = buildInquiryActivityDetail(inquiry);
 
         if (request == null) {
             throw new InvalidRequestException("Request is required.");
@@ -143,6 +160,23 @@ public class RFQSupplierService {
         inquiry.setStatus(determineInquiryStatus(inquiry.getChineseMessage(), inquiry.getStatus()));
         inquiry.setUpdatedBy(userProfileService.getNameFromId(userId));
         inquiry = rfqSupplierInquiryRepository.save(inquiry);
+
+        Map<String, Object> afterDetail = buildInquiryActivityDetail(inquiry);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", beforeDetail);
+        detail.put("after", afterDetail);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                rfqId,
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE_INQUIRY_MESSAGE,
+                ActivitySource.API,
+                "จัดซื้ออัพเดตข้อความสอบถามราคาของคำขอราคาเลขที่ " + rfqId + " เวอร์ชัน " + inquiry.getVersionNo(),
+                detail
+        );
+
         return toInquiryDto(inquiry);
     }
 
@@ -192,17 +226,26 @@ public class RFQSupplierService {
             throw new InvalidRequestException("Supplier quote already exists for supplier " + supplier.getId() + ".");
         }
 
+        String actor = userProfileService.getNameFromId(userId);
+
         RfqSupplierQuoteEntity quote = new RfqSupplierQuoteEntity();
         quote.setRequestPriceHeader(rfq);
         quote.setSupplier(supplier);
         quote.setStatus(request.getStatus() == null ? RfqSupplierQuoteStatus.RESPONDED : request.getStatus());
-        quote.setCreatedBy(userProfileService.getNameFromId(userId));
+        quote.setCreatedBy(actor);
         applySupplierQuoteRequest(rfq, quote, request, userId);
 
         quote = rfqSupplierQuoteRepository.save(quote);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("request", request);
+
+        rfq.setStatus(RfqStatus.SUPPLIER_QUOTED);
+        rfq.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        rfq.setUpdatedBy(actor);
+
+        rfq = requestPriceHeaderRepository.save(rfq);
+        saveRfqStatusTimeline(rfq, RfqStatus.SUPPLIER_QUOTED, rfq.getUpdatedDate());
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -216,6 +259,25 @@ public class RFQSupplierService {
         );
 
         return toSupplierQuoteDto(quote);
+    }
+
+    private void saveRfqStatusTimeline(RfqHeaderEntity rfq, RfqStatus status, ZonedDateTime statusDatetime) {
+        if (rfq == null || status == null || statusDatetime == null) {
+            return;
+        }
+
+        if (rfqStatusTimelineRepository.findByIdRfqIdAndIdStatus(rfq.getId(), status).isPresent()) {
+            return;
+        }
+
+        RfqStatusTimelineEntity timeline = new RfqStatusTimelineEntity();
+        RfqStatusTimelineId timelineId = new RfqStatusTimelineId();
+        timelineId.setRfqId(rfq.getId());
+        timelineId.setStatus(status);
+        timeline.setId(timelineId);
+        timeline.setRfqHeader(rfq);
+        timeline.setStatusDatetime(statusDatetime);
+        rfqStatusTimelineRepository.save(timeline);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -290,6 +352,22 @@ public class RFQSupplierService {
         return dto;
     }
 
+    private Map<String, Object> buildInquiryActivityDetail(RfqSupplierInquiryEntity inquiry) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("id", inquiry.getId());
+        detail.put("rfqId", inquiry.getRequestPriceHeader() != null ? inquiry.getRequestPriceHeader().getId() : null);
+        detail.put("versionNo", inquiry.getVersionNo());
+        detail.put("status", inquiry.getStatus());
+        detail.put("thaiMessage", inquiry.getThaiMessage());
+        detail.put("chineseMessage", inquiry.getChineseMessage());
+        detail.put("sourceSnapshot", inquiry.getSourceSnapshot());
+        detail.put("updatedBy", inquiry.getUpdatedBy());
+        detail.put("createdBy", inquiry.getCreatedBy());
+        detail.put("createdDate", inquiry.getCreatedDate());
+        detail.put("updatedDate", inquiry.getUpdatedDate());
+        return detail;
+    }
+
     private RfqSupplierQuoteDto toSupplierQuoteDto(RfqSupplierQuoteEntity entity) {
         RfqSupplierQuoteDto dto = new RfqSupplierQuoteDto();
         dto.setId(entity.getId());
@@ -323,9 +401,13 @@ public class RFQSupplierService {
         dto.setSpec(entity.getSpec());
         dto.setSortOrder(entity.getSortOrder());
         dto.setRemark(entity.getRemark());
+        dto.setPackageName(resolvePrimaryPackageName(entity));
         dto.setPackageDimension(entity.getPackageDimension());
         dto.setPackageWeight(entity.getPackageWeight());
         dto.setPackageCapacity(entity.getPackageCapacity());
+        dto.setPackages(resolveSupplierQuotePackages(entity).stream()
+                .map(this::toSupplierQuoteDetailPackageDto)
+                .toList());
         dto.setTiers(entity.getTiers().stream()
                 .sorted(Comparator.comparing(RfqSupplierQuoteTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteTierEntity::getId, Comparator.nullsLast(Long::compareTo)))
@@ -334,6 +416,15 @@ public class RFQSupplierService {
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setUpdatedDate(entity.getUpdatedDate());
         return dto;
+    }
+
+    private String resolvePrimaryPackageName(RfqSupplierQuoteDetailEntity entity) {
+        return resolveSupplierQuotePackages(entity).stream()
+                .map(RfqSupplierQuoteDetailPackageEntity::getPackageName)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .map(StringUtils::trimToNull)
+                .orElse(null);
     }
 
     private RfqSupplierQuoteTierDto toSupplierQuoteTierDto(RfqSupplierQuoteTierEntity entity) {
@@ -347,6 +438,48 @@ public class RFQSupplierService {
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setUpdatedDate(entity.getUpdatedDate());
         return dto;
+    }
+
+    private RfqSupplierQuoteDetailPackageDto toSupplierQuoteDetailPackageDto(
+            RfqSupplierQuoteDetailPackageEntity entity
+    ) {
+        RfqSupplierQuoteDetailPackageDto dto = new RfqSupplierQuoteDetailPackageDto();
+        dto.setId(entity.getId());
+        dto.setPackageName(entity.getPackageName());
+        dto.setPackageDimension(entity.getPackageDimension());
+        dto.setPackageWeight(entity.getPackageWeight());
+        dto.setPackageCapacity(entity.getPackageCapacity());
+        dto.setSortOrder(entity.getSortOrder());
+        dto.setCreatedDate(entity.getCreatedDate());
+        dto.setUpdatedDate(entity.getUpdatedDate());
+        return dto;
+    }
+
+    private List<RfqSupplierQuoteDetailPackageEntity> resolveSupplierQuotePackages(
+            RfqSupplierQuoteDetailEntity entity
+    ) {
+        if (!entity.getPackages().isEmpty()) {
+            return entity.getPackages().stream()
+                    .sorted(Comparator.comparing(RfqSupplierQuoteDetailPackageEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                            .thenComparing(RfqSupplierQuoteDetailPackageEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                    .toList();
+        }
+
+        if (StringUtils.isAllBlank(
+                entity.getPackageDimension(),
+                entity.getPackageWeight(),
+                entity.getPackageCapacity()
+        )) {
+            return List.of();
+        }
+
+        return List.of(buildSupplierQuoteDetailPackageEntity(
+                null,
+                entity.getPackageDimension(),
+                entity.getPackageWeight(),
+                entity.getPackageCapacity(),
+                1
+        ));
     }
 
     private RfqSupplierQuoteAdditionalCostDto toSupplierQuoteAdditionalCostDto(
@@ -391,9 +524,13 @@ public class RFQSupplierService {
         detail.put("spec", entity.getSpec());
         detail.put("sortOrder", entity.getSortOrder());
         detail.put("remark", entity.getRemark());
+        detail.put("packageName", resolvePrimaryPackageName(entity));
         detail.put("packageDimension", entity.getPackageDimension());
         detail.put("packageWeight", entity.getPackageWeight());
         detail.put("packageCapacity", entity.getPackageCapacity());
+        detail.put("packages", resolveSupplierQuotePackages(entity).stream()
+                .map(this::buildSupplierQuoteDetailPackageActivityDetail)
+                .toList());
         detail.put("tiers", entity.getTiers().stream()
                 .sorted(Comparator.comparing(RfqSupplierQuoteTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteTierEntity::getId, Comparator.nullsLast(Long::compareTo)))
@@ -409,6 +546,19 @@ public class RFQSupplierService {
         detail.put("productPrice", entity.getProductPrice());
         detail.put("shippingCost", entity.getShippingCost());
         detail.put("currency", entity.getCurrency());
+        detail.put("sortOrder", entity.getSortOrder());
+        return detail;
+    }
+
+    private Map<String, Object> buildSupplierQuoteDetailPackageActivityDetail(
+            RfqSupplierQuoteDetailPackageEntity entity
+    ) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("id", entity.getId());
+        detail.put("packageName", entity.getPackageName());
+        detail.put("packageDimension", entity.getPackageDimension());
+        detail.put("packageWeight", entity.getPackageWeight());
+        detail.put("packageCapacity", entity.getPackageCapacity());
         detail.put("sortOrder", entity.getSortOrder());
         return detail;
     }
@@ -550,10 +700,50 @@ public class RFQSupplierService {
         entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
         entity.setSpec(request.getSpec().trim());
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
-        entity.setPackageDimension(StringUtils.trimToNull(request.getPackageDimension()));
-        entity.setPackageWeight(StringUtils.trimToNull(request.getPackageWeight()));
-        entity.setPackageCapacity(StringUtils.trimToNull(request.getPackageCapacity()));
         entity.setSortOrder(sortOrder);
+
+        List<UpsertRfqSupplierQuoteRequest.PackageRequest> packageRequests =
+                Optional.ofNullable(request.getPackages()).orElse(List.of());
+        String packageDimension = StringUtils.trimToNull(request.getPackageDimension());
+        String packageWeight = StringUtils.trimToNull(request.getPackageWeight());
+        String packageCapacity = StringUtils.trimToNull(request.getPackageCapacity());
+        if (!packageRequests.isEmpty()) {
+            UpsertRfqSupplierQuoteRequest.PackageRequest firstPackageRequest = packageRequests.stream()
+                    .sorted(Comparator.comparing(UpsertRfqSupplierQuoteRequest.PackageRequest::getSortOrder,
+                            Comparator.nullsLast(Integer::compareTo)))
+                    .findFirst()
+                    .orElse(null);
+            if (StringUtils.isBlank(packageDimension) && firstPackageRequest != null) {
+                packageDimension = StringUtils.trimToNull(firstPackageRequest.getPackageDimension());
+            }
+            if (StringUtils.isBlank(packageWeight) && firstPackageRequest != null) {
+                packageWeight = StringUtils.trimToNull(firstPackageRequest.getPackageWeight());
+            }
+            if (StringUtils.isBlank(packageCapacity) && firstPackageRequest != null) {
+                packageCapacity = StringUtils.trimToNull(firstPackageRequest.getPackageCapacity());
+            }
+            int packageSortOrder = 1;
+            for (UpsertRfqSupplierQuoteRequest.PackageRequest packageRequest : packageRequests) {
+                entity.addPackage(buildSupplierQuoteDetailPackageEntity(
+                        packageRequest,
+                        packageRequest.getSortOrder() == null ? packageSortOrder : packageRequest.getSortOrder()
+                ));
+                packageSortOrder++;
+            }
+        } else if (StringUtils.isNotBlank(request.getPackageDimension())
+                || StringUtils.isNotBlank(request.getPackageWeight())
+                || StringUtils.isNotBlank(request.getPackageCapacity())) {
+            entity.addPackage(buildSupplierQuoteDetailPackageEntity(
+                    null,
+                    request.getPackageDimension(),
+                    request.getPackageWeight(),
+                    request.getPackageCapacity(),
+                    1
+            ));
+        }
+        entity.setPackageDimension(packageDimension);
+        entity.setPackageWeight(packageWeight);
+        entity.setPackageCapacity(packageCapacity);
 
         int tierSortOrder = 1;
         for (UpsertRfqSupplierQuoteRequest.TierRequest tierRequest : request.getTiers()) {
@@ -601,6 +791,35 @@ public class RFQSupplierService {
         entity.setDescription(request.getDescription().trim());
         entity.setUnit(StringUtils.trimToNull(request.getUnit()));
         entity.setValue(StringUtils.trimToNull(request.getValue()));
+        entity.setSortOrder(sortOrder);
+        return entity;
+    }
+
+    private RfqSupplierQuoteDetailPackageEntity buildSupplierQuoteDetailPackageEntity(
+            UpsertRfqSupplierQuoteRequest.PackageRequest request,
+            Integer sortOrder
+    ) {
+        return buildSupplierQuoteDetailPackageEntity(
+                request == null ? null : request.getPackageName(),
+                request == null ? null : request.getPackageDimension(),
+                request == null ? null : request.getPackageWeight(),
+                request == null ? null : request.getPackageCapacity(),
+                sortOrder
+        );
+    }
+
+    private RfqSupplierQuoteDetailPackageEntity buildSupplierQuoteDetailPackageEntity(
+            String packageName,
+            String packageDimension,
+            String packageWeight,
+            String packageCapacity,
+            Integer sortOrder
+    ) {
+        RfqSupplierQuoteDetailPackageEntity entity = new RfqSupplierQuoteDetailPackageEntity();
+        entity.setPackageName(StringUtils.trimToNull(packageName));
+        entity.setPackageDimension(StringUtils.trimToNull(packageDimension));
+        entity.setPackageWeight(StringUtils.trimToNull(packageWeight));
+        entity.setPackageCapacity(StringUtils.trimToNull(packageCapacity));
         entity.setSortOrder(sortOrder);
         return entity;
     }

@@ -1,5 +1,6 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.Currency;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -12,6 +13,8 @@ public class RfqTierDto {
     private SupplierDto supplier;
     private BigDecimal quantity;
     private BigDecimal productPrice;
+    private Currency currency;
+    private BigDecimal exchangeRate;
     private BigDecimal landFreightCost;
     private BigDecimal seaFreightCost;
     private BigDecimal landTotalPrice;

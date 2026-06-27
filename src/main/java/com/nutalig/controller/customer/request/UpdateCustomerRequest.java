@@ -6,6 +6,8 @@ import lombok.Data;
 public class UpdateCustomerRequest {
 
     private String customerType;
+    private String customerTier;
+    private String customerSegment;
     private String customerName;
     private String email;
     private String taxId;

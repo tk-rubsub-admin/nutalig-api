@@ -1,9 +1,11 @@
 package com.nutalig.controller.customer;
 
 import com.nutalig.controller.customer.request.*;
+import com.nutalig.controller.customer.response.UploadCustomerResponse;
 import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.dto.CustomerDashboardDto;
 import com.nutalig.dto.CustomerDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -11,7 +13,9 @@ import com.nutalig.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -39,6 +43,19 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, new CreateCustomerResponse(customerId));
     }
 
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public GeneralResponse<UploadCustomerResponse> uploadCustomers(
+            @RequestPart("file") MultipartFile file,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start upload customers ===");
+
+        UploadCustomerResponse response = customerService.uploadCustomers(file, userId);
+
+        log.info("=== End upload customers ===");
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/{id}")
     public GeneralResponse<CustomerDto> getCustomer(@PathVariable("id") String custId) throws DataNotFoundException {
         log.info("=== Start get customer ===");
@@ -60,6 +77,19 @@ public class CustomerController {
         CustomerDto response = customerService.updateCustomer(customerId, request, userId);
 
         log.info("=== End update customer {} ===", customerId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/{customerId}")
+    public GeneralResponse<CustomerDto> deleteCustomer(
+            @PathVariable String customerId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete customer {} ===", customerId);
+
+        CustomerDto response = customerService.deleteCustomer(customerId, userId);
+
+        log.info("=== End delete customer {} ===", customerId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
@@ -96,6 +126,18 @@ public class CustomerController {
         List<CustomerDto> response = customerService.getAllCustomer(searchCustomerRequest);
 
         log.info("=== End get all customer ===");
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/dashboard")
+    public GeneralResponse<CustomerDashboardDto> getCustomerDashboard(
+            @RequestParam(required = false) String salesId
+    ) {
+        log.info("=== Start get customer dashboard with salesId {} ===", salesId);
+
+        CustomerDashboardDto response = customerService.getCustomerDashboard(salesId);
+
+        log.info("=== End get customer dashboard with salesId {} ===", salesId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

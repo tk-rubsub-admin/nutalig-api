@@ -13,6 +13,8 @@ public class CustomerDto {
     private Status status;
     private SystemConfigDto customerType;
     private SystemConfigDto customerCreditTerm;
+    private SystemConfigDto customerTier;
+    private SystemConfigDto customerSegment;
     private String taxId;
     private String companyName;
     private String branchNumber;

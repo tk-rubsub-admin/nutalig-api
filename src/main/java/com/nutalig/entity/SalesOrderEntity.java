@@ -99,6 +99,12 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "rev_no")
     private Integer revNo;
 
+    @Column(name = "amount", precision = 18, scale = 2)
+    private BigDecimal amount;
+
+    @Column(name = "commission", precision = 18, scale = 2)
+    private BigDecimal commission;
+
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineNo asc")
     @ToString.Exclude

@@ -63,4 +63,9 @@ public class UserProfileService {
                 .orElse(null);
     }
 
+    public UserEntity getUserEntity(String userId) {
+        return userRepository.findById(userId)
+                .orElse(null);
+    }
+
 }

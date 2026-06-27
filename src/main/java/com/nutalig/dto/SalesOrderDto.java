@@ -24,6 +24,8 @@ public class SalesOrderDto {
     private BigDecimal freight;
     private BigDecimal vat;
     private BigDecimal grandTotal;
+    private BigDecimal amount;
+    private BigDecimal commission;
     private String shippingType;
     private BigDecimal vatRate;
     private String remark;

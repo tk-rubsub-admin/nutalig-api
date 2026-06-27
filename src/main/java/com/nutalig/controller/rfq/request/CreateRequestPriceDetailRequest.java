@@ -1,5 +1,6 @@
 package com.nutalig.controller.rfq.request;
 
+import com.nutalig.constant.Currency;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -23,6 +24,8 @@ public class CreateRequestPriceDetailRequest {
     public static class CreateRequestPriceTierRequest {
         private BigDecimal quantity;
         private BigDecimal productPrice;
+        private Currency currency;
+        private BigDecimal exchangeRate;
         private BigDecimal landFreightCost;
         private BigDecimal seaFreightCost;
         private BigDecimal landTotalPrice;

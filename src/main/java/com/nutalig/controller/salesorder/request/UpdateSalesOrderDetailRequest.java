@@ -1,12 +1,13 @@
-package com.nutalig.dto;
+package com.nutalig.controller.salesorder.request;
 
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
-public class QuotationItemRequestDto {
-    private String id;
+public class UpdateSalesOrderDetailRequest {
+    private Long id;
+    private String supplierId;
     private String name;
     private String type;
     private String capacity;
@@ -14,7 +15,5 @@ public class QuotationItemRequestDto {
     private String spec;
     private BigDecimal unitPrice;
     private BigDecimal quantity;
-    private BigDecimal amount;
-    private String imagePreview;
-    private String tierId;
+    private String imageUrl;
 }

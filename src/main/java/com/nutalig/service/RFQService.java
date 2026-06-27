@@ -11,6 +11,7 @@ import com.nutalig.controller.rfq.request.*;
 import com.nutalig.dto.*;
 import com.nutalig.entity.*;
 import com.nutalig.entity.id.ProductMaterialId;
+import com.nutalig.entity.id.RfqStatusTimelineId;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
@@ -46,13 +47,14 @@ public class RFQService {
     private final static String OTHER_FILE_TYPE = "OTHER";
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
-    private final RequestPriceHeaderMapper requestPriceHeaderMapper;
+    private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final ProductFamilyRepository productFamilyEntityRepository;
     private final ProductSubtype1Repository productSubtype1Repository;
     private final ProductSubtype2Repository productSubtype2Repository;
     private final ProductMaterialRepository productMaterialRepository;
+    private final QuotationRepository quotationRepository;
     private final SupplierRepository supplierRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
@@ -62,6 +64,7 @@ public class RFQService {
     private final SupplierService supplierService;
     private final LineMessageService lineMessageService;
     private final ObjectMapper objectMapper;
+    private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final PromptTemplateEngine promptTemplateEngine;
     private final TemplateProperties templateProperties;
 
@@ -146,6 +149,107 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto requestInformation(RequestRfqInformationRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getRfqId())) {
+            throw new InvalidRequestException("rfqId is required.");
+        }
+        if (StringUtils.isBlank(request.getRequestInformation())) {
+            throw new InvalidRequestException("requestInformation is required.");
+        }
+
+        RfqHeaderEntity entity = getEntityById(request.getRfqId().trim());
+        Map<String, Object> beforeDetail = buildActivityDetail(entity);
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String updatedBy = userProfileService.getNameFromId(userId);
+        entity.setRequestInformation(appendRequestInformation(
+                entity.getRequestInformation(),
+                StringUtils.trimToNull(request.getRequestInformation()),
+                updatedBy,
+                now
+        ));
+        entity.setStatus(RfqStatus.REQUESTED_INFO);
+        entity.setUpdatedBy(updatedBy);
+        entity.setUpdatedDate(now);
+        entity = requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> afterDetail = buildActivityDetail(entity);
+        Map<String, Object> changedBeforeDetail = new LinkedHashMap<>();
+        Map<String, Object> changedAfterDetail = new LinkedHashMap<>();
+        extractChangedDetails(beforeDetail, afterDetail, changedBeforeDetail, changedAfterDetail);
+        changedBeforeDetail.remove("requestInformation");
+        changedAfterDetail.remove("requestInformation");
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", changedBeforeDetail);
+        detail.put("after", changedAfterDetail);
+        detail.put("requestInformation", parseRequestInformation(entity.getRequestInformation()));
+        detail.put("requestInformationText", StringUtils.trimToNull(request.getRequestInformation()));
+
+        String summary = "ขอข้อมูลเพิ่มเติมของคำขอราคาเลขที่ " + entity.getId();
+        if (StringUtils.isNotBlank(request.getRequestInformation())) {
+            summary += " : " + StringUtils.abbreviate(request.getRequestInformation().trim(), 120);
+        }
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.REQUEST_INFORMATION,
+                ActivitySource.API,
+                summary,
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto closeRfq(CloseRfqRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getRfqId())) {
+            throw new InvalidRequestException("rfqId is required.");
+        }
+
+        RfqHeaderEntity entity = getEntityById(request.getRfqId().trim());
+        java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String updatedBy = userProfileService.getNameFromId(userId);
+
+        entity.setStatus(RfqStatus.CLOSED);
+        entity.setUpdatedBy(updatedBy);
+        entity.setUpdatedDate(now);
+        entity.setRemark(request.getRemark());
+        entity = requestPriceHeaderRepository.save(entity);
+
+        java.util.Map<String, Object> afterDetail = buildActivityDetail(entity);
+        java.util.Map<String, Object> changedBeforeDetail = new LinkedHashMap<>();
+        java.util.Map<String, Object> changedAfterDetail = new LinkedHashMap<>();
+        extractChangedDetails(beforeDetail, afterDetail, changedBeforeDetail, changedAfterDetail);
+
+        java.util.Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", changedBeforeDetail);
+        detail.put("after", changedAfterDetail);
+
+        String summary = "ปิดงานคำขอราคาเลขที่ " + entity.getId();
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.STATUS_CHANGE,
+                ActivitySource.API,
+                summary,
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
         entity.setRequestedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -196,6 +300,8 @@ public class RFQService {
                 detail
         );
 
+        saveRfqStatusTimeline(entity, entity.getStatus(), entity.getRequestedDate());
+
         return mapToDto(entity);
     }
 
@@ -223,7 +329,7 @@ public class RFQService {
             addedDetails.add(addedDetail);
         }
 
-        if (entity.getStatus() == RfqStatus.IN_PROGRESS) {
+        if (entity.getStatus() == RfqStatus.SUPPLIER_QUOTED) {
             entity.setStatus(RfqStatus.QUOTED);
             entity.setQuotedDate(now);
         }
@@ -243,9 +349,13 @@ public class RFQService {
                 ActivityActorType.USER,
                 ActivityAction.UPDATE,
                 ActivitySource.API,
-                "เพิ่มรายละเอียดราคาคำขอราคาเลขที่ " + entity.getId(),
+                "คำขอราคาเลขที่ " + entity.getId() + " ได้ราคาแล้ว",
                 detail
         );
+
+        if (entity.getStatus() == RfqStatus.QUOTED) {
+            saveRfqStatusTimeline(entity, RfqStatus.QUOTED, now);
+        }
 
         return mapToDto(entity);
     }
@@ -384,6 +494,8 @@ public class RFQService {
                 "สร้าง Sales Order จากคำขอราคาเลขที่ " + entity.getId(),
                 activityDetail
         );
+
+        saveRfqStatusTimeline(entity, RfqStatus.COMPLETED, entity.getConfirmedDate());
 
         return mapToDto(entity);
     }
@@ -546,52 +658,135 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public void updateRFQStatus(String id, RfqStatus status, String userId) throws Exception {
+        RfqHeaderEntity entity = getEntityById(id);
+        String actor = userProfileService.getNameFromId(userId);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        log.info("Update RFQ {} with new status {} by {}", id, status, actor);
+        entity.setStatus(status);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+
+        requestPriceHeaderRepository.save(entity);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "ลูกค้าปฏิเสธคำขอราคาเลขที่ " + entity.getId(),
+                null
+        );
+
+        if (RfqStatus.REJECTED.equals(status) && StringUtils.isNotEmpty(entity.getQuotationNo())) {
+            log.info("Update Quotation {} with status {}", entity.getQuotationNo(), status);
+
+            QuotationEntity quotationEntity = quotationRepository.findById(entity.getQuotationNo())
+                    .orElse(null);
+
+            if (quotationEntity != null) {
+                quotationEntity.setStatus(QuotationStatus.REJECTED);
+                quotationEntity.setUpdatedDate(now);
+                quotationEntity.setUpdatedBy(actor);
+
+                quotationRepository.save(quotationEntity);
+
+                activityHistoryService.record(
+                        ActivityEntityType.QUOTATION,
+                        quotationEntity.getQuotationNo(),
+                        userId,
+                        ActivityActorType.USER,
+                        ActivityAction.CREATE,
+                        ActivitySource.API,
+                        "ลูกค้าปฏิเสธใบเสนอราคาเลขที่ " + quotationEntity.getQuotationNo(),
+                        null
+                );
+            }
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateRFQ(String id, UpdateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = getEntityById(id);
         java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
 
-        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        if (!hasRFQUpdateChanges(entity, request) && !RfqStatus.REQUESTED_INFO.equals(entity.getStatus())) {
+            return mapToDto(entity);
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
         List<String> editFields = new ArrayList<>();
 
-        if (StringUtils.isNotEmpty(request.getOrderTypeCode())) {
-            entity.setOrderType(resolveOrderType(request.getOrderTypeCode()));
+        if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus())) {
+            log.info("Update status from {} to {}", RfqStatus.REQUESTED_INFO, RfqStatus.IN_PROGRESS);
+            entity.setStatus(RfqStatus.IN_PROGRESS);
+
+            SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
+            entity.setSlaDate(slaConfigService.calculateSlaDate(sla, now));
+            editFields.add("สถานะ");
+        }
+
+        String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
+        if (StringUtils.isNotEmpty(requestOrderTypeCode) && !StringUtils.equals(
+                requestOrderTypeCode,
+                entity.getOrderType() != null && entity.getOrderType().getId() != null
+                        ? entity.getOrderType().getId().getCode()
+                        : null
+        )) {
+            entity.setOrderType(resolveOrderType(requestOrderTypeCode));
             editFields.add("ประเภทงาน");
         }
-        if (StringUtils.isNotEmpty(request.getProductFamily())) {
+        String requestProductFamily = normalizeRequestValue(request.getProductFamily());
+        if (StringUtils.isNotEmpty(requestProductFamily)
+                && !StringUtils.equals(requestProductFamily, entity.getProductFamily())) {
             editFields.add("หมวดหมู่หลัก (Product Family)");
         }
-        if (StringUtils.isNotEmpty(request.getProductUsage())) {
+        String requestProductUsage = normalizeRequestValue(request.getProductUsage());
+        if (StringUtils.isNotEmpty(requestProductUsage)
+                && !StringUtils.equals(
+                requestProductUsage,
+                entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null
+        )) {
             editFields.add("Product Subtype 1");
         }
-        if (StringUtils.isNotEmpty(request.getSystemMechanic())) {
+        String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
+        if (StringUtils.isNotEmpty(requestSystemMechanic)
+                && !StringUtils.equals(
+                requestSystemMechanic,
+                entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null
+        )) {
             editFields.add("Product Subtype 2");
         }
-        if (StringUtils.isNotEmpty(request.getMaterial())) {
+        String requestMaterial = normalizeRequestValue(request.getMaterial());
+        if (StringUtils.isNotEmpty(requestMaterial)
+                && !StringUtils.equals(requestMaterial, entity.getMaterialCode())) {
             editFields.add("วัสดุ");
         }
-        if (StringUtils.isNotEmpty(request.getCapacity())) {
+        String requestCapacity = normalizeRequestValue(request.getCapacity());
+        if (StringUtils.isNotEmpty(requestCapacity) && !StringUtils.equals(requestCapacity, entity.getCapacity())) {
             entity.setCapacity(request.getCapacity());
             editFields.add("ความจุ");
         }
-        if (StringUtils.isNotEmpty(request.getDescription())) {
+        String requestDescription = normalizeRequestValue(request.getDescription());
+        if (StringUtils.isNotEmpty(requestDescription) && !StringUtils.equals(requestDescription, entity.getDescription())) {
             entity.setDescription(request.getDescription());
             editFields.add("รายละเอียด");
         }
 
-        applyProductHierarchy(
+        applyProductHierarchyIfChanged(
                 entity,
-                StringUtils.isNotEmpty(request.getProductFamily()) ? request.getProductFamily() : entity.getProductFamily(),
-                StringUtils.isNotEmpty(request.getProductUsage())
-                        ? request.getProductUsage()
-                        : entity.getProductUsage() == null ? null : entity.getProductUsage().getCode(),
-                StringUtils.isNotEmpty(request.getSystemMechanic())
-                        ? request.getSystemMechanic()
-                        : entity.getSystemMechanic() == null ? null : entity.getSystemMechanic().getCode(),
-                StringUtils.isNotEmpty(request.getMaterial())
-                        ? request.getMaterial()
-                        : entity.getMaterialCode()
+                requestProductFamily,
+                requestProductUsage,
+                requestSystemMechanic,
+                requestMaterial
         );
+
+        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedDate(now);
 
         entity = requestPriceHeaderRepository.save(entity);
         java.util.Map<String, Object> afterDetail = buildActivityDetail(entity);
@@ -620,6 +815,73 @@ public class RFQService {
         );
 
         return mapToDto(entity);
+    }
+
+    private boolean hasRFQUpdateChanges(RfqHeaderEntity entity, UpdateRequestPriceHeaderRequest request) {
+        if (entity == null || request == null) {
+            return false;
+        }
+
+        String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
+        String requestProductFamily = normalizeRequestValue(request.getProductFamily());
+        String requestProductUsage = normalizeRequestValue(request.getProductUsage());
+        String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
+        String requestMaterial = normalizeRequestValue(request.getMaterial());
+        String requestCapacity = normalizeRequestValue(request.getCapacity());
+        String requestDescription = normalizeRequestValue(request.getDescription());
+
+        return !StringUtils.equals(
+                requestOrderTypeCode,
+                entity.getOrderType() != null && entity.getOrderType().getId() != null
+                        ? entity.getOrderType().getId().getCode()
+                        : null
+        ) || !StringUtils.equals(requestProductFamily, entity.getProductFamily())
+                || !StringUtils.equals(
+                requestProductUsage,
+                entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null
+        ) || !StringUtils.equals(
+                requestSystemMechanic,
+                entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null
+        ) || !StringUtils.equals(requestMaterial, entity.getMaterialCode())
+                || !StringUtils.equals(requestCapacity, entity.getCapacity())
+                || !StringUtils.equals(requestDescription, entity.getDescription());
+    }
+
+    private String normalizeRequestValue(String value) {
+        return StringUtils.trimToNull(value);
+    }
+
+    private void applyProductHierarchyIfChanged(
+            RfqHeaderEntity entity,
+            String productFamily,
+            String productUsage,
+            String systemMechanic,
+            String material
+    ) throws DataNotFoundException, InvalidRequestException {
+        if (entity == null) {
+            return;
+        }
+
+        String currentProductFamily = entity.getProductFamily();
+        String currentProductUsage = entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null;
+        String currentSystemMechanic =
+                entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null;
+        String currentMaterial = entity.getMaterialCode();
+
+        if (StringUtils.equals(productFamily, currentProductFamily)
+                && StringUtils.equals(productUsage, currentProductUsage)
+                && StringUtils.equals(systemMechanic, currentSystemMechanic)
+                && StringUtils.equals(material, currentMaterial)) {
+            return;
+        }
+
+        applyProductHierarchy(
+                entity,
+                StringUtils.isNotEmpty(productFamily) ? productFamily : currentProductFamily,
+                StringUtils.isNotEmpty(productUsage) ? productUsage : currentProductUsage,
+                StringUtils.isNotEmpty(systemMechanic) ? systemMechanic : currentSystemMechanic,
+                StringUtils.isNotEmpty(material) ? material : currentMaterial
+        );
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -785,6 +1047,7 @@ public class RFQService {
         java.util.Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("requestedDate", entity.getRequestedDate());
         detail.put("status", entity.getStatus());
+        detail.put("requestInformation", entity.getRequestInformation());
         detail.put("contactName", entity.getContactName());
         detail.put("contactPhone", entity.getContactPhone());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
@@ -799,6 +1062,37 @@ public class RFQService {
         detail.put("description", entity.getDescription());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
         return detail;
+    }
+
+    private String appendRequestInformation(
+            String existingRequestInformation,
+            String requestInformation,
+            String requestedBy,
+            ZonedDateTime requestedDate
+    ) throws InvalidRequestException {
+        List<RequestInformationEntry> entries = parseRequestInformation(existingRequestInformation);
+        entries.add(new RequestInformationEntry(requestInformation, requestedBy, requestedDate));
+
+        try {
+            return objectMapper.writeValueAsString(entries);
+        } catch (Exception exception) {
+            throw new InvalidRequestException("Cannot serialize request information.");
+        }
+    }
+
+    private List<RequestInformationEntry> parseRequestInformation(String requestInformationJson) {
+        if (StringUtils.isBlank(requestInformationJson)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            RequestInformationEntry[] entries =
+                    objectMapper.readValue(requestInformationJson, RequestInformationEntry[].class);
+            return new ArrayList<>(Arrays.asList(entries));
+        } catch (Exception exception) {
+            log.warn("Cannot parse request information json", exception);
+            return new ArrayList<>();
+        }
     }
 
     private boolean shouldMoveToInProgressOnView(RfqHeaderEntity entity, String userId) {
@@ -869,6 +1163,8 @@ public class RFQService {
             tierEntity.setSupplier(supplier);
             tierEntity.setQuantity(tierRequest.getQuantity());
             tierEntity.setProductPrice(tierRequest.getProductPrice());
+            tierEntity.setCurrency(tierRequest.getCurrency());
+            tierEntity.setExchangeRate(tierRequest.getExchangeRate());
             tierEntity.setLandFreightCost(tierRequest.getLandFreightCost());
             tierEntity.setSeaFreightCost(tierRequest.getSeaFreightCost());
             tierEntity.setLandTotalPrice(tierRequest.getLandTotalPrice());
@@ -1164,10 +1460,12 @@ public class RFQService {
             case NEW -> "ใหม่";
             case IN_PROGRESS -> "กำลังดำเนินการ";
             case SUPPLIER_QUOTED -> "ซัพพลายเออร์ตอบแล้ว";
+            case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case QUOTED -> "เสนอราคาแล้ว";
             case CANCELED -> "ยกเลิก";
             case CLOSED -> "ปิดงาน";
             case COMPLETED -> "เสร็จสิ้น";
+            case REJECTED -> "ปฏิเสธ";
         };
     }
 
@@ -1178,5 +1476,32 @@ public class RFQService {
         return updatedDate
                 .withZoneSameInstant(DateUtil.getTimeZone())
                 .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
+    }
+
+    private void saveRfqStatusTimeline(RfqHeaderEntity rfq, RfqStatus status, ZonedDateTime statusDatetime) {
+        if (rfq == null || status == null || statusDatetime == null) {
+            return;
+        }
+
+        if (rfqStatusTimelineRepository.findByIdRfqIdAndIdStatus(rfq.getId(), status).isPresent()) {
+            return;
+        }
+
+        RfqStatusTimelineEntity timeline = new RfqStatusTimelineEntity();
+        RfqStatusTimelineId timelineId = new RfqStatusTimelineId();
+        timelineId.setRfqId(rfq.getId());
+        timelineId.setStatus(status);
+        timeline.setId(timelineId);
+        timeline.setRfqHeader(rfq);
+        timeline.setStatusDatetime(statusDatetime);
+
+        rfqStatusTimelineRepository.save(timeline);
+    }
+
+    private record RequestInformationEntry(
+            String requestInformation,
+            String requestedBy,
+            ZonedDateTime requestedDate
+    ) {
     }
 }

@@ -88,18 +88,19 @@ public class QuotationEntity extends AuditDateEntity {
     @ToString.Exclude
     private Set<QuotationDetailEntity> items = new LinkedHashSet<>();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", referencedColumnName = "id")
-    @ToString.Exclude
-    private UserEntity createdBy;
+    @Column(name = "created_by")
+    @ToString.Include
+    private String createdBy;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "updated_by", referencedColumnName = "id")
-    @ToString.Exclude
-    private UserEntity updatedBy;
+    @Column(name = "updated_by")
+    @ToString.Include
+    private String updatedBy;
 
     @Column(name = "rev_no")
     private Integer revNo;
+
+    @Column(name = "is_show_summary")
+    private Boolean isShowSummary;
 
     public void addItem(QuotationDetailEntity item) {
         if (item == null) return;

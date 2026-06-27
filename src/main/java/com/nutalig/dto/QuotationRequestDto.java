@@ -20,5 +20,6 @@ public class QuotationRequestDto {
     private BigDecimal discount;
     private BigDecimal freight;
     private Boolean isVat;
+    private Boolean isShowSummary;
     private List<QuotationItemRequestDto> items;
 }

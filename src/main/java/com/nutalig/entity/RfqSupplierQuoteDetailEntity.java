@@ -53,7 +53,15 @@ public class RfqSupplierQuoteDetailEntity extends AuditDateEntity {
     private String packageCapacity;
 
     @OneToMany(mappedBy = "quoteDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RfqSupplierQuoteDetailPackageEntity> packages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "quoteDetail", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqSupplierQuoteTierEntity> tiers = new ArrayList<>();
+
+    public void addPackage(RfqSupplierQuoteDetailPackageEntity packageEntity) {
+        packages.add(packageEntity);
+        packageEntity.setQuoteDetail(this);
+    }
 
     public void addTier(RfqSupplierQuoteTierEntity tier) {
         tiers.add(tier);

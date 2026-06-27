@@ -36,6 +36,9 @@ public class RfqHeaderDto {
     private String quotationNo;
     private String saleOrderId;
     private String shippingMethod;
+    private String requestInformation;
+    private String remark;
+    private List<RfqStatusTimelineDto> rfqStatusTimeline;
     private Long confirmedDetailId;
     private Long confirmedTierId;
     private String confirmedShippingMethod;

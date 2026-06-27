@@ -14,6 +14,8 @@ public class CreateCustomerRequest {
     private String branchNumber;
     private String branchName;
     private String creditTerm;
+    private String customerSegment;
+    private String customerTier;
     private CreateCustomerAddressRequest address;
     private List<CreateCustomerContactRequest> contacts;
     private String salesAccount;

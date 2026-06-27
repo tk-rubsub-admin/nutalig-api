@@ -1,5 +1,6 @@
 package com.nutalig.entity;
 
+import com.nutalig.constant.Currency;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -46,6 +47,13 @@ public class RfqTierEntity extends AuditDateEntity {
 
     @Column(name = "product_price", precision = 18, scale = 4, nullable = false)
     private BigDecimal productPrice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency", length = 10)
+    private Currency currency;
+
+    @Column(name = "exchange_rate", precision = 18, scale = 4)
+    private BigDecimal exchangeRate;
 
     @Column(name = "land_freight_cost", precision = 18, scale = 4)
     private BigDecimal landFreightCost;

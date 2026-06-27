@@ -12,4 +12,5 @@ public class UpdateRequestPriceHeaderRequest {
     private String material;
     private String capacity;
     private String description;
+    private String requestInformation;
 }

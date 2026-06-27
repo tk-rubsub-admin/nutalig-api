@@ -9,6 +9,8 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.salesorder.request.CreateSalesOrderDetailRequest;
 import com.nutalig.controller.salesorder.request.CreateSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
+import com.nutalig.controller.salesorder.request.UpdateSalesOrderDetailRequest;
+import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
 import com.nutalig.dto.SalesOrderDetailDto;
 import com.nutalig.dto.SalesOrderDto;
 import com.nutalig.dto.SystemConfigDto;
@@ -122,11 +124,16 @@ public class SalesOrderService {
 
         SalesOrderSummary summary = calculate(request.getItems(), entity.getDiscount(), entity.getFreight(), request.getIsVat());
         entity.setSubTotal(summary.subTotal());
+        entity.setAmount(summary.subTotal.subtract(entity.getFreight()));
         entity.setVat(summary.vat());
         entity.setGrandTotal(summary.grandTotal());
 
         salesOrderRepository.save(entity);
-        linkRfq(request.getRfqId(), salesOrderNo, userId, now);
+
+        if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
+            linkRfq(request.getRfqId(), salesOrderNo, userId, now);
+        }
+
         recordCreateSalesOrderActivity(entity, request, userId);
 
         return entity;
@@ -136,6 +143,78 @@ public class SalesOrderService {
     public SalesOrderDto getSalesOrderById(String salesOrderNo) throws DataNotFoundException {
         SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto updateSalesOrder(String salesOrderNo, UpdateSalesOrderRequest request, String userId)
+            throws DataNotFoundException {
+        log.info("Update sales order {} by {}", salesOrderNo, userId);
+
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        Integer oldRevNo = entity.getRevNo();
+        Map<String, Object> before = buildSalesOrderSnapshot(entity);
+
+        if (request.getDocDate() != null) {
+            entity.setDocDate(request.getDocDate());
+        }
+        if (request.getExpireDate() != null) {
+            entity.setExpireDate(request.getExpireDate());
+        }
+        if (request.getCoSaleId() != null) {
+            entity.setCoSalesId(request.getCoSaleId());
+        }
+        if (request.getDiscount() != null) {
+            entity.setDiscount(defaultIfNull(request.getDiscount()));
+        }
+        if (request.getFreight() != null) {
+            entity.setFreight(defaultIfNull(request.getFreight()));
+        }
+        if (request.getShippingType() != null) {
+            entity.setShippingType(normalizeShippingType(request.getShippingType()));
+        }
+        if (request.getRemark() != null) {
+            entity.setRemark(request.getRemark());
+        }
+        if (request.getIsVat() != null) {
+            entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
+        }
+        if (request.getItems() != null) {
+            replaceSalesOrderItems(entity, request.getItems());
+        }
+        if (request.getAmount() != null) {
+            entity.setAmount(request.getAmount());
+        }
+        if (request.getCommission() != null) {
+            entity.setCommission(request.getCommission());
+        }
+
+        if (SalesOrderStatus.DRAFT.equals(entity.getStatus())) {
+            entity.setStatus(SalesOrderStatus.CREATED);
+        }
+
+        List<UpdateSalesOrderDetailRequest> itemsForCalculate = request.getItems() != null
+                ? request.getItems()
+                : toUpdateItemRequests(entity.getItems());
+        Boolean isVat = request.getIsVat() != null
+                ? request.getIsVat()
+                : entity.getVatRate() != null && entity.getVatRate().compareTo(BigDecimal.ZERO) > 0;
+
+        SalesOrderSummary summary = calculateForUpdate(itemsForCalculate, entity.getDiscount(), entity.getFreight(), isVat);
+        entity.setSubTotal(summary.subTotal());
+        entity.setVat(summary.vat());
+        entity.setGrandTotal(summary.grandTotal());
+        entity.setRevNo(defaultRevNo(oldRevNo) + 1);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedBy(user);
+
+        salesOrderRepository.save(entity);
+        recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
 
         return mapToDto(entity);
     }
@@ -356,6 +435,52 @@ public class SalesOrderService {
         return detail;
     }
 
+    private void replaceSalesOrderItems(SalesOrderEntity entity, List<UpdateSalesOrderDetailRequest> itemRequests)
+            throws DataNotFoundException {
+        entity.getItems().clear();
+        int lineNo = 1;
+
+        for (UpdateSalesOrderDetailRequest itemRequest : Optional.ofNullable(itemRequests).orElseGet(List::of)) {
+            SupplierEntity supplier = resolveSupplier(itemRequest.getSupplierId());
+            BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
+            BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
+
+            SalesOrderDetailEntity detail = new SalesOrderDetailEntity();
+            detail.setSalesOrder(entity);
+            detail.setLineNo(lineNo++);
+            detail.setSupplier(supplier);
+            detail.setName(itemRequest.getName());
+            detail.setType(itemRequest.getType());
+            detail.setCapacity(itemRequest.getCapacity());
+            detail.setSize(itemRequest.getSize());
+            detail.setSpec(itemRequest.getSpec());
+            detail.setUnitPrice(unitPrice);
+            detail.setQuantity(quantity);
+            detail.setAmount(unitPrice.multiply(quantity).setScale(2, RoundingMode.HALF_UP));
+            detail.setImageUrl(itemRequest.getImageUrl());
+            entity.addItem(detail);
+        }
+    }
+
+    private List<UpdateSalesOrderDetailRequest> toUpdateItemRequests(Set<SalesOrderDetailEntity> items) {
+        List<UpdateSalesOrderDetailRequest> requests = new ArrayList<>();
+        for (SalesOrderDetailEntity item : items) {
+            UpdateSalesOrderDetailRequest request = new UpdateSalesOrderDetailRequest();
+            request.setId(item.getId());
+            request.setSupplierId(item.getSupplier() != null ? item.getSupplier().getId() : null);
+            request.setName(item.getName());
+            request.setType(item.getType());
+            request.setCapacity(item.getCapacity());
+            request.setSize(item.getSize());
+            request.setSpec(item.getSpec());
+            request.setUnitPrice(item.getUnitPrice());
+            request.setQuantity(item.getQuantity());
+            request.setImageUrl(item.getImageUrl());
+            requests.add(request);
+        }
+        return requests;
+    }
+
     private SalesOrderSummary calculate(
             List<CreateSalesOrderDetailRequest> items,
             BigDecimal requestDiscount,
@@ -364,6 +489,35 @@ public class SalesOrderService {
     ) {
         BigDecimal subTotal = BigDecimal.ZERO;
         for (CreateSalesOrderDetailRequest item : Optional.ofNullable(items).orElseGet(List::of)) {
+            BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
+                    .multiply(defaultIfNull(item.getQuantity()));
+            subTotal = subTotal.add(lineTotal);
+        }
+
+        BigDecimal discount = defaultIfNull(requestDiscount);
+        BigDecimal freight = defaultIfNull(requestFreight);
+        BigDecimal taxableAmount = subTotal.subtract(discount);
+        if (taxableAmount.compareTo(BigDecimal.ZERO) < 0) {
+            taxableAmount = BigDecimal.ZERO;
+        }
+
+        BigDecimal vat = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(isVat)) {
+            vat = taxableAmount.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal grandTotal = taxableAmount.add(vat).setScale(2, RoundingMode.HALF_UP);
+        return new SalesOrderSummary(subTotal.setScale(2, RoundingMode.HALF_UP), vat, grandTotal);
+    }
+
+    private SalesOrderSummary calculateForUpdate(
+            List<UpdateSalesOrderDetailRequest> items,
+            BigDecimal requestDiscount,
+            BigDecimal requestFreight,
+            Boolean isVat
+    ) {
+        BigDecimal subTotal = BigDecimal.ZERO;
+        for (UpdateSalesOrderDetailRequest item : Optional.ofNullable(items).orElseGet(List::of)) {
             BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
                     .multiply(defaultIfNull(item.getQuantity()));
             subTotal = subTotal.add(lineTotal);
@@ -415,6 +569,8 @@ public class SalesOrderService {
         detail.put("vat", entity.getVat());
         detail.put("grandTotal", entity.getGrandTotal());
 
+        String summary = SalesOrderStatus.DRAFT.equals(entity.getStatus()) ? "บันทึกฉบับร่าง Sales Order เลขที่ " + entity.getSalesOrderNo() : "สร้าง Sales Order เลขที่ " + entity.getSalesOrderNo();
+
         activityHistoryService.record(
                 ActivityEntityType.SALES_ORDER,
                 entity.getSalesOrderNo(),
@@ -425,6 +581,53 @@ public class SalesOrderService {
                 "สร้าง Sales Order เลขที่ " + entity.getSalesOrderNo(),
                 detail
         );
+    }
+
+    private void recordUpdateSalesOrderActivity(
+            SalesOrderEntity entity,
+            UpdateSalesOrderRequest request,
+            String userId,
+            Integer oldRevNo,
+            Map<String, Object> before
+    ) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", before);
+        detail.put("after", buildSalesOrderSnapshot(entity));
+        detail.put("oldRevNo", oldRevNo);
+        detail.put("newRevNo", entity.getRevNo());
+        detail.put("itemsUpdated", request.getItems() != null);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "แก้ไข Sales Order เลขที่ " + entity.getSalesOrderNo(),
+                detail
+        );
+    }
+
+    private Map<String, Object> buildSalesOrderSnapshot(SalesOrderEntity entity) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("salesOrderNo", entity.getSalesOrderNo());
+        detail.put("docDate", entity.getDocDate());
+        detail.put("expireDate", entity.getExpireDate());
+        detail.put("status", entity.getStatus());
+        detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
+        detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
+        detail.put("coSaleId", entity.getCoSalesId());
+        detail.put("discount", entity.getDiscount());
+        detail.put("freight", entity.getFreight());
+        detail.put("shippingType", entity.getShippingType());
+        detail.put("vatRate", entity.getVatRate());
+        detail.put("remark", entity.getRemark());
+        detail.put("subTotal", entity.getSubTotal());
+        detail.put("vat", entity.getVat());
+        detail.put("grandTotal", entity.getGrandTotal());
+        detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
+        return detail;
     }
 
     private String generateSalesOrderNo() {
@@ -461,12 +664,25 @@ public class SalesOrderService {
                 .orElseThrow(() -> new DataNotFoundException("Internal sale " + input + " not found."));
     }
 
+    private SupplierEntity resolveSupplier(String input) throws DataNotFoundException {
+        if (StringUtils.isBlank(input)) {
+            throw new DataNotFoundException("Supplier is required.");
+        }
+
+        return supplierRepository.findById(input)
+                .orElseThrow(() -> new DataNotFoundException("Supplier " + input + " not found."));
+    }
+
     private String normalizeShippingType(String shippingType) {
         return StringUtils.isBlank(shippingType) ? null : shippingType.trim().toUpperCase(Locale.ROOT);
     }
 
     private BigDecimal defaultIfNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private Integer defaultRevNo(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private SalesOrderDto mapToDto(SalesOrderEntity entity) {
@@ -486,6 +702,8 @@ public class SalesOrderService {
         dto.setFreight(entity.getFreight());
         dto.setVat(entity.getVat());
         dto.setGrandTotal(entity.getGrandTotal());
+        dto.setAmount(entity.getAmount());
+        dto.setCommission(entity.getCommission());
         dto.setShippingType(entity.getShippingType());
         dto.setVatRate(entity.getVatRate());
         dto.setRemark(entity.getRemark());

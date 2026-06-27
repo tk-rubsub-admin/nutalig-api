@@ -26,4 +26,5 @@ public class QuotationDto {
     private BigDecimal grandTotal;
     private List<QuotationItemRequestDto> items;
     private Integer revNo;
+    private Boolean isShowSummary;
 }

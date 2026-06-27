@@ -16,6 +16,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "productFamily", source = "productFamilyEntity")
     @Mapping(target = "productSubtype1", source = "productUsage")
     @Mapping(target = "productSubType2", source = "systemMechanic")
+    @Mapping(target = "rfqStatusTimeline", source = "statusTimelines")
     RfqHeaderDto toDto(RfqHeaderEntity entity);
 
     List<RfqHeaderDto> toDtoList(List<RfqHeaderEntity> entities);
@@ -39,6 +40,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
     @Mapping(target = "saleOrderId", ignore = true)
+    @Mapping(target = "requestInformation", ignore = true)
     @Mapping(target = "confirmedDetailId", ignore = true)
     @Mapping(target = "confirmedTierId", ignore = true)
     @Mapping(target = "confirmedShippingMethod", ignore = true)
@@ -63,6 +65,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)
     @Mapping(target = "saleOrderId", ignore = true)
+    @Mapping(target = "requestInformation", ignore = true)
     @Mapping(target = "confirmedDetailId", ignore = true)
     @Mapping(target = "confirmedTierId", ignore = true)
     @Mapping(target = "confirmedShippingMethod", ignore = true)
@@ -85,6 +88,13 @@ public interface RequestPriceHeaderMapper {
     RfqAdditionalCostDto toAdditionalCostDto(RfqAdditionalCostEntity entity);
 
     List<RfqAdditionalCostDto> toAdditionalCostDtoList(List<RfqAdditionalCostEntity> entities);
+
+    @Mapping(target = "rfqId", source = "id.rfqId")
+    @Mapping(target = "status", source = "id.status")
+    @Mapping(target = "statusDatetime", source = "statusDatetime")
+    RfqStatusTimelineDto toRfqStatusTimelineDto(RfqStatusTimelineEntity entity);
+
+    List<RfqStatusTimelineDto> toRfqStatusTimelineDtoList(List<RfqStatusTimelineEntity> entities);
 
     SalesAccountDto toSalesDto(SalesEntity entity);
 }

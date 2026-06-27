@@ -7,6 +7,7 @@ import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.controller.salesorder.request.CreateSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
+import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
 import com.nutalig.controller.salesorder.response.CreateSalesOrderResponse;
 import com.nutalig.dto.SalesOrderDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
@@ -56,14 +57,6 @@ public class SalesOrderController {
         return new GeneralResponse<>(SUCCESS, new CreateSalesOrderResponse(salesOrder.getSalesOrderNo()));
     }
 
-    @PostMapping("/createSaloesOrd")
-    public GeneralResponse<CreateSalesOrderResponse> createSaloesOrd(
-            @RequestBody CreateSalesOrderRequest request,
-            @RequestHeader("userId") String userId
-    ) throws DataNotFoundException, InvalidRequestException {
-        return createSalesOrder(request, userId);
-    }
-
     @GetMapping
     public GeneralResponse<SalesOrderDto> getSalesOrderById(@RequestParam(name = "id") String id) throws DataNotFoundException {
         log.info("=== Start get sales order by id {} ===", id);
@@ -71,6 +64,20 @@ public class SalesOrderController {
         SalesOrderDto response = salesOrderService.getSalesOrderById(id);
 
         log.info("=== End get sales order by id {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}")
+    public GeneralResponse<SalesOrderDto> updateSalesOrder(
+            @PathVariable(name = "id") String id,
+            @RequestBody UpdateSalesOrderRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update sales order {} ===", id);
+
+        SalesOrderDto response = salesOrderService.updateSalesOrder(id, request, userId);
+
+        log.info("=== End update sales order {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

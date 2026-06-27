@@ -60,6 +60,9 @@ public class QuotationDetailEntity {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "tier_id")
+    private String tierId;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
