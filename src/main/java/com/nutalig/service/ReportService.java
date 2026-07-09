@@ -2,7 +2,11 @@ package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.ExportFileFormat;
+import com.nutalig.constant.ReceiptType;
+import com.nutalig.dto.document.InvoiceDocumentDto;
+import com.nutalig.dto.document.PurchaseOrderDocumentDto;
 import com.nutalig.dto.document.QuotationDocumentDto;
+import com.nutalig.dto.document.ReceiptDocumentDto;
 import com.nutalig.dto.document.SalesOrderDocumentDto;
 import com.nutalig.utils.JasperReportUtil;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.nutalig.constant.BusinessConstant.DocumentPrefix.*;
+import static com.nutalig.constant.BusinessConstant.DocumentPrefix.DEPOSIT_RECEIPT_TAX_PREFIX;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,6 +42,11 @@ public class ReportService {
     private static final String INVOICE_TEMPLATE = "report/invoice.jrxml";
     private static final String QUOTATION_TEMPLATE = "report/quotation.jrxml";
     private static final String SALES_ORDER_TEMPLATE = "report/salesOrder.jrxml";
+    private static final String PURCHASE_ORDER_TEMPLATE = "report/purchaseOrder.jrxml";
+    private static final String DEPOSIT_RECEIPT_TEMPLATE = "report/depositReceipt.jrxml";
+    private static final String DEPOSIT_RECEIPT_TAX_INVOICE_TEMPLATE = "report/depositReceiptTaxInvoice.jrxml";
+    private static final String RECEIPT_TEMPLATE = "report/receipt.jrxml";
+    private static final String RECEIPT_TAX_INVOICE_TEMPLATE = "report/receiptTaxInvoice.jrxml";
 
     private final ObjectMapper objectMapper;
 
@@ -131,6 +143,156 @@ public class ReportService {
         return null;
     }
 
+    public Object getInvoiceDocument(InvoiceDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+
+        parameters.put("docNo", dto.getDocNo());
+        parameters.put("docDate", dto.getDocDate());
+        parameters.put("custName", dto.getCustName());
+        parameters.put("custTaxId", dto.getCustTaxId());
+        parameters.put("custAddress", dto.getCustAddress());
+        parameters.put("custMobileNo", dto.getCustMobileNo());
+
+        parameters.put("salesId", dto.getSalesId());
+        parameters.put("salesName", dto.getSalesName());
+        parameters.put("salesNickname", dto.getSalesNickname());
+        parameters.put("salesMobileNo", dto.getSalesMobileNo());
+        parameters.put("coSalesId", dto.getCoSalesId());
+
+        parameters.put("referenceNo", dto.getReferenceNo());
+        parameters.put("amount", dto.getAmount());
+        parameters.put("subTotal", dto.getSubTotal());
+        parameters.put("discount", dto.getDiscount());
+        parameters.put("freight", dto.getFreight());
+        parameters.put("vat", dto.getVat());
+        parameters.put("grandTotal", dto.getGrandTotal());
+        parameters.put("remark", dto.getRemark());
+        parameters.put("thaiBahtText", dto.getThaiBahtText());
+        parameters.put("logo", loadResource(NUTALIG_LOGO));
+
+        parameters.put("bankName", dto.getBankName());
+        parameters.put("accountName", dto.getAccountName());
+        parameters.put("accountNo", dto.getAccountNo());
+
+        JasperPrint jasperPrint = buildJasperPrint(
+                INVOICE_TEMPLATE,
+                parameters,
+                new JRBeanCollectionDataSource(dto.getItems())
+        );
+
+        if (format == ExportFileFormat.PDF) {
+            return JasperReportUtil.exportJasperToPdf(jasperPrint);
+        }
+
+        if (format == ExportFileFormat.JPG) {
+            return exportImages(jasperPrint);
+        }
+
+        return null;
+    }
+
+    public Object getPurchaseOrderDocument(PurchaseOrderDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+
+        parameters.put("logo", loadResource(NUTALIG_LOGO));
+        parameters.put("supplierName", dto.getSupplierName());
+        parameters.put("supplierAddress", dto.getSupplierAddress());
+        parameters.put("docNo", dto.getDocNo());
+        parameters.put("docDate", dto.getDocDate());
+        parameters.put("salesName", dto.getSalesName());
+        parameters.put("salesMobileNo", dto.getSalesMobileNo());
+        parameters.put("accountName", dto.getAccountName());
+        parameters.put("bankName", dto.getBankName());
+        parameters.put("accountNo", dto.getAccountNo());
+        parameters.put("remark", dto.getRemark());
+        parameters.put("totalAmount", dto.getTotalAmount());
+        parameters.put("discount", dto.getDiscount());
+        parameters.put("freight", dto.getFreight());
+        parameters.put("subTotal", dto.getSubTotal());
+        parameters.put("vat", dto.getVat());
+        parameters.put("grandTotal", dto.getGrandTotal());
+        parameters.put("thaiBahtText", dto.getThaiBahtText());
+        parameters.put("coSalesId", dto.getCoSalesId());
+        parameters.put("salesId", dto.getSalesId());
+        parameters.put("shippingType", dto.getShippingType());
+        parameters.put("shippingLocation", dto.getShippingLocation());
+        parameters.put("shippingAddress", dto.getShippingAddress());
+        parameters.put("shippingRemark", dto.getShippingRemark());
+        parameters.put("carCode", dto.getCarCode());
+        parameters.put("procurementName", dto.getProcurementName());
+        parameters.put("procurementMobileNo", dto.getProcurementMobileNo());
+        parameters.put("leadTime", dto.getLeadTime());
+        parameters.put("dueDate", dto.getDueDate());
+        parameters.put("salesOrderNo", dto.getSalesOrderNo());
+
+        JasperPrint jasperPrint = buildJasperPrint(
+                PURCHASE_ORDER_TEMPLATE,
+                parameters,
+                new JRBeanCollectionDataSource(dto.getItems())
+        );
+
+        if (format == ExportFileFormat.PDF) {
+            return JasperReportUtil.exportJasperToPdf(jasperPrint);
+        }
+
+        if (format == ExportFileFormat.JPG) {
+            return exportImages(jasperPrint);
+        }
+
+        return null;
+    }
+
+    public Object getReceiptDocument(ReceiptDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+
+        parameters.put("reportName", getReceiptName(dto.getReceiptType()));
+        parameters.put("docNo", dto.getDocNo());
+        parameters.put("docDate", dto.getDocDate());
+        parameters.put("custName", dto.getCustName());
+        parameters.put("custTaxId", dto.getCustTaxId());
+        parameters.put("custAddress", dto.getCustAddress());
+
+        parameters.put("salesId", dto.getSalesId());
+
+        parameters.put("salesOrderNo", dto.getSalesOrderNo());
+        parameters.put("invoiceNo", dto.getInvoiceNo());
+        parameters.put("amount", dto.getAmount());
+        parameters.put("subTotal", dto.getSubTotal());
+        parameters.put("discount", dto.getDiscount());
+        parameters.put("freight", dto.getFreight());
+        parameters.put("vat", dto.getVat());
+        parameters.put("grandTotal", dto.getGrandTotal());
+        parameters.put("remark", dto.getRemark());
+        parameters.put("thaiBahtText", dto.getThaiBahtText());
+        parameters.put("logo", loadResource(NUTALIG_LOGO));
+
+        parameters.put("bankName", dto.getBankName());
+        parameters.put("accountName", dto.getAccountName());
+        parameters.put("accountNo", dto.getAccountNo());
+
+        parameters.put("paymentMethod", dto.getPaymentMethod().name());
+        parameters.put("chequeNo", dto.getChequeNo());
+        parameters.put("chequeBank", dto.getChequeBank());
+        parameters.put("chequeBranch", dto.getChequeBranch());
+        parameters.put("chequeDate", dto.getChequeDate());
+
+        JasperPrint jasperPrint = buildJasperPrint(
+                RECEIPT_TEMPLATE,
+                parameters,
+                new JRBeanCollectionDataSource(dto.getItems())
+        );
+
+        if (format == ExportFileFormat.PDF) {
+            return JasperReportUtil.exportJasperToPdf(jasperPrint);
+        }
+
+        if (format == ExportFileFormat.JPG) {
+            return exportImages(jasperPrint);
+        }
+
+        return null;
+    }
+
     /* ======================= CORE METHODS ======================= */
 
     private JasperPrint buildJasperPrint(
@@ -198,5 +360,15 @@ public class ReportService {
         g2d.dispose();
 
         return bufferedImage;
+    }
+
+
+    private String getReceiptName(ReceiptType receiptType) {
+        return switch (receiptType) {
+            case RECEIPT -> "ใบเสร็จรับเงิน/ RECEIPT";
+            case DEPOSIT_RECEIPT -> "ใบรับเงินมัดจำ/ DEPOSIT RECEIPT";
+            case RECEIPT_TAX_INVOICE -> "ใบเสร็จรับเงิน/ใบกำกับภาษี / RECEIPT/ TAX INVOICE";
+            case DEPOSIT_TAX_INVOICE -> "ใบรับเงินมัดจำ/ใบกำกับภาษี / DEPOSIT RECEIPT/ TAX INVOICE";
+        };
     }
 }

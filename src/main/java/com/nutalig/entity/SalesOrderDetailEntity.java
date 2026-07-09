@@ -1,5 +1,6 @@
 package com.nutalig.entity;
 
+import com.nutalig.constant.Currency;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -60,6 +61,37 @@ public class SalesOrderDetailEntity {
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
+
+    @Column(name = "rfq_detail_id")
+    private Long rfqDetailId;
+
+    @Column(name = "rfq_tier_id")
+    private Long rfqTierId;
+
+    @Column(name = "quotation_detail_id")
+    private Long quotationDetailId;
+
+    @Column(name = "shipping_method", length = 10)
+    private String shippingMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "supplier_currency", length = 10)
+    private Currency supplierCurrency;
+
+    @Column(name = "supplier_unit_price", precision = 18, scale = 4)
+    private BigDecimal supplierUnitPrice;
+
+    @Column(name = "exchange_rate", precision = 18, scale = 4)
+    private BigDecimal exchangeRate;
+
+    @Column(name = "supplier_shipping_cost", precision = 18, scale = 4)
+    private BigDecimal supplierShippingCost;
+
+    @Column(name = "supplier_total_unit_cost", precision = 18, scale = 4)
+    private BigDecimal supplierTotalUnitCost;
+
+    @Column(name = "supplier_quote_tier_id")
+    private Long supplierQuoteTierId;
 
     @Override
     public boolean equals(Object o) {

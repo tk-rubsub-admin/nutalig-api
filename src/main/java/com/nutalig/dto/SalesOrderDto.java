@@ -1,6 +1,7 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.ProcurementStatus;
 import com.nutalig.constant.SalesOrderStatus;
 import lombok.Data;
 
@@ -18,6 +19,7 @@ public class SalesOrderDto {
     private CustomerAddressDto customerAddress;
     private CustomerContactDto customerContact;
     private EmployeeDto saleAccount;
+    private String rfqId;
     private String coSaleId;
     private BigDecimal subTotal;
     private BigDecimal discount;
@@ -26,6 +28,7 @@ public class SalesOrderDto {
     private BigDecimal grandTotal;
     private BigDecimal amount;
     private BigDecimal commission;
+    private ProcurementStatus procurementStatus;
     private String shippingType;
     private BigDecimal vatRate;
     private String remark;

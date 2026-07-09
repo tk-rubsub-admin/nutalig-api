@@ -1,5 +1,6 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.Currency;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -18,4 +19,14 @@ public class SalesOrderDetailDto {
     private BigDecimal quantity;
     private BigDecimal amount;
     private String imageUrl;
+    private Long rfqDetailId;
+    private Long rfqTierId;
+    private Long quotationDetailId;
+    private String shippingMethod;
+    private Currency supplierCurrency;
+    private BigDecimal supplierUnitPrice;
+    private BigDecimal exchangeRate;
+    private BigDecimal supplierShippingCost;
+    private BigDecimal supplierTotalUnitCost;
+    private Long supplierQuoteTierId;
 }

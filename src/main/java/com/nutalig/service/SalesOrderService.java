@@ -11,6 +11,7 @@ import com.nutalig.controller.salesorder.request.CreateSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.UpdateSalesOrderDetailRequest;
 import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
+import com.nutalig.dto.QuotationDto;
 import com.nutalig.dto.SalesOrderDetailDto;
 import com.nutalig.dto.SalesOrderDto;
 import com.nutalig.dto.SystemConfigDto;
@@ -58,6 +59,7 @@ public class SalesOrderService {
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final QuotationRepository quotationRepository;
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
     private final SupplierRepository supplierRepository;
@@ -109,6 +111,7 @@ public class SalesOrderService {
         entity.setFreight(defaultIfNull(request.getFreight()));
         entity.setShippingType(normalizeShippingType(request.getShippingType()));
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
+        entity.setProcurementStatus(ProcurementStatus.NOT_READY);
         entity.setRemark(request.getRemark());
         entity.setRevNo(1);
         entity.setCreatedDate(now);
@@ -432,6 +435,16 @@ public class SalesOrderService {
         detail.setQuantity(quantity);
         detail.setAmount(unitPrice.multiply(quantity).setScale(2, RoundingMode.HALF_UP));
         detail.setImageUrl(request.getImageUrl());
+        detail.setRfqDetailId(request.getRfqDetailId());
+        detail.setRfqTierId(request.getRfqTierId());
+        detail.setQuotationDetailId(request.getQuotationDetailId());
+        detail.setShippingMethod(normalizeShippingType(request.getShippingMethod()));
+        detail.setSupplierCurrency(request.getSupplierCurrency());
+        detail.setSupplierUnitPrice(request.getSupplierUnitPrice());
+        detail.setExchangeRate(request.getExchangeRate());
+        detail.setSupplierShippingCost(request.getSupplierShippingCost());
+        detail.setSupplierTotalUnitCost(request.getSupplierTotalUnitCost());
+        detail.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
         return detail;
     }
 
@@ -458,6 +471,16 @@ public class SalesOrderService {
             detail.setQuantity(quantity);
             detail.setAmount(unitPrice.multiply(quantity).setScale(2, RoundingMode.HALF_UP));
             detail.setImageUrl(itemRequest.getImageUrl());
+            detail.setRfqDetailId(itemRequest.getRfqDetailId());
+            detail.setRfqTierId(itemRequest.getRfqTierId());
+            detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
+            detail.setShippingMethod(normalizeShippingType(itemRequest.getShippingMethod()));
+            detail.setSupplierCurrency(itemRequest.getSupplierCurrency());
+            detail.setSupplierUnitPrice(itemRequest.getSupplierUnitPrice());
+            detail.setExchangeRate(itemRequest.getExchangeRate());
+            detail.setSupplierShippingCost(itemRequest.getSupplierShippingCost());
+            detail.setSupplierTotalUnitCost(itemRequest.getSupplierTotalUnitCost());
+            detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
             entity.addItem(detail);
         }
     }
@@ -476,6 +499,16 @@ public class SalesOrderService {
             request.setUnitPrice(item.getUnitPrice());
             request.setQuantity(item.getQuantity());
             request.setImageUrl(item.getImageUrl());
+            request.setRfqDetailId(item.getRfqDetailId());
+            request.setRfqTierId(item.getRfqTierId());
+            request.setQuotationDetailId(item.getQuotationDetailId());
+            request.setShippingMethod(item.getShippingMethod());
+            request.setSupplierCurrency(item.getSupplierCurrency());
+            request.setSupplierUnitPrice(item.getSupplierUnitPrice());
+            request.setExchangeRate(item.getExchangeRate());
+            request.setSupplierShippingCost(item.getSupplierShippingCost());
+            request.setSupplierTotalUnitCost(item.getSupplierTotalUnitCost());
+            request.setSupplierQuoteTierId(item.getSupplierQuoteTierId());
             requests.add(request);
         }
         return requests;
@@ -564,6 +597,7 @@ public class SalesOrderService {
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("shippingType", entity.getShippingType());
+        detail.put("procurementStatus", entity.getProcurementStatus());
         detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
         detail.put("subTotal", entity.getSubTotal());
         detail.put("vat", entity.getVat());
@@ -621,6 +655,7 @@ public class SalesOrderService {
         detail.put("discount", entity.getDiscount());
         detail.put("freight", entity.getFreight());
         detail.put("shippingType", entity.getShippingType());
+        detail.put("procurementStatus", entity.getProcurementStatus());
         detail.put("vatRate", entity.getVatRate());
         detail.put("remark", entity.getRemark());
         detail.put("subTotal", entity.getSubTotal());
@@ -631,7 +666,7 @@ public class SalesOrderService {
     }
 
     private String generateSalesOrderNo() {
-        return SALES_ORDER_PREFIX + generatedIdSequenceService.getNextSequence(SALES_ORDER_PREFIX, 6);
+        return generatedIdSequenceService.getNextIdWithMonth(SALES_ORDER_PREFIX, 6);
     }
 
     private CustomerEntity resolveCustomer(String input) throws DataNotFoundException {
@@ -704,9 +739,11 @@ public class SalesOrderService {
         dto.setGrandTotal(entity.getGrandTotal());
         dto.setAmount(entity.getAmount());
         dto.setCommission(entity.getCommission());
+        dto.setProcurementStatus(entity.getProcurementStatus());
         dto.setShippingType(entity.getShippingType());
         dto.setVatRate(entity.getVatRate());
         dto.setRemark(entity.getRemark());
+        dto.setRfqId(resolveRfq(entity.getSalesOrderNo()));
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
         dto.setRevNo(entity.getRevNo());
@@ -726,6 +763,16 @@ public class SalesOrderService {
             item.setQuantity(detail.getQuantity());
             item.setAmount(detail.getAmount());
             item.setImageUrl(detail.getImageUrl());
+            item.setRfqDetailId(detail.getRfqDetailId());
+            item.setRfqTierId(detail.getRfqTierId());
+            item.setQuotationDetailId(detail.getQuotationDetailId());
+            item.setShippingMethod(detail.getShippingMethod());
+            item.setSupplierCurrency(detail.getSupplierCurrency());
+            item.setSupplierUnitPrice(detail.getSupplierUnitPrice());
+            item.setExchangeRate(detail.getExchangeRate());
+            item.setSupplierShippingCost(detail.getSupplierShippingCost());
+            item.setSupplierTotalUnitCost(detail.getSupplierTotalUnitCost());
+            item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());
             items.add(item);
         }
         dto.setItems(items);
@@ -767,5 +814,11 @@ public class SalesOrderService {
             log.warn("Cannot load image from url: {}", imageUrl, e);
             return null;
         }
+    }
+
+    private String resolveRfq(String salesOrderNo) {
+        return requestPriceHeaderRepository.findFirstBySaleOrderId(salesOrderNo)
+                .map(RfqHeaderEntity::getId)
+                .orElse(null);
     }
 }

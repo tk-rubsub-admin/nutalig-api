@@ -87,6 +87,7 @@ public class SupplierEntity extends AuditDateEntity {
     @OrderBy("productFamilyCode ASC, productMaterialCode ASC")
     private List<SupplierCapabilityEntity> capabilities = new ArrayList<>();
 
+
     public void addContact(SupplierContactEntity contact) {
         contacts.add(contact);
         contact.setSupplier(this);

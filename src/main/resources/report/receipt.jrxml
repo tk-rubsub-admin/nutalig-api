@@ -1,0 +1,841 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="depositReceipt" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="8cac0898-3832-4fc4-bbd4-71035cbfc057">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="custName" class="java.lang.String"/>
+	<parameter name="custTaxId" class="java.lang.String"/>
+	<parameter name="custAddress" class="java.lang.String"/>
+	<parameter name="docNo" class="java.lang.String"/>
+	<parameter name="docDate" class="java.lang.String"/>
+	<parameter name="accountName" class="java.lang.String"/>
+	<parameter name="bankName" class="java.lang.String"/>
+	<parameter name="accountNo" class="java.lang.String"/>
+	<parameter name="remark" class="java.lang.String"/>
+	<parameter name="totalAmount" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="discount" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="freight" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="subTotal" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="vat" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="grandTotal" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="thaiBahtText" class="java.lang.String">
+		<defaultValueExpression><![CDATA["บาทถ้วน"]]></defaultValueExpression>
+	</parameter>
+	<parameter name="salesId" class="java.lang.String"/>
+	<parameter name="salesOrderNo" class="java.lang.String"/>
+	<parameter name="amount" class="java.math.BigDecimal">
+		<defaultValueExpression><![CDATA[BigDecimal.ZERO]]></defaultValueExpression>
+	</parameter>
+	<parameter name="paymentMethod" class="java.lang.String"/>
+	<parameter name="invoiceNo" class="java.lang.String"/>
+	<parameter name="chequeBank" class="java.lang.String"/>
+	<parameter name="chequeNo" class="java.lang.String"/>
+	<parameter name="chequeDate" class="java.lang.String"/>
+	<parameter name="chequeBranch" class="java.lang.String"/>
+	<parameter name="reportName" class="java.lang.String"/>
+	<field name="no" class="java.lang.Integer">
+		<description><![CDATA[no]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
+	</field>
+	<field name="type" class="java.lang.String">
+		<description><![CDATA[type]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="type"/>
+	</field>
+	<field name="capacity" class="java.lang.String">
+		<description><![CDATA[capacity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="capacity"/>
+	</field>
+	<field name="spec" class="java.lang.String">
+		<description><![CDATA[spec]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="spec"/>
+	</field>
+	<field name="size" class="java.lang.String">
+		<description><![CDATA[size]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="size"/>
+	</field>
+	<field name="price" class="java.math.BigDecimal">
+		<description><![CDATA[price]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="price"/>
+	</field>
+	<field name="quantity" class="java.math.BigDecimal">
+		<description><![CDATA[quantity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="quantity"/>
+	</field>
+	<field name="amount" class="java.math.BigDecimal">
+		<description><![CDATA[amount]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="amount"/>
+	</field>
+	<field name="name" class="java.lang.String"/>
+	<field name="sku" class="java.lang.String"/>
+	<background splitType="Stretch"/>
+	<title height="225">
+		<element kind="frame" uuid="9667e3e1-a3e6-493f-b7ad-04efe8a47f25" x="1" y="0" width="555" height="159" forecolor="#C0C0C0">
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<element kind="staticText" uuid="e7b2f837-acf6-4215-9ba6-4cbdb41babfe" x="52" y="0" width="502" height="51" fontName="TH SarabunPSK" fontSize="16.0" hTextAlign="Left">
+				<text><![CDATA[บริษัท นูทาร์ลิค จำกัด เลขที่ 334 ถนนลาดพร้าว 101 แขวงคลองจั่น เขตบางกะปิ กรุงเทพ 10240 โทร. 02-187-0213]]></text>
+				<box topPadding="5" leftPadding="5">
+					<topPen lineWidth="2.0"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="afc5cff1-9a20-4037-84a6-abd9eb397cba" x="0" y="79" width="410" height="80" fontName="TH SarabunPSK" fontSize="12.0">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["เรียน/Attention: " + $P{custName} + "\n" + 
+"เลขประจำตัวผู้เสียภาษี " + $P{custTaxId} + "\n" + 
+"ที่อยู่/Address: " + $P{custAddress}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="109005e9-b8d7-40f9-b9b9-90c37283ccb9" x="410" y="79" width="145" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["เลขที่/ No: " + $P{docNo}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="006ac6d4-664d-48c1-99f4-9ce2511e5f1e" x="410" y="99" width="145" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["วันที่/ Date: " + $P{docDate}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="beb4a6a8-fa81-4369-82a0-734a43d1a109" x="1" y="1" width="50" height="50">
+				<expression><![CDATA[$P{logo}]]></expression>
+			</element>
+			<element kind="textField" uuid="5a548593-2292-466d-823b-1582681d76c1" x="0" y="50" width="553" height="28" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA[$P{reportName}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<box>
+				<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="frame" uuid="4f013cfb-f375-4b95-95dc-2a231461e271" x="1" y="160" width="554" height="60">
+			<element kind="textField" uuid="e2e5f0a4-3561-40d9-8132-c0d3c1a05984" x="0" y="0" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["ใบยืนยันสั่งซื้อเลขที่"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="821633a7-67cd-43a5-b234-e16fefc6538f" x="0" y="20" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["SALES ORDER NO"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="8b46eb09-d291-454e-bc32-b924e4d71a26" x="184" y="0" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["ใบส่งของ/ใบแจ้งหนี้"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="d1fba971-6b38-406f-a3d1-79f59de890c4" x="184" y="20" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["INVOICE NO"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="67ac7809-2b8a-44fe-8e79-ee518da14433" x="368" y="0" width="185" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["พนักงานขาย"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="8a7f396c-0395-45b0-a6da-1f53e913b462" x="368" y="20" width="185" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["SALEMAN CODE"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="545f00af-0db9-41d6-ba77-ee49f8f2879f" x="0" y="40" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA[$P{salesOrderNo}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0" rightPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="12282b2f-4580-4c69-846d-0a5dbcfffb87" x="184" y="40" width="184" height="20" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA[$P{invoiceNo}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0" rightPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="b2f32d86-59ba-4ccd-8285-1d58e04b20d1" x="368" y="40" width="185" height="20" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA[$P{salesId}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="0" rightPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+	</title>
+	<columnHeader height="40">
+		<element kind="textField" uuid="32183225-a17c-4df2-8275-9146498ecbd6" x="0" y="0" width="80" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["รหัสสินค้า"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="72eb8dcc-195b-4194-8414-ed6f6f6344e2" x="0" y="20" width="80" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["ITEM CODE"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="0496cd20-1bb0-446d-aff6-ed0b0759b9c8" x="405" y="0" width="54" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["ราคาต่อหน่วย"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="4c50d1a5-f306-497a-84ee-06134d1774db" x="405" y="20" width="54" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["PRICE"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="133f0e91-294d-4dc0-862e-4ec3dfa32645" x="459" y="20" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["QUANTITY"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="ba440da0-3bc0-4497-abe3-96e9d872b133" x="459" y="0" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["จำนวน"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="a1ba04a1-e205-4402-9321-aca986ab24a3" x="509" y="0" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["จำนวนเงิน"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="588eead5-9af1-46d1-b0f6-e976420243be" x="509" y="20" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["AMOUNT"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="e978c551-9e94-4f3a-86e2-00df60290f86" x="80" y="0" width="325" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["รายการ"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="b7d81e24-d06c-4f7f-8fe7-20d80a9f4bae" x="80" y="20" width="325" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["DESCRIPTION"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<property name="com.jaspersoft.studio.unit.height" value="px"/>
+	</columnHeader>
+	<detail>
+		<band height="50">
+			<element kind="frame" uuid="841a05f4-cc41-4700-aef8-db8b122e7797" x="0" y="0" width="555" height="50">
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<element kind="textField" uuid="874fe312-b0c3-44b1-9ec2-a57404420695" x="0" y="0" width="80" height="50" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+					<expression><![CDATA[$F{sku}]]></expression>
+					<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<box>
+						<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					</box>
+				</element>
+				<element kind="textField" uuid="d5ad6dd5-933c-44aa-b92b-bfaa5f606aaa" x="80" y="0" width="325" height="50" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
+					<expression><![CDATA[(
+  ($F{name} != null && !$F{name}.trim().isEmpty()) 
+    ? $F{name} + "\n" 
+    : ""
+)+(
+  ($F{type} != null && !$F{type}.trim().isEmpty()) 
+    ? "ประเภท: " + $F{type} + "\n" 
+    : ""
+)
++
+(
+  ($F{capacity} != null && !$F{capacity}.trim().isEmpty()) 
+    ? "ขนาดบรรจุ: " + $F{capacity} + "\n" 
+    : ""
+)
++
+(
+  ($F{spec} != null && !$F{spec}.trim().isEmpty()) 
+    ? "สเปคงาน: " + $F{spec} 
+    : ""
+)]]></expression>
+					<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					<box leftPadding="5">
+						<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					</box>
+				</element>
+				<element kind="textField" uuid="bc99101f-6f81-4dce-8f69-96cf652b115a" x="405" y="0" width="54" height="50" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+					<expression><![CDATA[$F{price}]]></expression>
+					<property name="com.jaspersoft.studio.unit.x" value="px"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.unit.y" value="px"/>
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					<box topPadding="0" leftPadding="0" rightPadding="5">
+						<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					</box>
+				</element>
+				<element kind="textField" uuid="a9b25051-1302-4bc6-8b4d-4e497c102271" x="459" y="0" width="50" height="50" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+					<expression><![CDATA[$F{quantity}]]></expression>
+					<property name="com.jaspersoft.studio.unit.x" value="px"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.unit.y" value="px"/>
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					<box topPadding="0" leftPadding="0" rightPadding="5">
+						<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					</box>
+				</element>
+				<element kind="textField" uuid="564da3eb-7f5c-4c8b-9d8f-9a2d3064ae01" x="509" y="0" width="46" height="50" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+					<expression><![CDATA[$F{amount}]]></expression>
+					<property name="com.jaspersoft.studio.unit.x" value="px"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.unit.y" value="px"/>
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					<box topPadding="0" leftPadding="0" rightPadding="5">
+						<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					</box>
+				</element>
+				<box>
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+		</band>
+	</detail>
+	<pageFooter height="238">
+		<element kind="staticText" uuid="01b38b52-fd56-452c-9c48-f92ca808ffb3" positionType="Float" x="375" y="1" width="180" height="212" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[บริษัท นูทาร์ลิค จำกัด
+NUTALIG CO., LTD.
+
+
+
+
+
+
+.......................................................................
+ผู้รับมอบอำนาจ
+AUTHORIZED SIGNATURE
+]]></text>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<box>
+				<pen lineWidth="1.0"/>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="frame" uuid="e7944d28-c272-4177-8ea7-e889c797eaa9" x="0" y="1" width="375" height="212">
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<element kind="textField" uuid="b5f5ae15-21a2-4bed-b07c-7d6045b6a21c" x="0" y="0" width="80" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["ได้รับเงินแล้ว"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="5150336f-d451-4ab9-9f49-a12379044521" x="30" y="30" width="90" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Middle">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["เงินสด CASH"]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="21827d14-1e36-4a32-9ef9-9816ac59b9da" x="10" y="32" width="16" height="16">
+				<expression><![CDATA["CASH".equals($P{paymentMethod}) ? "report/checked.png" : "report/unchecked.png"]]></expression>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			</element>
+			<element kind="textField" uuid="47d38fcb-20d9-4c58-ba7b-8d66f875f049" x="30" y="51" width="330" height="58" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["เช็คธนาคาร CHEQUE BANK  " + $P{chequeBank} + "\r\n" + "เลขที่ No.  " + $P{chequeNo}  + " ลงวันที่ DATE  " + $P{chequeDate} + "\r\n" + "สาขา BRANCH  " + $P{chequeBranch}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="d59ac631-fbc3-43f1-90a2-d951e7c729cb" x="10" y="53" width="16" height="16">
+				<expression><![CDATA["CHEQUE".equals($P{paymentMethod}) ? "report/checked.png" : "report/unchecked.png"]]></expression>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			</element>
+			<element kind="textField" uuid="74644ada-bd34-440f-981d-e9c6274048c5" x="30" y="109" width="330" height="58" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["โอนเงินเข้าบัญชี ออมทรัพย์ ธนาคาร  " + $P{bankName} + "\r\n" + "ชื่อบัญชี  " + $P{accountName} + "เลขที่บัญชี  " + $P{accountNo} +  "\r\n" + "เลขที่ Pay-in Slip  ..................................................................................."]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.y" value="px"/>
+				<box topPadding="0" leftPadding="5">
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="c6707357-3f30-46a8-8f39-7b052eb472de" x="10" y="111" width="16" height="16">
+				<expression><![CDATA["TRANSFER".equals($P{paymentMethod}) ? "report/checked.png" : "report/unchecked.png"]]></expression>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			</element>
+			<element kind="staticText" uuid="c8b3b5be-41c1-46e1-a232-50181792c0c9" positionType="Float" x="30" y="166" width="180" height="43" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Bottom">
+				<text><![CDATA[ผู้รับเงิน .......................................................................
+COLLECTOR]]></text>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="staticText" uuid="14040d89-216a-4bb4-bf5b-827428f65c0b" positionType="Float" x="210" y="166" width="150" height="43" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Bottom">
+				<text><![CDATA[วันที่ ......................................................
+DATE]]></text>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="0" leftPadding="0">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<box>
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+	</pageFooter>
+	<summary height="122">
+		<element kind="textField" uuid="2181737a-5d65-47af-befc-e682fe65c802" x="459" y="20" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["ส่วนลด"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="41b84dcf-853b-4381-acf5-5e47066b5b21" x="509" y="20" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{discount}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="86198cc9-d44e-40e0-b09c-9d1566745a53" x="459" y="40" width="50" height="20" fontName="TH SarabunPSK" fontSize="10.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["ราคาหลังส่วนลด"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="da47ab9a-bd88-48a5-bbd6-3963cabf47f5" x="509" y="40" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{subTotal}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="47931b0c-22e0-4241-837d-64a85e0a2593" x="459" y="80" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["Vat7%"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="b06ca1c5-396c-41e0-80e9-4ddde6fcfbc0" x="509" y="80" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{vat}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="626790ad-47b4-4807-8c9d-c16b877a11b4" x="459" y="100" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["รวมทั้งสิ้น"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="8aab018e-cc79-4623-a75c-cf864f785cdd" x="509" y="100" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{grandTotal}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="32b6baaf-2497-446f-97d4-a76ffd2956df" mode="Opaque" x="0" y="40" width="459" height="40" backcolor="#C0C0C0" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{thaiBahtText}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="d4f1e159-5f49-44e3-8b58-95f00bec2230" x="459" y="60" width="50" height="20" fontName="TH SarabunPSK" fontSize="10.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["มัดจำ 50%"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="b474d715-e830-48a4-9363-9fd2877171b2" x="509" y="60" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{amount}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="b4e4c7a7-b2ad-46b7-b974-6f6d72812270" x="0" y="80" width="459" height="30" fontName="TH SarabunPSK" fontSize="12.0" textAdjust="StretchHeight">
+			<expression><![CDATA["***ใบเสร็จจะมีผลสมบูรณ์ก็ต่อเมื่อได้รับการชำระเงินเรียบร้อยแล้ว***"]]></expression>
+			<box topPadding="2" leftPadding="5" bottomPadding="2" rightPadding="5">
+				<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="0435f749-eddf-4978-9144-f58101a6656d" x="0" y="0" width="80" height="40" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box>
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="e592eab5-1642-4510-865a-f0972366bab4" x="80" y="0" width="325" height="40" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<box leftPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="1f385b77-b2f0-4b01-8fcf-51d647c30315" x="405" y="0" width="54" height="40" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="b5361836-3160-4543-bb6a-b27caed56783" x="459" y="0" width="50" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA["รวมเป็นเงิน"]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="f2e18cbe-b977-401c-b770-7a979898994a" x="509" y="0" width="46" height="20" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{subTotal}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="0" rightPadding="5">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+	</summary>
+</jasperReport>

@@ -1,0 +1,48 @@
+CREATE TABLE IF NOT EXISTS supplier_shipping (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    shipping_method VARCHAR(20) NOT NULL,
+    shipping_name VARCHAR(255) DEFAULT NULL,
+    origin_country_code VARCHAR(10) DEFAULT NULL,
+    origin_province VARCHAR(255) DEFAULT NULL,
+    currency VARCHAR(10) DEFAULT NULL,
+    base_cost DECIMAL(18,4) DEFAULT NULL,
+    lead_time_day_min INT DEFAULT NULL,
+    lead_time_day_max INT DEFAULT NULL,
+    remark VARCHAR(1000) DEFAULT NULL,
+    car_code VARCHAR(255) DEFAULT NULL,
+    active BIT(1) NOT NULL DEFAULT b'1',
+    created_by VARCHAR(255) DEFAULT NULL,
+    updated_by VARCHAR(255) DEFAULT NULL,
+    created_date DATETIME(6) DEFAULT NULL,
+    updated_date DATETIME(6) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_supplier_shipping_method (shipping_method),
+    CONSTRAINT fk_supplier_shipping_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+    CONSTRAINT fk_supplier_shipping_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS supplier_shipping_destination (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    supplier_shipping_id BIGINT NOT NULL,
+    destination_code VARCHAR(100) DEFAULT NULL,
+    destination_name VARCHAR(255) NOT NULL,
+    country_code VARCHAR(10) DEFAULT NULL,
+    province VARCHAR(255) DEFAULT NULL,
+    district VARCHAR(255) DEFAULT NULL,
+    subdistrict VARCHAR(255) DEFAULT NULL,
+    postal_code VARCHAR(20) DEFAULT NULL,
+    full_address VARCHAR(1000) DEFAULT NULL,
+    additional_cost DECIMAL(18,4) DEFAULT NULL,
+    sort_order INT DEFAULT NULL,
+    active BIT(1) NOT NULL DEFAULT b'1',
+    created_by VARCHAR(255) DEFAULT NULL,
+    updated_by VARCHAR(255) DEFAULT NULL,
+    created_date DATETIME(6) DEFAULT NULL,
+    updated_date DATETIME(6) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_supplier_shipping_destination_shipping_id (supplier_shipping_id),
+    CONSTRAINT fk_supplier_shipping_destination_shipping
+        FOREIGN KEY (supplier_shipping_id) REFERENCES supplier_shipping (id),
+    CONSTRAINT fk_supplier_shipping_destination_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+    CONSTRAINT fk_supplier_shipping_destination_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

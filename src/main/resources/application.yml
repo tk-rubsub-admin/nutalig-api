@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: classpath:template.yml
   application:
     name: api
   output:
@@ -9,6 +11,10 @@ spring:
   mvc:
     format:
       date: yyyy-MM-dd
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
   threads:
     virtual:
       enabled: true
@@ -29,12 +35,17 @@ spring:
     properties:
       hibernate:
         jdbc:
+          time_zone: Asia/Bangkok
           batch_size: 50
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
 
 server:
   port: 8002
   shutdown: graceful
   max-http-request-header-size: 2MB
+  forward-headers-strategy: framework
   servlet:
     context-path: /nutalig
 
@@ -59,9 +70,13 @@ management:
 line:
   message:
     api: https://api.line.me/v2/bot/message/push
+    channel:
+      id: 2010387740
+      secret: a961a623df12d346b7db496bac516c40
+      access-token: //q9ZcWqeTRup4QPsmfqGQD2dbfeObCAsO0aGCWPF4gXThkRpLHwQtaC1LS61sC0Wp1zgQjUL4i6HpsHTMH0vmxeu9NXYkCw1Fmc+krbEz8imWxXfKgWqeVLxQoDIvL5kd0uEdBh/AQzLasNJwEyjwdB04t89/1O/w1cDnyilFU=
   channel:
-    id: ${LINE_CHANNEL_ID:${line.channel-id:}}
-    secret: ${LINE_CHANNEL_SECRET:${line.channel-secret:65f21992eee89aa98b958b255b60e60a}}
+    id: 2009827715
+    secret: 36a290d42a99bb893997ad6e6a98b5e7
     access-token: XPxE1ZPu7Q/OsDARP9A15xTl8vWGg0f1Mhn8EHFyEJ9v1ox5c0Yh20CC9JxLIwvklrRdvWoYxIGTFy8mJRdLoqrhf1Vr/qjc4WLgaPp/0WaXjOrA+XYrNgqoaUiIdjz3YkiPYYqhvxsShWBRuhm/MAdB04t89/1O/w1cDnyilFU=
   login:
     authorize-url: https://access.line.me/oauth2/v2.1/authorize
@@ -69,25 +84,30 @@ line:
     verify-access-token-url: https://api.line.me/oauth2/v2.1/verify
     verify-id-token-url: https://api.line.me/oauth2/v2.1/verify
     profile-url: https://api.line.me/v2/profile
-    redirect-uri: https://nutalig.tk-rubsub.online/api/v1/auth/line/callback
-    scope: openid profile
-    login-success-url: https://nutalig.tk-rubsub.online/login-success
-    login-failure-url: https://nutalig.tk-rubsub.online/login-failure
+    redirect-uri: https://upload-discuss-safeguard.ngrok-free.dev/nutalig/v1/auth/line/callback
+    scope: openid profile email
+    login-success-url: http://localhost:3000/login-success
+    login-failure-url: http://localhost:3000/login-failure
     link-success-url: https://nutalig.tk-rubsub.online/api
     link-failure-url: https://nutalig.tk-rubsub.online/api
   channel-id: 2009827715
   channel-secret: 36a290d42a99bb893997ad6e6a98b5e7
-  redirect-uri: https://nutalig.tk-rubsub.online/api/v1/auth/line/callback
-  scope: openid profile
+  redirect-uri: https://upload-discuss-safeguard.ngrok-free.dev/nutalig/v1/auth/line/callback
+  scope: openid profile email
 
 openai:
   base-url: https://api.openai.com/v1
   api-key: sk-proj-f_BHp0fBg1wnYvfqNzCAwhgJsYFvsCOFVNn-
 
+gemini:
+  api-key: AIzaSyCWwVAW2RIi78oYKlZUgrnnGJdkik2Mr-I
+  model: gemini-3-flash-preview
+
 app:
   upload:
     dir: ./uploads
-    public-base-url: http://localhost:8005/nutalig/uploads
+#    public-base-url: https://nutalig.tk-rubsub.online/nutalig/uploads
+    public-base-url: http://localhost:8002/nutalig/uploads
 
 # Alternative datasource values
 # spring:

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fontFamilies>
+    <fontFamily name="Calibri">
+        <normal>report/calibri.ttf</normal>
+        <bold>report/calibri.ttf</bold>
+        <italic>report/calibri.ttf</italic>
+        <boldItalic>report/calibri.ttf</boldItalic>
+        <pdfEncoding>Identity-H</pdfEncoding>
+        <pdfEmbedded>true</pdfEmbedded>
+    </fontFamily>
+</fontFamilies>

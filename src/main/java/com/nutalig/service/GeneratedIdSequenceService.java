@@ -2,12 +2,15 @@ package com.nutalig.service;
 
 import com.nutalig.entity.GeneratedIdSequenceEntity;
 import com.nutalig.repository.GeneratedIdSequenceRepository;
+import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
 
 @Slf4j
 @Service
@@ -32,6 +35,20 @@ public class GeneratedIdSequenceService {
         seq.setNextId(id + 1);
 
         return String.format("%0" + digit + "d", id);
+    }
+
+    @Transactional
+    public String getNextIdWithMonth(String prefix, int digit) {
+        String monthStr = DateUtil.YYYY_MM.format(new Date());
+        prefix = prefix + monthStr;
+        String finalPrefix = prefix;
+        GeneratedIdSequenceEntity seq = generatedIdSequenceRepository.findById(prefix)
+                .orElseGet(() -> initialPrefixId(finalPrefix));
+
+        Integer id = seq.getNextId();
+        log.info("got next sequence id for prefix {} : {}", prefix, id);
+        seq.setNextId(id + 1);
+        return finalPrefix + String.format("%0" + digit + "d", id);
     }
 
     private GeneratedIdSequenceEntity initialPrefixId(String prefix) {

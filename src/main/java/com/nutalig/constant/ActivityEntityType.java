@@ -4,5 +4,8 @@ public enum ActivityEntityType {
     RFQ,
     CUSTOMER,
     QUOTATION,
-    SALES_ORDER
+    SALES_ORDER,
+    INVOICE,
+    RECEIPT,
+    PURCHASE_ORDER
 }

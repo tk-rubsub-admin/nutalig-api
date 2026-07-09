@@ -6,9 +6,11 @@ import com.nutalig.controller.supplier.request.AddSupplierMaterialCapabilityRequ
 import com.nutalig.controller.supplier.request.CreateSupplierRequest;
 import com.nutalig.controller.supplier.request.SearchSupplierRequest;
 import com.nutalig.controller.supplier.request.SuggestSupplierCapabilitiesRequest;
+import com.nutalig.controller.supplier.request.UpsertSupplierShippingRequest;
 import com.nutalig.controller.supplier.response.SearchSupplierResponse;
 import com.nutalig.dto.SupplierCapabilityDto;
 import com.nutalig.dto.SupplierDto;
+import com.nutalig.dto.SupplierShippingDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.SupplierService;
@@ -56,6 +58,37 @@ public class SupplierController {
         java.util.List<SupplierCapabilityDto> response = supplierService.getSupplierCapabilities(supplierId);
 
         log.info("=== End get supplier capabilities {} size {} ===", supplierId, response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/supplier-shippings")
+    public GeneralResponse<java.util.List<SupplierShippingDto>> getSupplierShippings() {
+        java.util.List<SupplierShippingDto> response = supplierService.getSupplierShippings();
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/v1/supplier-shippings")
+    public GeneralResponse<java.util.List<SupplierShippingDto>> createSupplierShipping(
+            @RequestBody UpsertSupplierShippingRequest request
+    ) throws InvalidRequestException {
+        java.util.List<SupplierShippingDto> response = supplierService.createSupplierShipping(request);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/v1/supplier-shippings/{shippingId}")
+    public GeneralResponse<java.util.List<SupplierShippingDto>> updateSupplierShipping(
+            @PathVariable Long shippingId,
+            @RequestBody UpsertSupplierShippingRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        java.util.List<SupplierShippingDto> response = supplierService.updateSupplierShipping(shippingId, request);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/v1/supplier-shippings/{shippingId}")
+    public GeneralResponse<java.util.List<SupplierShippingDto>> deleteSupplierShipping(
+            @PathVariable Long shippingId
+    ) throws DataNotFoundException {
+        java.util.List<SupplierShippingDto> response = supplierService.deleteSupplierShipping(shippingId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

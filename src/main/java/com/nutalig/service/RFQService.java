@@ -1169,6 +1169,7 @@ public class RFQService {
             tierEntity.setSeaFreightCost(tierRequest.getSeaFreightCost());
             tierEntity.setLandTotalPrice(tierRequest.getLandTotalPrice());
             tierEntity.setSeaTotalPrice(tierRequest.getSeaTotalPrice());
+            tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
             tierEntity.setSortOrder(
                     tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder++
             );

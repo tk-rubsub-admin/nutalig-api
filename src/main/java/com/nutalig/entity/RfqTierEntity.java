@@ -67,6 +67,9 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "sea_total_price", precision = 18, scale = 4)
     private BigDecimal seaTotalPrice;
 
+    @Column(name = "supplier_quote_tier_id")
+    private Long supplierQuoteTierId;
+
     @Column(name = "sort_order")
     private Integer sortOrder;
 }

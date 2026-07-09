@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fontFamilies>
+    <fontFamily name="Arial">
+        <normal><![CDATA[fonts/arialunicode/arial unicode ms.otf]]></normal>
+        <bold><![CDATA[fonts/arialunicode/arial unicode ms bold.otf]]></bold>
+        <italic><![CDATA[fonts/arialunicode/arial unicode ms.otf]]></italic>
+        <boldItalic><![CDATA[fonts/arialunicode/arial unicode ms bold.otf]]></boldItalic>
+        <pdfEncoding><![CDATA[Identity-H]]></pdfEncoding>
+        <pdfEmbedded><![CDATA[true]]></pdfEmbedded>
+    </fontFamily>
+</fontFamilies>

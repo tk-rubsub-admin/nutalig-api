@@ -11,6 +11,13 @@ public class BusinessConstant {
     public class DocumentPrefix {
         public static final String SALES_ORDER_PREFIX = "NTL-SO";
         public static final String QUOTATION_PREFIX = "NTL-QT";
+        public static final String INVOICE_PREFIX = "NTL-IV";
+        public static final String PURCHASE_ORDER_PREFIX = "NTL-PO";
+        public static final String RECEIPT_PREFIX = "NTL-RE";
+        public static final String DEPOSIT_RECEIPT_PREFIX = "NTL-DR";
+        public static final String RECEIPT_TAX_PREFIX = "NTL-RT";
+        public static final String DEPOSIT_RECEIPT_TAX_PREFIX = "NTL-DRT";
+
     }
 
     public class MessageTemplateCode {

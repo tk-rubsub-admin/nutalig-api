@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.ProcurementStatus;
 import com.nutalig.constant.SalesOrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -104,6 +105,10 @@ public class SalesOrderEntity extends AuditDateEntity {
 
     @Column(name = "commission", precision = 18, scale = 2)
     private BigDecimal commission;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "procurement_status", length = 30)
+    private ProcurementStatus procurementStatus;
 
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineNo asc")

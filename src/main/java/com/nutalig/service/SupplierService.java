@@ -17,6 +17,7 @@ import com.nutalig.repository.ProductFamilyRepository;
 import com.nutalig.repository.ProductMaterialRepository;
 import com.nutalig.repository.SupplierCapabilityRepository;
 import com.nutalig.repository.SupplierRepository;
+import com.nutalig.repository.SupplierShippingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -39,6 +40,7 @@ public class SupplierService {
 
     private final SupplierRepository supplierRepository;
     private final SupplierCapabilityRepository supplierCapabilityRepository;
+    private final SupplierShippingRepository supplierShippingRepository;
     private final ProductFamilyRepository productFamilyRepository;
     private final ProductMaterialRepository productMaterialRepository;
     private final ProductFamilyMapper productFamilyMapper;
@@ -140,6 +142,55 @@ public class SupplierService {
                         .thenComparing(SupplierEntity::getId, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(this::buildSupplierDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SupplierShippingDto> getSupplierShippings() {
+        return supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc().stream()
+                .map(this::buildSupplierShippingDto)
+                .toList();
+    }
+
+    @Transactional
+    public List<SupplierShippingDto> createSupplierShipping(
+            UpsertSupplierShippingRequest request
+    ) throws InvalidRequestException {
+        validateSupplierShippingRequest(request);
+
+        SupplierShippingEntity shipping = new SupplierShippingEntity();
+        applySupplierShipping(shipping, request);
+        supplierShippingRepository.save(shipping);
+
+        return getSupplierShippings();
+    }
+
+    @Transactional
+    public List<SupplierShippingDto> updateSupplierShipping(
+            Long shippingId,
+            UpsertSupplierShippingRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        validateSupplierShippingRequest(request);
+
+        SupplierShippingEntity shipping = supplierShippingRepository.findByIdAndActiveTrue(shippingId)
+                .orElseThrow(() -> new DataNotFoundException("Supplier shipping " + shippingId + " not found."));
+        applySupplierShipping(shipping, request);
+        supplierShippingRepository.save(shipping);
+
+        return getSupplierShippings();
+    }
+
+    @Transactional
+    public List<SupplierShippingDto> deleteSupplierShipping(Long shippingId)
+            throws DataNotFoundException {
+        SupplierShippingEntity shipping = supplierShippingRepository.findByIdAndActiveTrue(shippingId)
+                .orElseThrow(() -> new DataNotFoundException("Supplier shipping " + shippingId + " not found."));
+        shipping.setActive(Boolean.FALSE);
+        if (CollectionUtils.isNotEmpty(shipping.getDestinations())) {
+            shipping.getDestinations().forEach(item -> item.setActive(Boolean.FALSE));
+        }
+        supplierShippingRepository.save(shipping);
+
+        return getSupplierShippings();
     }
 
     @Transactional
@@ -386,6 +437,78 @@ public class SupplierService {
         SupplierDto dto = supplierMapper.toDto(entity);
         dto.setCapabilities(buildCapabilityDtos(entity.getCapabilities()));
         return dto;
+    }
+
+    private SupplierShippingDto buildSupplierShippingDto(SupplierShippingEntity entity) {
+        SupplierShippingDto dto = supplierMapper.toDto(entity);
+        dto.setDestinations(entity.getDestinations() == null
+                ? List.of()
+                : entity.getDestinations().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getActive()))
+                .sorted(Comparator
+                        .comparing(SupplierShippingDestinationEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(SupplierShippingDestinationEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(item -> {
+                    SupplierShippingDestinationDto destinationDto = supplierMapper.toDto(item);
+                    destinationDto.setSupplierShippingId(entity.getId());
+                    return destinationDto;
+                })
+                .toList());
+        return dto;
+    }
+
+    private void validateSupplierShippingRequest(UpsertSupplierShippingRequest request) throws InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("request is required");
+        }
+        if (request.getShippingMethod() == null) {
+            throw new InvalidRequestException("shippingMethod is required");
+        }
+        if (CollectionUtils.isEmpty(request.getDestinations())) {
+            throw new InvalidRequestException("At least one destination is required");
+        }
+        boolean hasDestinationName = request.getDestinations().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(item -> StringUtils.isNotBlank(item.getDestinationName()));
+        if (!hasDestinationName) {
+            throw new InvalidRequestException("At least one destination name is required");
+        }
+    }
+
+    private void applySupplierShipping(SupplierShippingEntity shipping, UpsertSupplierShippingRequest request) {
+        shipping.setShippingMethod(request.getShippingMethod());
+        shipping.setShippingName(StringUtils.trimToNull(request.getShippingName()));
+        shipping.setOriginCountryCode(StringUtils.trimToNull(request.getOriginCountryCode()));
+        shipping.setOriginProvince(StringUtils.trimToNull(request.getOriginProvince()));
+        shipping.setCurrency(request.getCurrency());
+        shipping.setBaseCost(request.getBaseCost());
+        shipping.setLeadTimeDayMin(request.getLeadTimeDayMin());
+        shipping.setLeadTimeDayMax(request.getLeadTimeDayMax());
+        shipping.setRemark(StringUtils.trimToNull(request.getRemark()));
+        shipping.setCarCode(request.getCarCode());
+        shipping.setActive(Boolean.TRUE);
+
+        List<SupplierShippingDestinationEntity> existingDestinations = new ArrayList<>(shipping.getDestinations());
+        existingDestinations.forEach(shipping::removeDestination);
+
+        for (UpsertSupplierShippingDestinationRequest destinationRequest : request.getDestinations()) {
+            if (destinationRequest == null || StringUtils.isBlank(destinationRequest.getDestinationName())) {
+                continue;
+            }
+            SupplierShippingDestinationEntity destination = new SupplierShippingDestinationEntity();
+            destination.setDestinationCode(StringUtils.trimToNull(destinationRequest.getDestinationCode()));
+            destination.setDestinationName(StringUtils.trimToNull(destinationRequest.getDestinationName()));
+            destination.setCountryCode(StringUtils.trimToNull(destinationRequest.getCountryCode()));
+            destination.setProvince(StringUtils.trimToNull(destinationRequest.getProvince()));
+            destination.setDistrict(StringUtils.trimToNull(destinationRequest.getDistrict()));
+            destination.setSubdistrict(StringUtils.trimToNull(destinationRequest.getSubdistrict()));
+            destination.setPostalCode(StringUtils.trimToNull(destinationRequest.getPostalCode()));
+            destination.setFullAddress(StringUtils.trimToNull(destinationRequest.getFullAddress()));
+            destination.setAdditionalCost(destinationRequest.getAdditionalCost());
+            destination.setSortOrder(destinationRequest.getSortOrder());
+            destination.setActive(Boolean.TRUE);
+            shipping.addDestination(destination);
+        }
     }
 
     private List<SupplierCapabilityDto> buildCapabilityDtos(List<SupplierCapabilityEntity> capabilities) {

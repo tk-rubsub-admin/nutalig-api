@@ -19,6 +19,7 @@ public class RfqTierDto {
     private BigDecimal seaFreightCost;
     private BigDecimal landTotalPrice;
     private BigDecimal seaTotalPrice;
+    private Long supplierQuoteTierId;
     private Integer sortOrder;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;

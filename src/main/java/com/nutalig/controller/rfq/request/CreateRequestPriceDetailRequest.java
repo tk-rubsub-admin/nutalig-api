@@ -30,6 +30,7 @@ public class CreateRequestPriceDetailRequest {
         private BigDecimal seaFreightCost;
         private BigDecimal landTotalPrice;
         private BigDecimal seaTotalPrice;
+        private Long supplierQuoteTierId;
         private Integer sortOrder;
     }
 

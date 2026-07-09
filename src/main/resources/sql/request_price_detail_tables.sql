@@ -1,6 +1,6 @@
-CREATE TABLE request_price_detail (
+CREATE TABLE rfq_detail (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    request_price_header_id VARCHAR(255) NOT NULL,
+    rfq_header_id VARCHAR(255) NOT NULL,
     option_name VARCHAR(255) NULL,
     spec TEXT NOT NULL,
     sort_order INT NULL,
@@ -8,13 +8,13 @@ CREATE TABLE request_price_detail (
     created_date DATETIME(6) NULL,
     updated_date DATETIME(6) NULL,
     PRIMARY KEY (id),
-    CONSTRAINT fk_request_price_detail_header
-        FOREIGN KEY (request_price_header_id) REFERENCES request_price_header (id)
+    CONSTRAINT fk_rfq_detail_header
+        FOREIGN KEY (rfq_header_id) REFERENCES rfq_header (id)
 );
 
-CREATE TABLE request_price_tier (
+CREATE TABLE rfq_tier (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    request_price_detail_id BIGINT NOT NULL,
+    rfq_detail_id BIGINT NOT NULL,
     quantity DECIMAL(18,0) NOT NULL,
     product_price DECIMAL(18,4) NOT NULL,
     land_freight_cost DECIMAL(18,4) NULL,
@@ -25,15 +25,15 @@ CREATE TABLE request_price_tier (
     created_date DATETIME(6) NULL,
     updated_date DATETIME(6) NULL,
     PRIMARY KEY (id),
-    CONSTRAINT fk_request_price_tier_detail
-        FOREIGN KEY (request_price_detail_id) REFERENCES request_price_detail (id),
-    CONSTRAINT uk_request_price_tier_detail_qty
-        UNIQUE (request_price_detail_id, quantity)
+    CONSTRAINT fk_rfq_tier_detail
+        FOREIGN KEY (rfq_detail_id) REFERENCES rfq_detail (id),
+    CONSTRAINT uk_rfq_tier_detail_qty
+        UNIQUE (rfq_detail_id, quantity)
 );
 
-CREATE TABLE request_price_additional_cost (
+CREATE TABLE rfq_additional_cost (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    request_price_header_id VARCHAR(255) NOT NULL,
+    rfq_header_id VARCHAR(255) NOT NULL,
     cost_type VARCHAR(100) NOT NULL,
     description TEXT NOT NULL,
     unit VARCHAR(50) NULL,
@@ -42,6 +42,6 @@ CREATE TABLE request_price_additional_cost (
     created_date DATETIME(6) NULL,
     updated_date DATETIME(6) NULL,
     PRIMARY KEY (id),
-    CONSTRAINT fk_request_price_additional_cost_header
-        FOREIGN KEY (request_price_header_id) REFERENCES request_price_header (id)
+    CONSTRAINT fk_rfq_additional_cost_header
+        FOREIGN KEY (rfq_header_id) REFERENCES rfq_header (id)
 );

@@ -41,6 +41,19 @@ databaseChangeLog:
                   KEY idx_rfq_supplier_quote_detail_rfq_detail (rfq_detail_id)
               ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+              CREATE TABLE IF NOT EXISTS rfq_supplier_quote_detail_package (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  quote_detail_id BIGINT NOT NULL,
+                  package_dimension TEXT DEFAULT NULL,
+                  package_weight TEXT DEFAULT NULL,
+                  package_capacity TEXT DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_detail_package_detail (quote_detail_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
               CREATE TABLE IF NOT EXISTS rfq_supplier_quote_tier (
                   id BIGINT NOT NULL AUTO_INCREMENT,
                   quote_detail_id BIGINT NOT NULL,
@@ -73,12 +86,15 @@ databaseChangeLog:
   - changeSet:
       id: 20260604-002-normalize-rfq-supplier-quote-collation
       author: codex
+      validCheckSum:
+        - 9:b97667e7d5df35b38d340e4c85bf34d5
       changes:
         - sql:
             splitStatements: true
             sql: |
               ALTER TABLE rfq_supplier_quote CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
               ALTER TABLE rfq_supplier_quote_detail CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              ALTER TABLE rfq_supplier_quote_detail_package CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
               ALTER TABLE rfq_supplier_quote_tier CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
               ALTER TABLE rfq_supplier_quote_additional_cost CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
@@ -90,6 +106,31 @@ databaseChangeLog:
             sql: |
               ALTER TABLE rfq_supplier_quote
                   MODIFY supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci NOT NULL;
+
+  - changeSet:
+      id: 20260622-000-create-rfq-supplier-quote-detail-package-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_supplier_quote_detail_package
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE rfq_supplier_quote_detail_package (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  quote_detail_id BIGINT NOT NULL,
+                  package_dimension TEXT DEFAULT NULL,
+                  package_weight TEXT DEFAULT NULL,
+                  package_capacity TEXT DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_detail_package_detail (quote_detail_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
   - changeSet:
       id: 20260604-003-add-fk-rfq-supplier-quote-rfq
@@ -160,6 +201,23 @@ databaseChangeLog:
             constraintName: fk_rfq_supplier_quote_tier_detail
 
   - changeSet:
+      id: 20260622-001-add-fk-rfq-supplier-quote-detail-package-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_detail_package_detail
+                foreignKeyTableName: rfq_supplier_quote_detail_package
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_detail_package
+            baseColumnNames: quote_detail_id
+            referencedTableName: rfq_supplier_quote_detail
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_detail_package_detail
+
+  - changeSet:
       id: 20260604-009-add-fk-rfq-supplier-quote-additional-cost-quote
       author: codex
       preConditions:
@@ -175,6 +233,57 @@ databaseChangeLog:
             referencedTableName: rfq_supplier_quote
             referencedColumnNames: id
             constraintName: fk_rfq_supplier_quote_additional_cost_quote
+
+  - changeSet:
+      id: 20260625-001-add-package-name-to-rfq-supplier-quote-detail-package
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote_detail_package
+                columnName: package_name
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_detail_package
+            columns:
+              - column:
+                  name: package_name
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260625-002-add-currency-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: currency
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: currency
+                  type: VARCHAR(10)
+
+  - changeSet:
+      id: 20260625-003-add-exchange-rate-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: exchange_rate
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: exchange_rate
+                  type: DECIMAL(18,4)
 
   - changeSet:
       id: 20260605-001-add-rfq-detail-supplier
@@ -955,6 +1064,23 @@ databaseChangeLog:
                   defaultValue: ALL
 
   - changeSet:
+      id: 20260622-002-add-rfq-header-request-information
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: request_information
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: request_information
+                  type: TEXT
+
+  - changeSet:
       id: 20260616-002-create-user-todo-table
       author: codex
       changes:
@@ -988,3 +1114,594 @@ databaseChangeLog:
                   KEY idx_user_todo_owner_active_sort (owner_user_id, active, sort_order),
                   CONSTRAINT fk_user_todo_owner_user FOREIGN KEY (owner_user_id) REFERENCES user (id)
               ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260623-001-create-rfq-status-timeline-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_status_timeline
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE rfq_status_timeline (
+                  rfq_id VARCHAR(255) NOT NULL,
+                  status VARCHAR(50) NOT NULL,
+                  status_datetime DATETIME(6) NOT NULL,
+                  PRIMARY KEY (rfq_id, status),
+                  CONSTRAINT fk_rfq_status_timeline_rfq
+                      FOREIGN KEY (rfq_id) REFERENCES rfq_header (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260627-001-create-invoice-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS invoice (
+                  invoice_no VARCHAR(50) NOT NULL,
+                  sales_order_no VARCHAR(50) NOT NULL,
+                  quotation_no VARCHAR(50) DEFAULT NULL,
+                  doc_date DATE DEFAULT NULL,
+                  due_date DATE DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  currency VARCHAR(10) DEFAULT NULL,
+                  customer_id VARCHAR(255) DEFAULT NULL,
+                  customer_address_id BIGINT DEFAULT NULL,
+                  customer_contact_id BIGINT DEFAULT NULL,
+                  sales_id VARCHAR(255) DEFAULT NULL,
+                  co_sales_id VARCHAR(20) DEFAULT NULL,
+                  subtotal DECIMAL(18,2) DEFAULT NULL,
+                  discount DECIMAL(18,2) DEFAULT NULL,
+                  freight DECIMAL(18,2) DEFAULT NULL,
+                  amount DECIMAL(18,2) DEFAULT NULL,
+                  commission DECIMAL(18,2) DEFAULT NULL,
+                  vat_rate DECIMAL(6,4) DEFAULT NULL,
+                  vat DECIMAL(18,2) DEFAULT NULL,
+                  grand_total DECIMAL(18,2) DEFAULT NULL,
+                  paid_total DECIMAL(18,2) DEFAULT NULL,
+                  outstanding_total DECIMAL(18,2) DEFAULT NULL,
+                  remark VARCHAR(2000) DEFAULT NULL,
+                  rev_no INT DEFAULT NULL,
+                  customer_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  customer_tax_id_snapshot VARCHAR(50) DEFAULT NULL,
+                  customer_address_snapshot VARCHAR(2000) DEFAULT NULL,
+                  customer_contact_snapshot VARCHAR(255) DEFAULT NULL,
+                  customer_phone_snapshot VARCHAR(100) DEFAULT NULL,
+                  sales_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (invoice_no),
+                  KEY idx_invoice_sales_order_no (sales_order_no),
+                  KEY idx_invoice_quotation_no (quotation_no),
+                  KEY idx_invoice_doc_date (doc_date),
+                  KEY idx_invoice_status (status),
+                  KEY idx_invoice_customer_id (customer_id),
+                  KEY idx_invoice_sales_id (sales_id),
+                  CONSTRAINT fk_invoice_sales_order FOREIGN KEY (sales_order_no) REFERENCES sales_order (sales_order_no),
+                  CONSTRAINT fk_invoice_customer FOREIGN KEY (customer_id) REFERENCES customer (id),
+                  CONSTRAINT fk_invoice_customer_address FOREIGN KEY (customer_address_id) REFERENCES customer_address (id),
+                  CONSTRAINT fk_invoice_customer_contact FOREIGN KEY (customer_contact_id) REFERENCES customer_contact (id),
+                  CONSTRAINT fk_invoice_sales FOREIGN KEY (sales_id) REFERENCES employee (employee_id),
+                  CONSTRAINT fk_invoice_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_invoice_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS invoice_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  invoice_no VARCHAR(50) NOT NULL,
+                  sales_order_detail_id BIGINT DEFAULT NULL,
+                  line_no INT DEFAULT NULL,
+                  name VARCHAR(255) DEFAULT NULL,
+                  type VARCHAR(255) DEFAULT NULL,
+                  capacity VARCHAR(255) DEFAULT NULL,
+                  size VARCHAR(255) DEFAULT NULL,
+                  spec VARCHAR(2000) DEFAULT NULL,
+                  unit_price DECIMAL(18,2) DEFAULT NULL,
+                  quantity DECIMAL(18,2) DEFAULT NULL,
+                  amount DECIMAL(18,2) DEFAULT NULL,
+                  image_url VARCHAR(500) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_invoice_detail_invoice_no (invoice_no),
+                  KEY idx_invoice_detail_sales_order_detail_id (sales_order_detail_id),
+                  CONSTRAINT fk_invoice_detail_invoice FOREIGN KEY (invoice_no) REFERENCES invoice (invoice_no),
+                  CONSTRAINT fk_invoice_detail_sales_order_detail FOREIGN KEY (sales_order_detail_id) REFERENCES sales_order_detail (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260629-001-create-invoice-payment-table
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS invoice_payment (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  invoice_no VARCHAR(50) NOT NULL,
+                  payment_date DATE NOT NULL,
+                  amount DECIMAL(18,2) NOT NULL,
+                  slip_file_name VARCHAR(255) DEFAULT NULL,
+                  slip_file_url VARCHAR(500) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_invoice_payment_invoice_no (invoice_no),
+                  KEY idx_invoice_payment_payment_date (payment_date),
+                  CONSTRAINT fk_invoice_payment_invoice FOREIGN KEY (invoice_no) REFERENCES invoice (invoice_no),
+                  CONSTRAINT fk_invoice_payment_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_invoice_payment_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260629-002-add-payment-method-fields-to-invoice-payment
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE invoice_payment
+                  ADD COLUMN payment_method VARCHAR(30) NOT NULL DEFAULT 'TRANSFER' AFTER amount,
+                  ADD COLUMN cheque_bank VARCHAR(255) DEFAULT NULL AFTER payment_method,
+                  ADD COLUMN cheque_no VARCHAR(100) DEFAULT NULL AFTER cheque_bank,
+                  ADD COLUMN cheque_date DATE DEFAULT NULL AFTER cheque_no,
+                  ADD COLUMN cheque_branch VARCHAR(255) DEFAULT NULL AFTER cheque_date;
+
+  - changeSet:
+      id: 20260629-003-create-receipt-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS receipt (
+                  receipt_no VARCHAR(50) NOT NULL,
+                  receipt_type VARCHAR(40) NOT NULL,
+                  status VARCHAR(20) NOT NULL,
+                  invoice_no VARCHAR(50) NOT NULL,
+                  invoice_payment_id BIGINT NOT NULL,
+                  sales_order_no VARCHAR(50) DEFAULT NULL,
+                  quotation_no VARCHAR(50) DEFAULT NULL,
+                  doc_date DATE NOT NULL,
+                  paid_date DATE NOT NULL,
+                  currency VARCHAR(10) NOT NULL,
+                  customer_id VARCHAR(100) DEFAULT NULL,
+                  customer_address_id BIGINT DEFAULT NULL,
+                  customer_contact_id BIGINT DEFAULT NULL,
+                  sales_id VARCHAR(50) DEFAULT NULL,
+                  co_sales_id VARCHAR(20) DEFAULT NULL,
+                  subtotal DECIMAL(18,2) DEFAULT NULL,
+                  discount DECIMAL(18,2) DEFAULT NULL,
+                  amount DECIMAL(18,2) DEFAULT NULL,
+                  vat_rate DECIMAL(10,4) DEFAULT NULL,
+                  vat DECIMAL(18,2) DEFAULT NULL,
+                  grand_total DECIMAL(18,2) DEFAULT NULL,
+                  payment_method VARCHAR(30) NOT NULL,
+                  cheque_bank VARCHAR(255) DEFAULT NULL,
+                  cheque_no VARCHAR(100) DEFAULT NULL,
+                  cheque_date DATE DEFAULT NULL,
+                  cheque_branch VARCHAR(255) DEFAULT NULL,
+                  slip_file_name VARCHAR(255) DEFAULT NULL,
+                  slip_file_url VARCHAR(500) DEFAULT NULL,
+                  remark VARCHAR(2000) DEFAULT NULL,
+                  rev_no INT DEFAULT NULL,
+                  customer_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  customer_tax_id_snapshot VARCHAR(50) DEFAULT NULL,
+                  customer_address_snapshot VARCHAR(2000) DEFAULT NULL,
+                  customer_contact_snapshot VARCHAR(255) DEFAULT NULL,
+                  customer_phone_snapshot VARCHAR(100) DEFAULT NULL,
+                  sales_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (receipt_no),
+                  KEY idx_receipt_invoice_no (invoice_no),
+                  KEY idx_receipt_invoice_payment_id (invoice_payment_id),
+                  KEY idx_receipt_sales_order_no (sales_order_no),
+                  KEY idx_receipt_doc_date (doc_date),
+                  KEY idx_receipt_status (status),
+                  CONSTRAINT fk_receipt_invoice FOREIGN KEY (invoice_no) REFERENCES invoice (invoice_no),
+                  CONSTRAINT fk_receipt_invoice_payment FOREIGN KEY (invoice_payment_id) REFERENCES invoice_payment (id),
+                  CONSTRAINT fk_receipt_sales_order FOREIGN KEY (sales_order_no) REFERENCES sales_order (sales_order_no),
+                  CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customer (id),
+                  CONSTRAINT fk_receipt_customer_address FOREIGN KEY (customer_address_id) REFERENCES customer_address (id),
+                  CONSTRAINT fk_receipt_customer_contact FOREIGN KEY (customer_contact_id) REFERENCES customer_contact (id),
+                  CONSTRAINT fk_receipt_sales FOREIGN KEY (sales_id) REFERENCES employee (employee_id),
+                  CONSTRAINT fk_receipt_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_receipt_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+              CREATE TABLE IF NOT EXISTS receipt_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  receipt_no VARCHAR(50) NOT NULL,
+                  invoice_detail_id BIGINT DEFAULT NULL,
+                  line_no INT DEFAULT NULL,
+                  name VARCHAR(255) DEFAULT NULL,
+                  type VARCHAR(255) DEFAULT NULL,
+                  capacity VARCHAR(255) DEFAULT NULL,
+                  size VARCHAR(255) DEFAULT NULL,
+                  spec VARCHAR(2000) DEFAULT NULL,
+                  unit_price DECIMAL(18,2) DEFAULT NULL,
+                  quantity DECIMAL(18,2) DEFAULT NULL,
+                  amount DECIMAL(18,2) DEFAULT NULL,
+                  image_url VARCHAR(500) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_receipt_detail_receipt_no (receipt_no),
+                  KEY idx_receipt_detail_invoice_detail_id (invoice_detail_id),
+                  CONSTRAINT fk_receipt_detail_receipt FOREIGN KEY (receipt_no) REFERENCES receipt (receipt_no),
+                  CONSTRAINT fk_receipt_detail_invoice_detail FOREIGN KEY (invoice_detail_id) REFERENCES invoice_detail (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260629-004-add-receipt-no-to-invoice-payment
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE invoice_payment
+                  ADD COLUMN receipt_no VARCHAR(50) DEFAULT NULL AFTER slip_file_url;
+
+  - changeSet:
+      id: 20260630-001-alter-invoice-payment-date-to-datetime
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE invoice_payment
+                  MODIFY COLUMN payment_date DATETIME(6) NOT NULL;
+
+  - changeSet:
+      id: 20260630-002-alter-receipt-paid-date-to-datetime
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE receipt
+                  MODIFY COLUMN paid_date DATETIME(6) NOT NULL;
+
+  - changeSet:
+      id: 20260630-003-add-procurement-status-to-sales-order
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE sales_order
+                  ADD COLUMN procurement_status VARCHAR(30) DEFAULT NULL AFTER commission;
+
+  - changeSet:
+      id: 20260630-004-add-supplier-quote-tier-id-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: supplier_quote_tier_id
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: supplier_quote_tier_id
+                  type: BIGINT
+
+  - changeSet:
+      id: 20260630-005-add-supplier-quote-tier-id-to-sales-order-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order_detail
+                columnName: supplier_quote_tier_id
+      changes:
+        - addColumn:
+            tableName: sales_order_detail
+            columns:
+              - column:
+                  name: supplier_quote_tier_id
+                  type: BIGINT
+
+  - changeSet:
+      id: 20260630-006-add-source-fields-to-sales-order-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order_detail
+                columnName: rfq_detail_id
+      changes:
+        - addColumn:
+            tableName: sales_order_detail
+            columns:
+              - column:
+                  name: rfq_detail_id
+                  type: BIGINT
+              - column:
+                  name: rfq_tier_id
+                  type: BIGINT
+              - column:
+                  name: quotation_detail_id
+                  type: BIGINT
+              - column:
+                  name: shipping_method
+                  type: VARCHAR(10)
+
+  - changeSet:
+      id: 20260701-001-add-supplier-cost-snapshots-to-sales-order-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order_detail
+                columnName: supplier_currency
+      changes:
+        - addColumn:
+            tableName: sales_order_detail
+            columns:
+              - column:
+                  name: supplier_currency
+                  type: VARCHAR(10)
+              - column:
+                  name: supplier_unit_price
+                  type: DECIMAL(18,4)
+              - column:
+                  name: exchange_rate
+                  type: DECIMAL(18,4)
+              - column:
+                  name: supplier_shipping_cost
+                  type: DECIMAL(18,4)
+              - column:
+                  name: supplier_total_unit_cost
+                  type: DECIMAL(18,4)
+
+  - changeSet:
+      id: 20260701-002-create-purchase-order-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS purchase_order (
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  sales_order_no VARCHAR(50) NOT NULL,
+                  supplier_id VARCHAR(50) NOT NULL,
+                  doc_date DATE NOT NULL,
+                  expected_date DATE DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  currency VARCHAR(10) DEFAULT NULL,
+                  exchange_rate DECIMAL(18,4) DEFAULT NULL,
+                  sub_total DECIMAL(18,2) DEFAULT NULL,
+                  sub_total_thb DECIMAL(18,2) DEFAULT NULL,
+                  grand_total DECIMAL(18,2) DEFAULT NULL,
+                  grand_total_thb DECIMAL(18,2) DEFAULT NULL,
+                  remark VARCHAR(2000) DEFAULT NULL,
+                  rev_no INT DEFAULT NULL,
+                  supplier_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  supplier_address_snapshot VARCHAR(2000) DEFAULT NULL,
+                  supplier_contact_snapshot VARCHAR(255) DEFAULT NULL,
+                  supplier_phone_snapshot VARCHAR(100) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (purchase_order_no),
+                  KEY idx_purchase_order_sales_order_no (sales_order_no),
+                  KEY idx_purchase_order_supplier_id (supplier_id),
+                  KEY idx_purchase_order_doc_date (doc_date),
+                  KEY idx_purchase_order_status (status),
+                  CONSTRAINT fk_purchase_order_sales_order FOREIGN KEY (sales_order_no) REFERENCES sales_order (sales_order_no),
+                  CONSTRAINT fk_purchase_order_supplier FOREIGN KEY (supplier_id) REFERENCES supplier (id),
+                  CONSTRAINT fk_purchase_order_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_purchase_order_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260701-003-create-purchase-order-attachment-table
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS purchase_order_attachment (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  file_name VARCHAR(255) NOT NULL,
+                  original_file_name VARCHAR(255) DEFAULT NULL,
+                  file_url VARCHAR(500) NOT NULL,
+                  content_type VARCHAR(100) DEFAULT NULL,
+                  file_size BIGINT DEFAULT NULL,
+                  remark VARCHAR(1000) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  active BIT(1) NOT NULL DEFAULT b'1',
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_purchase_order_attachment_po_no (purchase_order_no),
+                  CONSTRAINT fk_purchase_order_attachment_po FOREIGN KEY (purchase_order_no) REFERENCES purchase_order (purchase_order_no),
+                  CONSTRAINT fk_purchase_order_attachment_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_purchase_order_attachment_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+              CREATE TABLE IF NOT EXISTS purchase_order_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  sales_order_detail_id BIGINT DEFAULT NULL,
+                  line_no INT DEFAULT NULL,
+                  name VARCHAR(255) DEFAULT NULL,
+                  type VARCHAR(255) DEFAULT NULL,
+                  capacity VARCHAR(255) DEFAULT NULL,
+                  size VARCHAR(255) DEFAULT NULL,
+                  spec VARCHAR(2000) DEFAULT NULL,
+                  quantity DECIMAL(18,2) DEFAULT NULL,
+                  supplier_currency VARCHAR(10) DEFAULT NULL,
+                  supplier_unit_price DECIMAL(18,4) DEFAULT NULL,
+                  exchange_rate DECIMAL(18,4) DEFAULT NULL,
+                  supplier_shipping_cost DECIMAL(18,4) DEFAULT NULL,
+                  supplier_total_unit_cost DECIMAL(18,4) DEFAULT NULL,
+                  amount_supplier_currency DECIMAL(18,2) DEFAULT NULL,
+                  amount_thb DECIMAL(18,2) DEFAULT NULL,
+                  image_url VARCHAR(500) DEFAULT NULL,
+                  rfq_detail_id BIGINT DEFAULT NULL,
+                  rfq_tier_id BIGINT DEFAULT NULL,
+                  quotation_detail_id BIGINT DEFAULT NULL,
+                  shipping_method VARCHAR(10) DEFAULT NULL,
+                  supplier_quote_tier_id BIGINT DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_purchase_order_detail_po_no (purchase_order_no),
+                  KEY idx_purchase_order_detail_sales_order_detail_id (sales_order_detail_id),
+                  CONSTRAINT fk_purchase_order_detail_po FOREIGN KEY (purchase_order_no) REFERENCES purchase_order (purchase_order_no),
+                  CONSTRAINT fk_purchase_order_detail_sales_order_detail FOREIGN KEY (sales_order_detail_id) REFERENCES sales_order_detail (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  - changeSet:
+      id: 20260702-001-create-supplier-shipping-tables
+      author: codex
+      validCheckSum:
+        - 9:b7629c513fbd2fa93f80dace122d580a
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS supplier_shipping (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  shipping_method VARCHAR(20) NOT NULL,
+                  shipping_name VARCHAR(255) DEFAULT NULL,
+                  origin_country_code VARCHAR(10) DEFAULT NULL,
+                  origin_province VARCHAR(255) DEFAULT NULL,
+                  currency VARCHAR(10) DEFAULT NULL,
+                  base_cost DECIMAL(18,4) DEFAULT NULL,
+                  lead_time_day_min INT DEFAULT NULL,
+                  lead_time_day_max INT DEFAULT NULL,
+                  remark VARCHAR(1000) DEFAULT NULL,
+                  car_code VARCHAR(255) DEFAULT NULL,
+                  active BIT(1) NOT NULL DEFAULT b'1',
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_supplier_shipping_method (shipping_method),
+                  CONSTRAINT fk_supplier_shipping_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_supplier_shipping_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS supplier_shipping_destination (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  supplier_shipping_id BIGINT NOT NULL,
+                  destination_code VARCHAR(100) DEFAULT NULL,
+                  destination_name VARCHAR(255) NOT NULL,
+                  country_code VARCHAR(10) DEFAULT NULL,
+                  province VARCHAR(255) DEFAULT NULL,
+                  district VARCHAR(255) DEFAULT NULL,
+                  subdistrict VARCHAR(255) DEFAULT NULL,
+                  postal_code VARCHAR(20) DEFAULT NULL,
+                  full_address VARCHAR(1000) DEFAULT NULL,
+                  additional_cost DECIMAL(18,4) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  active BIT(1) NOT NULL DEFAULT b'1',
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_supplier_shipping_destination_shipping_id (supplier_shipping_id),
+                  CONSTRAINT fk_supplier_shipping_destination_shipping
+                      FOREIGN KEY (supplier_shipping_id) REFERENCES supplier_shipping (id),
+                  CONSTRAINT fk_supplier_shipping_destination_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_supplier_shipping_destination_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  - changeSet:
+      id: 20260702-002-add-supplier-shipping-id-to-purchase-order
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE purchase_order
+                  ADD COLUMN supplier_shipping_id BIGINT DEFAULT NULL AFTER supplier_id;
+
+              ALTER TABLE purchase_order
+                  ADD KEY idx_purchase_order_supplier_shipping_id (supplier_shipping_id);
+
+              ALTER TABLE purchase_order
+                  ADD CONSTRAINT fk_purchase_order_supplier_shipping
+                      FOREIGN KEY (supplier_shipping_id) REFERENCES supplier_shipping (id);
+  - changeSet:
+      id: 20260702-004-add-lead-time-fields-to-purchase-order
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE purchase_order
+                  ADD COLUMN production_lead_time_day INT DEFAULT NULL AFTER doc_date,
+                  ADD COLUMN shipping_lead_time_day INT DEFAULT NULL AFTER production_lead_time_day;
+  - changeSet:
+      id: 20260702-003-detach-supplier-shipping-from-supplier
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              SET @fk_exists := (
+                  SELECT COUNT(*)
+                  FROM information_schema.TABLE_CONSTRAINTS
+                  WHERE CONSTRAINT_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'supplier_shipping'
+                    AND CONSTRAINT_NAME = 'fk_supplier_shipping_supplier'
+              );
+              SET @drop_fk_sql := IF(
+                  @fk_exists > 0,
+                  'ALTER TABLE supplier_shipping DROP FOREIGN KEY fk_supplier_shipping_supplier',
+                  'SELECT 1'
+              );
+              PREPARE stmt FROM @drop_fk_sql;
+              EXECUTE stmt;
+              DEALLOCATE PREPARE stmt;
+
+              SET @idx_exists := (
+                  SELECT COUNT(*)
+                  FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'supplier_shipping'
+                    AND INDEX_NAME = 'idx_supplier_shipping_supplier_id'
+              );
+              SET @drop_idx_sql := IF(
+                  @idx_exists > 0,
+                  'ALTER TABLE supplier_shipping DROP INDEX idx_supplier_shipping_supplier_id',
+                  'SELECT 1'
+              );
+              PREPARE stmt FROM @drop_idx_sql;
+              EXECUTE stmt;
+              DEALLOCATE PREPARE stmt;
+
+              SET @col_exists := (
+                  SELECT COUNT(*)
+                  FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'supplier_shipping'
+                    AND COLUMN_NAME = 'supplier_id'
+              );
+              SET @drop_col_sql := IF(
+                  @col_exists > 0,
+                  'ALTER TABLE supplier_shipping DROP COLUMN supplier_id',
+                  'SELECT 1'
+              );
+              PREPARE stmt FROM @drop_col_sql;
+              EXECUTE stmt;
+              DEALLOCATE PREPARE stmt;
