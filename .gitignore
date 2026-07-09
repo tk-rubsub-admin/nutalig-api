@@ -52,3 +52,4 @@ nb-configuration.xml
 ##############################
 src/main/resources/dpk-project-service-account.json
 src/main/resources/dpk-flower-firebase-adminsdk.json
+src/main/resources/application.yml
