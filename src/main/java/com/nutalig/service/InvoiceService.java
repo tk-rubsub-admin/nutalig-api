@@ -328,7 +328,7 @@ public class InvoiceService {
     }
 
     private String generateInvoiceNo() {
-        return INVOICE_PREFIX + generatedIdSequenceService.getNextSequence(INVOICE_PREFIX, 6);
+        return generatedIdSequenceService.getNextIdWithMonth(INVOICE_PREFIX, 4);
     }
 
     private String resolveQuotationNo(String salesOrderNo) {

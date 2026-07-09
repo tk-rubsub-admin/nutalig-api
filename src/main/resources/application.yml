@@ -97,7 +97,7 @@ line:
 
 openai:
   base-url: https://api.openai.com/v1
-  api-key: sk-proj-f_BHp0fBg1wnYvfqNzCAwhgJsYFvsCOFVNn-
+  api-key:
 
 gemini:
   api-key: AIzaSyCWwVAW2RIi78oYKlZUgrnnGJdkik2Mr-I
