@@ -16,6 +16,8 @@ public record LinePushMessageRequest(
 
             String type,
 
+            String text,
+
             String altText,
 
             JsonNode contents

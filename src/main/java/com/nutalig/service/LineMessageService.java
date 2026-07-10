@@ -65,7 +65,7 @@ public class LineMessageService {
         log.info("Send message {} to line user {}", message, lineUserId);
         sendPushMessage(new LinePushMessageRequest(
                 lineUserId,
-                List.of(new LinePushMessageRequest.LineMessage("text", message, null))
+                List.of(new LinePushMessageRequest.LineMessage("text", message, null, null))
         ));
     }
 
@@ -73,6 +73,7 @@ public class LineMessageService {
         LinePushMessageRequest.LineMessage message =
                 new LinePushMessageRequest.LineMessage(
                         messageTemplate.path("type").asText("flex"),
+                        null,
                         messageTemplate.path("altText").asText("มีรายการรอการอนุมัติ"),
                         messageTemplate.path("contents")
                 );
@@ -92,6 +93,7 @@ public class LineMessageService {
         LinePushMessageRequest.LineMessage message =
                 new LinePushMessageRequest.LineMessage(
                         template.path("type").asText("flex"),
+                        null,
                         template.path("altText").asText("มีรายการรอการอนุมัติ"),
                         template.path("contents")
                 );
