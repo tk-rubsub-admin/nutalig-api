@@ -240,7 +240,18 @@ public class ApprovalService {
         }
 
         UserEntity actorUser = resolveLineActorOrRoleActor(step, claims.actorLineUserId());
-        return rejectStep(request, step, actorUser, claims.actorLineUserId(), reason.trim(), ApprovalSource.WEB);
+        ApprovalRequestDto response = rejectStep(request, step, actorUser, claims.actorLineUserId(), reason.trim(), ApprovalSource.WEB);
+        if (StringUtils.isNotBlank(claims.actorLineUserId())) {
+            try {
+                lineMessageService.sendTextMessageToLineUser(
+                        claims.actorLineUserId(),
+                        "คำขออนุมัติ " + request.getRequestNo() + " นี้ถูกปฏิเสธแล้ว"
+                );
+            } catch (Exception exception) {
+                log.warn("Cannot send reject confirmation to line user {}", claims.actorLineUserId(), exception);
+            }
+        }
+        return response;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -278,6 +289,10 @@ public class ApprovalService {
 
         if (ACTION_APPROVE.equalsIgnoreCase(action)) {
             approveStep(request, step, resolveLineActorOrRoleActor(step, lineUserId), lineUserId, ApprovalSource.LINE_POSTBACK);
+            lineMessageService.sendTextMessageToLineUser(
+                    lineUserId,
+                    "คำขออนุมัติ " + request.getRequestNo() + " นี้ได้รับการอนุมัติแล้ว"
+            );
             return;
         }
 
