@@ -537,10 +537,26 @@ public class ApprovalService {
 
     private Map<String, Object> buildUrgentRfqPayload(RfqHeaderEntity rfqEntity, String actorName) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        String productFamilyName = rfqEntity.getProductFamilyEntity() != null
+                ? rfqEntity.getProductFamilyEntity().getNameTh()
+                : rfqEntity.getProductFamily();
+        String productMaterialName = rfqEntity.getMaterial() != null
+                ? StringUtils.defaultIfBlank(rfqEntity.getMaterial().getNameTh(), rfqEntity.getMaterialCode())
+                : rfqEntity.getMaterialCode();
+        String productType = StringUtils.join(
+                List.of(
+                        StringUtils.trimToNull(productFamilyName),
+                        StringUtils.trimToNull(productMaterialName)
+                ).stream().filter(Objects::nonNull).toList(),
+                " / "
+        );
+
         payload.put("rfqId", rfqEntity.getId());
         payload.put("customerName", rfqEntity.getCustomer() != null ? rfqEntity.getCustomer().getCustomerName() : "-");
         payload.put("contactName", rfqEntity.getContactName());
-        payload.put("productFamily", rfqEntity.getProductFamilyEntity() != null ? rfqEntity.getProductFamilyEntity().getNameTh() : rfqEntity.getProductFamily());
+        payload.put("productFamily", productFamilyName);
+        payload.put("productMaterial", productMaterialName);
+        payload.put("productType", StringUtils.defaultIfBlank(productType, "-"));
         payload.put("capacity", rfqEntity.getCapacity());
         payload.put("salesName", actorName);
         payload.put("urgentReason", rfqEntity.getUrgentRequestReason());
@@ -566,6 +582,7 @@ public class ApprovalService {
         placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
         placeholders.put("orderTypeName", String.valueOf(payload.getOrDefault("orderTypeName", "-")));
         placeholders.put("rfqTypeName", String.valueOf(payload.getOrDefault("rfqTypeName", "-")));
+        placeholders.put("productType", String.valueOf(payload.getOrDefault("productType", "-")));
         placeholders.put("capacity", String.valueOf(payload.getOrDefault("capacity", "-")));
         placeholders.put("requesterName", String.valueOf(payload.getOrDefault("salesName", request.getRequestedBy())));
         placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("urgentReason", "-")));
