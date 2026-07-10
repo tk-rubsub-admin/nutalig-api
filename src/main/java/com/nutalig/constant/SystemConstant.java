@@ -10,6 +10,7 @@ public enum SystemConstant {
     ORDER_TYPE,
     REPORT_VAT,
     REPORT_NO_VAT,
+    RFQ_TYPE,
     SALES_TYPE,
     POSITION,
     TEAM,

@@ -1,12 +1,12 @@
 package com.nutalig.controller.quotation;
 
 import com.nutalig.constant.ExportFileFormat;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.quotation.request.SearchQuotationRequest;
 import com.nutalig.controller.quotation.response.SearchQuotationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
-import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.dto.QuotationDto;
 import com.nutalig.dto.QuotationRequestDto;
 import com.nutalig.dto.document.DownloadDocumentDto;

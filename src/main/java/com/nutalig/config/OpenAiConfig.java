@@ -1,8 +1,8 @@
 package com.nutalig.config;
 
 import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -23,11 +23,6 @@ public class OpenAiConfig {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("OpenAI API key is blank after property binding");
         }
-
-        log.info("OpenAI configuration loaded. baseUrl={}, apiKeyLength={}, apiKeyPrefix={}",
-                openAiProperties.getBaseUrl(),
-                apiKey.length(),
-                maskedPrefix(apiKey));
     }
 
     @Bean
