@@ -782,8 +782,9 @@ public class ApprovalService {
         entity.setSource(source);
         entity.setSummary(summary);
         entity.setDetailJson(detailJson);
-        entity.setCreatedBy(StringUtils.trimToNull(actorId));
-        entity.setUpdatedBy(StringUtils.trimToNull(actorId));
+        String auditActorUserId = actorUser != null ? StringUtils.trimToNull(actorUser.getId()) : null;
+        entity.setCreatedBy(auditActorUserId);
+        entity.setUpdatedBy(auditActorUserId);
         approvalRequestAuditLogRepository.save(entity);
     }
 
