@@ -21,5 +21,6 @@ public class SearchRFQRequest {
     private String keyword;
     private LocalDate requestedDateStart;
     private LocalDate requestedDateEnd;
+    private Boolean prioritizeApprovedUrgent;
 
 }

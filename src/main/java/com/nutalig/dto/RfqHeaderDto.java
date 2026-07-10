@@ -1,8 +1,10 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -16,6 +18,7 @@ public class RfqHeaderDto {
     private String contactPhone;
     private EmployeeDto sales;
     private CustomerDto customer;
+    private SystemConfigDto rfqType;
     private SystemConfigDto orderType;
     private List<RfqPicturesDto> pictures;
     private List<RfqDetailDto> details;
@@ -25,6 +28,18 @@ public class RfqHeaderDto {
     private ProductSubtype2Dto productSubType2;
     private ProductMaterialDto material;
     private String capacity;
+    private BigDecimal targetPrice;
+    private List<BigDecimal> requestedMoqs;
+    private Boolean urgentRequest;
+    private String urgentRequestReason;
+    private UrgentRequestStatus urgentRequestStatus;
+    private String urgentRequestedBy;
+    private ZonedDateTime urgentRequestedDate;
+    private String urgentApprovedBy;
+    private ZonedDateTime urgentApprovedDate;
+    private String urgentRejectedBy;
+    private ZonedDateTime urgentRejectedDate;
+    private String urgentRejectReason;
     private String description;
     private String createdBy;
     private String updatedBy;

@@ -45,4 +45,10 @@ public interface UserTodoRepository extends JpaRepository<UserTodoEntity, Long> 
             String targetModule,
             String targetId
     );
+
+    List<UserTodoEntity> findAllByTargetModuleAndTargetIdAndStatusInAndActiveTrueOrderByCreatedDateDesc(
+            String targetModule,
+            String targetId,
+            List<UserTodoStatus> statuses
+    );
 }

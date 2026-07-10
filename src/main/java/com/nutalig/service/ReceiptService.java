@@ -7,7 +7,9 @@ import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.controller.response.Pagination;
-import com.nutalig.dto.*;
+import com.nutalig.dto.ReceiptDetailDto;
+import com.nutalig.dto.ReceiptDto;
+import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.ReceiptDocumentDto;
 import com.nutalig.dto.document.ReceiptItemDocumentDto;
@@ -39,10 +41,7 @@ import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.*;
 
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.DEPOSIT_RECEIPT_PREFIX;
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.DEPOSIT_RECEIPT_TAX_PREFIX;
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.RECEIPT_PREFIX;
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.RECEIPT_TAX_PREFIX;
+import static com.nutalig.constant.BusinessConstant.DocumentPrefix.*;
 import static com.nutalig.repository.specification.ReceiptSpecification.*;
 
 @Slf4j

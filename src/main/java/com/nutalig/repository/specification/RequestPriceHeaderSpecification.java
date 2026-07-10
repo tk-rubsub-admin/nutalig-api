@@ -1,8 +1,10 @@
 package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import com.nutalig.entity.*;
 import com.nutalig.utils.DateUtil;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;
@@ -150,6 +152,23 @@ public class RequestPriceHeaderSpecification {
                     cb.like(cb.lower(salesJoin.get("name")), pattern),
                     cb.like(cb.lower(salesJoin.get("nickname")), pattern)
             );
+        };
+    }
+
+    public static Specification<RfqHeaderEntity> orderByApprovedUrgentFirst() {
+        return (root, query, cb) -> {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                Expression<Integer> urgentOrder = cb.<Integer>selectCase()
+                        .when(cb.equal(root.get("urgentRequestStatus"), UrgentRequestStatus.APPROVED), 0)
+                        .otherwise(1);
+                query.orderBy(
+                        cb.asc(urgentOrder),
+                        cb.asc(root.get("slaDate")),
+                        cb.asc(root.get("requestedDate"))
+                );
+            }
+
+            return cb.conjunction();
         };
     }
 }

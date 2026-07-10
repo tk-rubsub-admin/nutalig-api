@@ -1,15 +1,10 @@
 package com.nutalig.service;
 
-import com.nutalig.constant.Status;
-import com.nutalig.constant.SystemConstant;
-import com.nutalig.constant.ActivityAction;
-import com.nutalig.constant.ActivityActorType;
-import com.nutalig.constant.ActivityEntityType;
-import com.nutalig.constant.ActivitySource;
+import com.nutalig.constant.*;
 import com.nutalig.controller.customer.request.*;
+import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.customer.response.UploadCustomerErrorResponse;
 import com.nutalig.controller.customer.response.UploadCustomerResponse;
-import com.nutalig.controller.customer.response.SearchCustomerResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.CustomerDashboardBreakdownDto;
@@ -28,8 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 import org.apache.poi.ss.usermodel.*;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -38,13 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.LinkedHashMap;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.nutalig.repository.specification.CustomerSpecification.*;
 

@@ -1,17 +1,15 @@
 package com.nutalig.repository.specification;
 
+import com.nutalig.constant.Status;
 import com.nutalig.entity.CustomerEntity;
 import com.nutalig.entity.SystemConfigEntity;
-import com.nutalig.constant.Status;
 import com.nutalig.utils.SqlUtil;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.domain.Specification;
 
-import static com.nutalig.constant.SystemConstant.CUSTOMER_SEGMENT;
-import static com.nutalig.constant.SystemConstant.CUSTOMER_TIER;
-import static com.nutalig.constant.SystemConstant.CUSTOMER_TYPE;
+import static com.nutalig.constant.SystemConstant.*;
 
 public class CustomerSpecification {
 

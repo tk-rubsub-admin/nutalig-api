@@ -3,11 +3,7 @@ package com.nutalig.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.ReceiptType;
-import com.nutalig.dto.document.InvoiceDocumentDto;
-import com.nutalig.dto.document.PurchaseOrderDocumentDto;
-import com.nutalig.dto.document.QuotationDocumentDto;
-import com.nutalig.dto.document.ReceiptDocumentDto;
-import com.nutalig.dto.document.SalesOrderDocumentDto;
+import com.nutalig.dto.document.*;
 import com.nutalig.utils.JasperReportUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,9 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.*;
-import static com.nutalig.constant.BusinessConstant.DocumentPrefix.DEPOSIT_RECEIPT_TAX_PREFIX;
 
 @Slf4j
 @Service

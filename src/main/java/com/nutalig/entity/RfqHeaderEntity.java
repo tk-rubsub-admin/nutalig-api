@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Table;
 import jakarta.persistence.*;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.*;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +78,15 @@ public class RfqHeaderEntity extends AuditDateEntity {
 
     @OneToOne
     @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula= @JoinFormula(value="'RFQ_TYPE'", referencedColumnName="group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "rfq_type", referencedColumnName ="code"))
+    })
+    @EqualsAndHashCode.Exclude
+    @ToString.Include
+    private SystemConfigEntity rfqType;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
             @JoinColumnOrFormula(formula= @JoinFormula(value="'ORDER_TYPE'", referencedColumnName="group_code")),
             @JoinColumnOrFormula(column = @JoinColumn(name = "order_type", referencedColumnName ="code"))
     })
@@ -120,6 +131,43 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @ToString.Include
     @Column(name = "capacity")
     private String capacity;
+
+    @Column(name = "target_price", precision = 18, scale = 4)
+    private BigDecimal targetPrice;
+
+    @Column(name = "requested_moq", columnDefinition = "TEXT")
+    private String requestedMoq;
+
+    @Column(name = "is_urgent_request")
+    private Boolean urgentRequest;
+
+    @Column(name = "urgent_request_reason", columnDefinition = "TEXT")
+    private String urgentRequestReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "urgent_request_status", length = 30)
+    private UrgentRequestStatus urgentRequestStatus;
+
+    @Column(name = "urgent_requested_by")
+    private String urgentRequestedBy;
+
+    @Column(name = "urgent_requested_date")
+    private ZonedDateTime urgentRequestedDate;
+
+    @Column(name = "urgent_approved_by")
+    private String urgentApprovedBy;
+
+    @Column(name = "urgent_approved_date")
+    private ZonedDateTime urgentApprovedDate;
+
+    @Column(name = "urgent_rejected_by")
+    private String urgentRejectedBy;
+
+    @Column(name = "urgent_rejected_date")
+    private ZonedDateTime urgentRejectedDate;
+
+    @Column(name = "urgent_reject_reason", columnDefinition = "TEXT")
+    private String urgentRejectReason;
 
     @ToString.Include
     @Column(name = "description")
@@ -179,6 +227,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @ToString.Include
     @Column(name = "confirmed_date")
     private ZonedDateTime confirmedDate;
+
+    @Column(name = "is_accept")
+    private Boolean isAccept;
 
     public void addPicture(RfqPicturesEntity picture) {
         pictures.add(picture);

@@ -1,0 +1,194 @@
+{
+  "type": "flex",
+  "altText": "มีรายการรอการอนุมัติ QT-20260710-001",
+  "contents": {
+    "type": "bubble",
+    "header": {
+      "type": "box",
+      "layout": "vertical",
+      "backgroundColor": "#1E3A5F",
+      "paddingAll": "20px",
+      "contents": [
+        {
+          "type": "text",
+          "text": "คำขออนุมัติ",
+          "weight": "bold",
+          "size": "xl",
+          "color": "#FFFFFF"
+        },
+        {
+          "type": "text",
+          "text": "ใบเสนอราคา",
+          "size": "sm",
+          "color": "#D8E6F3",
+          "margin": "sm"
+        }
+      ]
+    },
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "20px",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "text",
+          "text": "QT-20260710-001",
+          "weight": "bold",
+          "size": "lg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ลูกค้า",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "NMT Limited",
+              "size": "sm",
+              "weight": "bold",
+              "flex": 3,
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "จำนวน",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "10,000 ชิ้น",
+              "size": "sm",
+              "flex": 3
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ยอดรวม",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "152,000.00 บาท",
+              "size": "sm",
+              "weight": "bold",
+              "color": "#D97706",
+              "flex": 3
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ผู้ขอ",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "กาญ",
+              "size": "sm",
+              "flex": 3
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "backgroundColor": "#FFF7E6",
+          "cornerRadius": "md",
+          "paddingAll": "10px",
+          "contents": [
+            {
+              "type": "text",
+              "text": "สถานะ",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "รออนุมัติ",
+              "size": "sm",
+              "weight": "bold",
+              "color": "#D97706",
+              "align": "end",
+              "flex": 3
+            }
+          ]
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "spacing": "sm",
+      "paddingAll": "20px",
+      "contents": [
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "button",
+              "style": "primary",
+              "color": "#16A34A",
+              "action": {
+                "type": "postback",
+                "label": "อนุมัติ",
+                "data": "action=approve&requestId=1001"
+              }
+            },
+            {
+              "type": "button",
+              "style": "primary",
+              "color": "#DC2626",
+              "action": {
+                "type": "postback",
+                "label": "ปฏิเสธ",
+                "data": "action=reject&requestId=1001"
+              }
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "style": "secondary",
+          "action": {
+            "type": "uri",
+            "label": "ดูรายละเอียดเพิ่มเติม",
+            "uri": "https://your-domain.com/approvals/1001"
+          }
+        }
+      ]
+    }
+  }
+}

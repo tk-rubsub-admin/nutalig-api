@@ -1,8 +1,8 @@
 package com.nutalig.repository;
 
+import com.nutalig.constant.Status;
 import com.nutalig.dto.CustomerDto;
 import com.nutalig.entity.CustomerEntity;
-import com.nutalig.constant.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;

@@ -4,8 +4,12 @@ import com.nutalig.controller.rfq.request.CreateRequestPriceHeaderRequest;
 import com.nutalig.controller.rfq.request.UpdateRequestPriceHeaderRequest;
 import com.nutalig.dto.*;
 import com.nutalig.entity.*;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.mapstruct.*;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING,
@@ -13,10 +17,13 @@ import java.util.List;
                 ProductSubtype2Mapper.class, ProductMaterialMapper.class, SupplierMapper.class})
 public interface RequestPriceHeaderMapper {
 
+    ObjectMapper MOQ_OBJECT_MAPPER = new ObjectMapper();
+
     @Mapping(target = "productFamily", source = "productFamilyEntity")
     @Mapping(target = "productSubtype1", source = "productUsage")
     @Mapping(target = "productSubType2", source = "systemMechanic")
     @Mapping(target = "rfqStatusTimeline", source = "statusTimelines")
+    @Mapping(target = "requestedMoqs", source = "requestedMoq")
     RfqHeaderDto toDto(RfqHeaderEntity entity);
 
     List<RfqHeaderDto> toDtoList(List<RfqHeaderEntity> entities);
@@ -27,6 +34,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "requestedDate", ignore = true)
     @Mapping(target = "sales", ignore = true)
     @Mapping(target = "customer", ignore = true)
+    @Mapping(target = "rfqType", ignore = true)
     @Mapping(target = "orderType", ignore = true)
     @Mapping(target = "pictures", ignore = true)
     @Mapping(target = "details", ignore = true)
@@ -34,6 +42,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "productUsage", ignore = true)
     @Mapping(target = "systemMechanic", ignore = true)
     @Mapping(target = "materialCode", ignore = true)
+    @Mapping(target = "requestedMoq", source = "requestedMoqs")
     @Mapping(target = "material", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
@@ -52,6 +61,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "sales", ignore = true)
     @Mapping(target = "customer", ignore = true)
+    @Mapping(target = "rfqType", ignore = true)
     @Mapping(target = "orderType", ignore = true)
     @Mapping(target = "pictures", ignore = true)
     @Mapping(target = "details", ignore = true)
@@ -59,6 +69,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "productUsage", ignore = true)
     @Mapping(target = "systemMechanic", ignore = true)
     @Mapping(target = "materialCode", ignore = true)
+    @Mapping(target = "requestedMoq", source = "requestedMoqs")
     @Mapping(target = "material", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
@@ -97,4 +108,37 @@ public interface RequestPriceHeaderMapper {
     List<RfqStatusTimelineDto> toRfqStatusTimelineDtoList(List<RfqStatusTimelineEntity> entities);
 
     SalesAccountDto toSalesDto(SalesEntity entity);
+
+    default String mapRequestedMoqs(List<BigDecimal> requestedMoqs) {
+        if (requestedMoqs == null || requestedMoqs.isEmpty()) {
+            return null;
+        }
+
+        List<BigDecimal> filtered = requestedMoqs.stream()
+                .filter(value -> value != null)
+                .toList();
+
+        if (filtered.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return MOQ_OBJECT_MAPPER.writeValueAsString(filtered);
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Cannot serialize requested MOQ.", exception);
+        }
+    }
+
+    default List<BigDecimal> mapRequestedMoq(String requestedMoq) {
+        if (requestedMoq == null || requestedMoq.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        try {
+            return MOQ_OBJECT_MAPPER.readValue(requestedMoq, new TypeReference<List<BigDecimal>>() {
+            });
+        } catch (Exception exception) {
+            return new ArrayList<>();
+        }
+    }
 }

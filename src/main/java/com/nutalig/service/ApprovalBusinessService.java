@@ -1,0 +1,153 @@
+package com.nutalig.service;
+
+import com.nutalig.constant.*;
+import com.nutalig.entity.ApprovalRequestEntity;
+import com.nutalig.entity.RfqHeaderEntity;
+import com.nutalig.entity.UserTodoEntity;
+import com.nutalig.exception.DataNotFoundException;
+import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.utils.DateUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ApprovalBusinessService {
+
+    private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final ActivityHistoryService activityHistoryService;
+    private final UserTodoService userTodoService;
+    private final UserProfileService userProfileService;
+
+    @Transactional
+    public void handleApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source)
+            throws DataNotFoundException {
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
+            handleUrgentRfqApproved(approvalRequest, actorUserId, source);
+            return;
+        }
+
+        log.info("No business approval handler for requestType={}", approvalRequest.getRequestType());
+    }
+
+    @Transactional
+    public void handleRejected(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source,
+            String reason
+    ) throws DataNotFoundException {
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
+            handleUrgentRfqRejected(approvalRequest, actorUserId, source, reason);
+            return;
+        }
+
+        log.info("No business rejection handler for requestType={}", approvalRequest.getRequestType());
+    }
+
+    public String buildTargetPath(ApprovalRequestEntity approvalRequest) {
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
+            return "/price-inquiry/" + approvalRequest.getReferenceId();
+        }
+        return null;
+    }
+
+    private void handleUrgentRfqApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source)
+            throws DataNotFoundException {
+        RfqHeaderEntity entity = requestPriceHeaderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("RFQ " + approvalRequest.getReferenceId() + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+
+        entity.setUrgentRequestStatus(UrgentRequestStatus.APPROVED);
+        entity.setUrgentApprovedBy(actor);
+        entity.setUrgentApprovedDate(now);
+        entity.setUrgentRejectedBy(null);
+        entity.setUrgentRejectedDate(null);
+        entity.setUrgentRejectReason(null);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentApprovedBy", entity.getUrgentApprovedBy());
+        detail.put("urgentApprovedDate", entity.getUrgentApprovedDate());
+        detail.put("approvalRequestId", approvalRequest.getId());
+        detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("approvalSource", source);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                actorUserId,
+                ActivityActorType.USER,
+                ActivityAction.APPROVE,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "อนุมัติคำขอเร่งด่วนของคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handleUrgentRfqRejected(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source,
+            String reason
+    ) throws DataNotFoundException {
+        RfqHeaderEntity entity = requestPriceHeaderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("RFQ " + approvalRequest.getReferenceId() + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+
+        entity.setUrgentRequestStatus(UrgentRequestStatus.REJECTED);
+        entity.setUrgentRejectedBy(actor);
+        entity.setUrgentRejectedDate(now);
+        entity.setUrgentRejectReason(StringUtils.trimToNull(reason));
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentRejectedBy", entity.getUrgentRejectedBy());
+        detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
+        detail.put("urgentRejectReason", entity.getUrgentRejectReason());
+        detail.put("approvalRequestId", approvalRequest.getId());
+        detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("approvalSource", source);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                actorUserId,
+                ActivityActorType.USER,
+                ActivityAction.REJECT,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "ไม่อนุมัติคำขอเร่งด่วนของคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void completeApprovalTodos(Long approvalRequestId, String userId) {
+        List<UserTodoEntity> todos = userTodoService.findActiveTodosByTarget(
+                ActivityEntityType.APPROVAL_REQUEST.name(),
+                String.valueOf(approvalRequestId),
+                List.of(UserTodoStatus.TODO, UserTodoStatus.IN_PROGRESS)
+        );
+        userTodoService.markTodosAsDone(todos, userId);
+    }
+}

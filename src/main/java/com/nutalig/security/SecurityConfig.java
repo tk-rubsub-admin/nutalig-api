@@ -54,6 +54,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/auth/line/register/validate").permitAll()
                         .requestMatchers("/v1/auth/line/register/url").permitAll()
                         .requestMatchers("/v1/auth/line/callback").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/approvals/reject-form").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/approvals/reject-form").permitAll()
                         .requestMatchers(HttpMethod.POST, "/line-webhook").permitAll()
                 .anyRequest().authenticated())
                 .exceptionHandling(e -> e

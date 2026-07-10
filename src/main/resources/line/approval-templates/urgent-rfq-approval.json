@@ -1,0 +1,235 @@
+{
+  "type": "flex",
+  "altText": "${altText}",
+  "contents": {
+    "type": "bubble",
+    "header": {
+      "type": "box",
+      "layout": "vertical",
+      "backgroundColor": "#1E3A5F",
+      "paddingAll": "20px",
+      "contents": [
+        {
+          "type": "text",
+          "text": "${requestTitle}",
+          "weight": "bold",
+          "size": "xl",
+          "color": "#FFFFFF"
+        },
+        {
+          "type": "text",
+          "text": "${entityLabel}",
+          "size": "sm",
+          "color": "#D8E6F3",
+          "margin": "sm"
+        }
+      ]
+    },
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "20px",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "text",
+          "text": "${requestNo}",
+          "weight": "bold",
+          "size": "lg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ลูกค้า",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${customerName}",
+              "size": "sm",
+              "weight": "bold",
+              "flex": 3,
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ประเภทงาน",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${orderTypeName}",
+              "size": "sm",
+              "flex": 3,
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "RFQ Type",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${rfqTypeName}",
+              "size": "sm",
+              "flex": 3,
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ขนาด",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${capacity}",
+              "size": "sm",
+              "flex": 3
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "contents": [
+            {
+              "type": "text",
+              "text": "ผู้ขอ",
+              "color": "#777777",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${requesterName}",
+              "size": "sm",
+              "flex": 3
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "vertical",
+          "backgroundColor": "#FFF7E6",
+          "cornerRadius": "md",
+          "paddingAll": "10px",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "text",
+              "text": "เหตุผลความเร่งด่วน",
+              "size": "sm",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "text": "${urgentReason}",
+              "size": "sm",
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "backgroundColor": "#FFF7E6",
+          "cornerRadius": "md",
+          "paddingAll": "10px",
+          "contents": [
+            {
+              "type": "text",
+              "text": "สถานะ",
+              "size": "sm",
+              "flex": 2
+            },
+            {
+              "type": "text",
+              "text": "${statusText}",
+              "size": "sm",
+              "weight": "bold",
+              "color": "#D97706",
+              "align": "end",
+              "flex": 3
+            }
+          ]
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "spacing": "sm",
+      "paddingAll": "20px",
+      "contents": [
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "button",
+              "style": "primary",
+              "color": "#16A34A",
+              "action": {
+                "type": "postback",
+                "label": "อนุมัติ",
+                "data": "${approvePostbackData}"
+              }
+            },
+            {
+              "type": "button",
+              "style": "primary",
+              "color": "#DC2626",
+              "action": {
+                "type": "postback",
+                "label": "ปฏิเสธ",
+                "data": "${rejectPostbackData}"
+              }
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "style": "secondary",
+          "action": {
+            "type": "uri",
+            "label": "ดูรายละเอียดเพิ่มเติม",
+            "uri": "${detailUrl}"
+          }
+        }
+      ]
+    }
+  }
+}

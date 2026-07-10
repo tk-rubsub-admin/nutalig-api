@@ -9,6 +9,8 @@ public class Event {
     private String type;
     @JsonProperty("message")
     private Message message;
+    @JsonProperty("postback")
+    private Postback postback;
     @JsonProperty("webhookEventId")
     private String webhookEventId;
     @JsonProperty("deliveryContext")

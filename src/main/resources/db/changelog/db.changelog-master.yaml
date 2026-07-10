@@ -1705,3 +1705,177 @@ databaseChangeLog:
               PREPARE stmt FROM @drop_col_sql;
               EXECUTE stmt;
               DEALLOCATE PREPARE stmt;
+  - changeSet:
+      id: 20260710-001-add-rfq-type-to-rfq-header
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: rfq_type
+                  type: VARCHAR(255)
+  - changeSet:
+      id: 20260710-002-add-target-price-and-requested-moq-to-rfq-header
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: target_price
+                  type: DECIMAL(18,4)
+              - column:
+                  name: requested_moq
+                  type: TEXT
+  - changeSet:
+      id: 20260710-003-add-urgent-request-fields-to-rfq-header
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: is_urgent_request
+                  type: BIT(1)
+                  defaultValueBoolean: false
+              - column:
+                  name: urgent_request_reason
+                  type: TEXT
+              - column:
+                  name: urgent_request_status
+                  type: VARCHAR(30)
+              - column:
+                  name: urgent_requested_by
+                  type: VARCHAR(255)
+              - column:
+                  name: urgent_requested_date
+                  type: DATETIME(6)
+              - column:
+                  name: urgent_approved_by
+                  type: VARCHAR(255)
+              - column:
+                  name: urgent_approved_date
+                  type: DATETIME(6)
+              - column:
+                  name: urgent_rejected_by
+                  type: VARCHAR(255)
+              - column:
+                  name: urgent_rejected_date
+                  type: DATETIME(6)
+              - column:
+                  name: urgent_reject_reason
+                  type: TEXT
+  - changeSet:
+      id: 20260710-004-create-approval-request-tables
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE approval_request (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  request_no VARCHAR(50) NOT NULL,
+                  entity_type VARCHAR(50) NOT NULL,
+                  reference_id VARCHAR(100) NOT NULL,
+                  request_type VARCHAR(50) NOT NULL,
+                  template_code VARCHAR(100) NOT NULL,
+                  title VARCHAR(255) NOT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  current_step_no INT DEFAULT NULL,
+                  requested_by VARCHAR(255) NOT NULL,
+                  requested_date DATETIME(6) NOT NULL,
+                  approved_date DATETIME(6) DEFAULT NULL,
+                  rejected_date DATETIME(6) DEFAULT NULL,
+                  reject_reason TEXT DEFAULT NULL,
+                  payload_json LONGTEXT DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_approval_request_request_no (request_no),
+                  KEY idx_approval_request_entity_ref_status (entity_type, reference_id, status),
+                  CONSTRAINT fk_approval_request_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE approval_request_step (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  approval_request_id BIGINT NOT NULL,
+                  step_no INT NOT NULL,
+                  approver_user_id VARCHAR(100) DEFAULT NULL,
+                  approver_role_code VARCHAR(50) DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  sent_at DATETIME(6) DEFAULT NULL,
+                  acted_at DATETIME(6) DEFAULT NULL,
+                  acted_by_user_id VARCHAR(100) DEFAULT NULL,
+                  acted_by_line_user_id VARCHAR(255) DEFAULT NULL,
+                  action_channel VARCHAR(30) DEFAULT NULL,
+                  line_message_id VARCHAR(255) DEFAULT NULL,
+                  reject_reason TEXT DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_approval_request_step_request (approval_request_id, step_no),
+                  KEY idx_approval_request_step_approver_user (approver_user_id),
+                  KEY idx_approval_request_step_acted_by_user (acted_by_user_id),
+                  CONSTRAINT fk_approval_request_step_request FOREIGN KEY (approval_request_id) REFERENCES approval_request (id),
+                  CONSTRAINT fk_approval_request_step_approver_user FOREIGN KEY (approver_user_id) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_step_acted_by_user FOREIGN KEY (acted_by_user_id) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_step_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_step_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE approval_request_audit_log (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  approval_request_id BIGINT NOT NULL,
+                  approval_request_step_id BIGINT DEFAULT NULL,
+                  event_type VARCHAR(50) NOT NULL,
+                  actor_user_id VARCHAR(100) DEFAULT NULL,
+                  actor_line_user_id VARCHAR(255) DEFAULT NULL,
+                  source VARCHAR(30) NOT NULL,
+                  summary VARCHAR(500) DEFAULT NULL,
+                  detail_json LONGTEXT DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_approval_request_audit_request (approval_request_id, created_date),
+                  KEY idx_approval_request_audit_step (approval_request_step_id),
+                  CONSTRAINT fk_approval_request_audit_request FOREIGN KEY (approval_request_id) REFERENCES approval_request (id),
+                  CONSTRAINT fk_approval_request_audit_step FOREIGN KEY (approval_request_step_id) REFERENCES approval_request_step (id),
+                  CONSTRAINT fk_approval_request_audit_actor_user FOREIGN KEY (actor_user_id) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_audit_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_approval_request_audit_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  - changeSet:
+      id: 20260710-005-add-action-keys-to-approval-request-step
+      author: codex
+      changes:
+        - addColumn:
+            tableName: approval_request_step
+            columns:
+              - column:
+                  name: approve_action_key
+                  type: VARCHAR(64)
+              - column:
+                  name: reject_action_key
+                  type: VARCHAR(64)
+        - createIndex:
+            tableName: approval_request_step
+            indexName: idx_approval_request_step_approve_action_key
+            unique: true
+            columns:
+              - column:
+                  name: approve_action_key
+        - createIndex:
+            tableName: approval_request_step
+            indexName: idx_approval_request_step_reject_action_key
+            unique: true
+            columns:
+              - column:
+                  name: reject_action_key

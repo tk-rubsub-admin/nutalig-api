@@ -4,8 +4,8 @@ import com.nutalig.constant.UserTodoPriority;
 import com.nutalig.constant.UserTodoStatus;
 import com.nutalig.constant.UserTodoType;
 import com.nutalig.dto.UserTodoDto;
-import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.entity.UserEntity;
+import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.UserTodoRepository;
 import com.nutalig.utils.DateUtil;
@@ -116,6 +116,43 @@ public class UserTodoService {
         userTodoRepository.save(entity);
 
         return entity;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserTodoEntity> findActiveTodosByTarget(String targetModule, String targetId, List<UserTodoStatus> statuses) {
+        List<UserTodoStatus> normalizedStatuses = statuses == null
+                ? List.of()
+                : statuses.stream().filter(Objects::nonNull).distinct().toList();
+
+        if (!normalizedStatuses.isEmpty()) {
+            return userTodoRepository.findAllByTargetModuleAndTargetIdAndStatusInAndActiveTrueOrderByCreatedDateDesc(
+                    StringUtils.trimToNull(targetModule),
+                    StringUtils.trimToNull(targetId),
+                    normalizedStatuses
+            );
+        }
+
+        return userTodoRepository.findAllByTargetModuleAndTargetIdAndActiveTrueOrderByCreatedDateDesc(
+                StringUtils.trimToNull(targetModule),
+                StringUtils.trimToNull(targetId)
+        );
+    }
+
+    @Transactional
+    public void markTodosAsDone(List<UserTodoEntity> todos, String userId) {
+        if (todos == null || todos.isEmpty()) {
+            return;
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        for (UserTodoEntity todo : todos) {
+            todo.setStatus(UserTodoStatus.DONE);
+            todo.setCompletedDate(now);
+            todo.setUpdatedBy(userId);
+            todo.setUpdatedDate(now);
+        }
+
+        userTodoRepository.saveAll(todos);
     }
 
     private UserTodoDto toDto(UserTodoEntity entity) {

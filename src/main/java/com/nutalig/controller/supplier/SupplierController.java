@@ -2,11 +2,7 @@ package com.nutalig.controller.supplier;
 
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
-import com.nutalig.controller.supplier.request.AddSupplierMaterialCapabilityRequest;
-import com.nutalig.controller.supplier.request.CreateSupplierRequest;
-import com.nutalig.controller.supplier.request.SearchSupplierRequest;
-import com.nutalig.controller.supplier.request.SuggestSupplierCapabilitiesRequest;
-import com.nutalig.controller.supplier.request.UpsertSupplierShippingRequest;
+import com.nutalig.controller.supplier.request.*;
 import com.nutalig.controller.supplier.response.SearchSupplierResponse;
 import com.nutalig.dto.SupplierCapabilityDto;
 import com.nutalig.dto.SupplierDto;

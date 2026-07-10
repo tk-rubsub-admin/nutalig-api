@@ -8,7 +8,10 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.rfq.request.*;
-import com.nutalig.dto.*;
+import com.nutalig.dto.FinalRfqFromLineDto;
+import com.nutalig.dto.RfqHeaderDto;
+import com.nutalig.dto.SlaConfigDto;
+import com.nutalig.dto.SupplierDto;
 import com.nutalig.entity.*;
 import com.nutalig.entity.id.ProductMaterialId;
 import com.nutalig.entity.id.RfqStatusTimelineId;
@@ -17,6 +20,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -62,7 +66,10 @@ public class RFQService {
     private final UserProfileService userProfileService;
     private final SlaConfigService slaConfigService;
     private final SupplierService supplierService;
+    private final UserRepository userRepository;
+    private final UserTodoService userTodoService;
     private final LineMessageService lineMessageService;
+    private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final PromptTemplateEngine promptTemplateEngine;
@@ -70,7 +77,10 @@ public class RFQService {
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
-        if (pageableRequest.getSortBy() == null || pageableRequest.getSortDirection() == null) {
+        if (Boolean.TRUE.equals(searchRequest != null ? searchRequest.getPrioritizeApprovedUrgent() : null)) {
+            pageableRequest.setSortBy(null);
+            pageableRequest.setSortDirection(null);
+        } else if (pageableRequest.getSortBy() == null || pageableRequest.getSortDirection() == null) {
             pageableRequest.setSortBy("requestedDate");
             pageableRequest.setSortDirection(Sort.Direction.DESC);
         }
@@ -90,23 +100,23 @@ public class RFQService {
         log.info("Get RFQ by id : {}", id);
         RfqHeaderEntity entity = getEntityById(id);
 
-        if (shouldMoveToInProgressOnView(entity, userId)) {
-            entity.setStatus(RfqStatus.IN_PROGRESS);
-            entity.setUpdatedBy(userProfileService.getNameFromId(userId));
-            entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-            entity = requestPriceHeaderRepository.save(entity);
-
-            activityHistoryService.record(
-                    ActivityEntityType.RFQ,
-                    entity.getId(),
-                    userId,
-                    ActivityActorType.USER,
-                    ActivityAction.VIEW,
-                    ActivitySource.API,
-                    "จัดซื้อดูคำขอราคาเลขที่ " + entity.getId(),
-                    null
-            );
-        }
+//        if (shouldMoveToInProgressOnView(entity, userId)) {
+//            entity.setStatus(RfqStatus.IN_PROGRESS);
+//            entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+//            entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+//            entity = requestPriceHeaderRepository.save(entity);
+//
+//            activityHistoryService.record(
+//                    ActivityEntityType.RFQ,
+//                    entity.getId(),
+//                    userId,
+//                    ActivityActorType.USER,
+//                    ActivityAction.VIEW,
+//                    ActivitySource.API,
+//                    "จัดซื้อดูคำขอราคาเลขที่ " + entity.getId(),
+//                    null
+//            );
+//        }
         return mapToDto(entity);
     }
 
@@ -252,13 +262,38 @@ public class RFQService {
     @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
-        entity.setRequestedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-        entity.setStatus(RfqStatus.NEW);
-        entity.setShippingMethod(normalizeRfqShippingMethod(request.getShippingMethod()));
-        entity.setCreatedBy(userProfileService.getNameFromId(userId));
-        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(userId);
 
-        applyRelations(entity, request.getSalesId(), request.getCustomerId(), request.getOrderTypeCode(), request.getProcurementId());
+        entity.setRequestedDate(now);
+        entity.setStatus(RfqStatus.NEW);
+        entity.setIsAccept(Boolean.FALSE);
+        entity.setShippingMethod(normalizeRfqShippingMethod(request.getShippingMethod()));
+        entity.setCreatedBy(actor);
+        entity.setUpdatedBy(actor);
+        entity.setUrgentRequest(Boolean.TRUE.equals(request.getUrgentRequest()));
+
+        if (Boolean.TRUE.equals(entity.getUrgentRequest())) {
+            if (StringUtils.isBlank(request.getUrgentRequestReason())) {
+                throw new InvalidRequestException("urgentRequestReason is required.");
+            }
+
+            entity.setUrgentRequestReason(request.getUrgentRequestReason().trim());
+            entity.setUrgentRequestStatus(UrgentRequestStatus.PENDING_APPROVAL);
+            entity.setUrgentRequestedBy(actor);
+            entity.setUrgentRequestedDate(now);
+        } else {
+            entity.setUrgentRequest(Boolean.FALSE);
+        }
+
+        applyRelations(
+                entity,
+                request.getSalesId(),
+                request.getCustomerId(),
+                request.getRfqTypeCode(),
+                request.getOrderTypeCode(),
+                request.getProcurementId()
+        );
         applyProductHierarchy(
                 entity,
                 request.getProductFamily(),
@@ -277,13 +312,16 @@ public class RFQService {
             entity.setContactPhone(request.getContactPhone());
         }
 
-        SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
-        entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
+//        SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
+//        entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
 
         entity = requestPriceHeaderRepository.save(entity);
 
         java.util.Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("status", entity.getStatus());
+        detail.put("urgentRequest", entity.getUrgentRequest());
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentRequestReason", entity.getUrgentRequestReason());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("shippingMethod", entity.getShippingMethod());
@@ -296,13 +334,28 @@ public class RFQService {
                 ActivityActorType.USER,
                 ActivityAction.CREATE,
                 ActivitySource.API,
-                "สร้างคำขอราคาเลขที่ " + entity.getId(),
+                Boolean.TRUE.equals(entity.getUrgentRequest())
+                        ? "สร้างคำขอราคาเร่งด่วนเลขที่ " + entity.getId()
+                        : "สร้างคำขอราคาเลขที่ " + entity.getId(),
                 detail
         );
+
+        if (Boolean.TRUE.equals(entity.getUrgentRequest())) {
+            approvalService.createUrgentRfqApprovalRequest(entity, userId);
+        }
 
         saveRfqStatusTimeline(entity, entity.getStatus(), entity.getRequestedDate());
 
         return mapToDto(entity);
+    }
+
+    @Transactional
+    public void createUrgentRfqApprovalRequest(String rfqId, String userId) throws Exception {
+        log.info("Create urgent rfq approval request for rfq {} by {}", rfqId, userId);
+
+        RfqHeaderEntity entity = getEntityById(rfqId);
+
+        approvalService.createUrgentRfqApprovalRequest(entity, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -709,6 +762,61 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto acceptRFQ(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity entity = getEntityById(id);
+        String actor = userProfileService.getNameFromId(userId);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        if (!RfqStatus.NEW.equals(entity.getStatus())) {
+            throw new InvalidRequestException("Only RFQ with NEW status can be accepted.");
+        }
+
+        entity.setStatus(RfqStatus.IN_PROGRESS);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+        entity.setIsAccept(Boolean.TRUE);
+        entity = requestPriceHeaderRepository.save(entity);
+
+        saveRfqStatusTimeline(entity, RfqStatus.IN_PROGRESS, now);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("beforeStatus", RfqStatus.NEW);
+        detail.put("afterStatus", RfqStatus.IN_PROGRESS);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.STATUS_CHANGE,
+                ActivitySource.API,
+                "รับงานคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto approveUrgentRequest(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+        validateSuperAdmin(userId);
+        approvalService.approveLatestApprovalByEntity(ActivityEntityType.RFQ, id, userId);
+        return mapToDto(getEntityById(id));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto rejectUrgentRequest(String id, RejectUrgentRfqRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
+        validateSuperAdmin(userId);
+
+        if (request == null || StringUtils.isBlank(request.getReason())) {
+            throw new InvalidRequestException("reason is required.");
+        }
+
+        approvalService.rejectLatestApprovalByEntity(ActivityEntityType.RFQ, id, request.getReason().trim(), userId);
+        return mapToDto(getEntityById(id));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateRFQ(String id, UpdateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = getEntityById(id);
         java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
@@ -721,12 +829,16 @@ public class RFQService {
 
         List<String> editFields = new ArrayList<>();
 
-        if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus())) {
+        if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus()) && Boolean.TRUE.equals(entity.getIsAccept())) {
             log.info("Update status from {} to {}", RfqStatus.REQUESTED_INFO, RfqStatus.IN_PROGRESS);
             entity.setStatus(RfqStatus.IN_PROGRESS);
 
             SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
             entity.setSlaDate(slaConfigService.calculateSlaDate(sla, now));
+            editFields.add("สถานะ");
+        } else if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus()) && Boolean.FALSE.equals(entity.getIsAccept())) {
+            log.info("Update status from {} to {}", RfqStatus.REQUESTED_INFO, RfqStatus.NEW);
+            entity.setStatus(RfqStatus.NEW);
             editFields.add("สถานะ");
         }
 
@@ -737,6 +849,7 @@ public class RFQService {
                         ? entity.getOrderType().getId().getCode()
                         : null
         )) {
+            entity.setRfqType(resolveRfqType(request.getRfqTypeCode()));
             entity.setOrderType(resolveOrderType(requestOrderTypeCode));
             editFields.add("ประเภทงาน");
         }
@@ -770,6 +883,19 @@ public class RFQService {
         if (StringUtils.isNotEmpty(requestCapacity) && !StringUtils.equals(requestCapacity, entity.getCapacity())) {
             entity.setCapacity(request.getCapacity());
             editFields.add("ความจุ");
+        }
+        BigDecimal requestTargetPrice = request.getTargetPrice();
+        if (!Objects.equals(requestTargetPrice, entity.getTargetPrice())) {
+            entity.setTargetPrice(requestTargetPrice);
+            editFields.add("Target Price");
+        }
+        List<BigDecimal> requestRequestedMoqs = request.getRequestedMoqs() == null
+                ? new ArrayList<>()
+                : request.getRequestedMoqs().stream().filter(Objects::nonNull).toList();
+        List<BigDecimal> currentRequestedMoqs = parseRequestedMoq(entity.getRequestedMoq());
+        if (!Objects.equals(requestRequestedMoqs, currentRequestedMoqs)) {
+            entity.setRequestedMoq(requestPriceHeaderMapper.mapRequestedMoqs(requestRequestedMoqs));
+            editFields.add("MOQ ที่ต้องการ");
         }
         String requestDescription = normalizeRequestValue(request.getDescription());
         if (StringUtils.isNotEmpty(requestDescription) && !StringUtils.equals(requestDescription, entity.getDescription())) {
@@ -828,6 +954,9 @@ public class RFQService {
         String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
         String requestMaterial = normalizeRequestValue(request.getMaterial());
         String requestCapacity = normalizeRequestValue(request.getCapacity());
+        List<BigDecimal> requestRequestedMoqs = request.getRequestedMoqs() == null
+                ? new ArrayList<>()
+                : request.getRequestedMoqs().stream().filter(Objects::nonNull).toList();
         String requestDescription = normalizeRequestValue(request.getDescription());
 
         return !StringUtils.equals(
@@ -844,6 +973,8 @@ public class RFQService {
                 entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null
         ) || !StringUtils.equals(requestMaterial, entity.getMaterialCode())
                 || !StringUtils.equals(requestCapacity, entity.getCapacity())
+                || !Objects.equals(request.getTargetPrice(), entity.getTargetPrice())
+                || !Objects.equals(requestRequestedMoqs, parseRequestedMoq(entity.getRequestedMoq()))
                 || !StringUtils.equals(requestDescription, entity.getDescription());
     }
 
@@ -1052,6 +1183,7 @@ public class RFQService {
         detail.put("contactPhone", entity.getContactPhone());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
+        detail.put("rfqTypeCode", entity.getRfqType() != null ? entity.getRfqType().getId().getCode() : null);
         detail.put("orderTypeCode", entity.getOrderType() != null ? entity.getOrderType().getId().getCode() : null);
         detail.put("shippingMethod", entity.getShippingMethod());
         detail.put("productFamily", entity.getProductFamily());
@@ -1059,6 +1191,18 @@ public class RFQService {
         detail.put("systemMechanic", entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null);
         detail.put("material", entity.getMaterialCode());
         detail.put("capacity", entity.getCapacity());
+        detail.put("targetPrice", entity.getTargetPrice());
+        detail.put("requestedMoqs", parseRequestedMoq(entity.getRequestedMoq()));
+        detail.put("urgentRequest", entity.getUrgentRequest());
+        detail.put("urgentRequestReason", entity.getUrgentRequestReason());
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentRequestedBy", entity.getUrgentRequestedBy());
+        detail.put("urgentRequestedDate", entity.getUrgentRequestedDate());
+        detail.put("urgentApprovedBy", entity.getUrgentApprovedBy());
+        detail.put("urgentApprovedDate", entity.getUrgentApprovedDate());
+        detail.put("urgentRejectedBy", entity.getUrgentRejectedBy());
+        detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
+        detail.put("urgentRejectReason", entity.getUrgentRejectReason());
         detail.put("description", entity.getDescription());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
         return detail;
@@ -1095,14 +1239,18 @@ public class RFQService {
         }
     }
 
-    private boolean shouldMoveToInProgressOnView(RfqHeaderEntity entity, String userId) {
-        if (entity == null || userId == null || entity.getStatus() != RfqStatus.NEW) {
-            return false;
+    private List<BigDecimal> parseRequestedMoq(String requestedMoqJson) {
+        if (StringUtils.isBlank(requestedMoqJson)) {
+            return new ArrayList<>();
         }
 
-        String roleCode = userProfileService.getRoleCodeFromId(userId);
-        return PROCUREMENT_ROLE_CODE.equalsIgnoreCase(roleCode)
-                || SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(roleCode);
+        try {
+            BigDecimal[] values = objectMapper.readValue(requestedMoqJson, BigDecimal[].class);
+            return new ArrayList<>(Arrays.asList(values));
+        } catch (Exception exception) {
+            log.warn("Cannot parse requested moq json", exception);
+            return new ArrayList<>();
+        }
     }
 
     private void extractChangedDetails(
@@ -1210,10 +1358,18 @@ public class RFQService {
                 .orElseThrow(() -> new DataNotFoundException("Supplier " + supplierId + " not found."));
     }
 
-    private void applyRelations(RfqHeaderEntity entity, String salesId, String customerId, String orderTypeCode, String procurementId)
+    private void applyRelations(
+            RfqHeaderEntity entity,
+            String salesId,
+            String customerId,
+            String rfqTypeCode,
+            String orderTypeCode,
+            String procurementId
+    )
             throws DataNotFoundException {
         entity.setSales(resolveSales(salesId));
         entity.setCustomer(resolveCustomer(customerId));
+        entity.setRfqType(resolveRfqType(rfqTypeCode));
         entity.setOrderType(resolveOrderType(orderTypeCode));
         entity.setProcurement(resolveProcurement(procurementId));
     }
@@ -1347,6 +1503,18 @@ public class RFQService {
         return orderType;
     }
 
+    private SystemConfigEntity resolveRfqType(String rfqTypeCode) throws DataNotFoundException {
+        if (StringUtils.isBlank(rfqTypeCode)) {
+            return null;
+        }
+
+        SystemConfigEntity rfqType = systemConfigService.getConfigEntity(SystemConstant.RFQ_TYPE, rfqTypeCode.trim());
+        if (rfqType == null) {
+            throw new DataNotFoundException("RFQ type " + rfqTypeCode + " not found.");
+        }
+        return rfqType;
+    }
+
     private String normalizeRfqShippingMethod(String shippingMethod) throws InvalidRequestException {
         String normalized = StringUtils.defaultIfBlank(shippingMethod, "ALL").trim().toUpperCase(Locale.ROOT);
         if (!List.of("ALL", "LAND", "SEA").contains(normalized)) {
@@ -1361,6 +1529,23 @@ public class RFQService {
             throw new DataNotFoundException("Cost type " + costTypeCode + " not found.");
         }
         return costType;
+    }
+
+    private void validateSuperAdmin(String userId) throws InvalidRequestException {
+        String roleCode = userProfileService.getRoleCodeFromId(userId);
+        if (!StringUtils.equals(roleCode, SUPER_ADMIN_ROLE_CODE)) {
+            throw new InvalidRequestException("Only SUPER_ADMIN can approve or reject urgent RFQ.");
+        }
+    }
+
+    private void validateUrgentPendingApproval(RfqHeaderEntity entity) throws InvalidRequestException {
+        if (!Boolean.TRUE.equals(entity.getUrgentRequest())) {
+            throw new InvalidRequestException("RFQ is not an urgent request.");
+        }
+
+        if (!UrgentRequestStatus.PENDING_APPROVAL.equals(entity.getUrgentRequestStatus())) {
+            throw new InvalidRequestException("Urgent request is not pending approval.");
+        }
     }
 
     private void attachPictures(RfqHeaderEntity entity, List<MultipartFile> pictures, String fileType, String userId) throws Exception {
@@ -1450,7 +1635,8 @@ public class RFQService {
                 ))
                 .and(productFamilyEqual(request.getProductFamily()))
                 .and(requestedDateBetween(request.getRequestedDateStart(), request.getRequestedDateEnd()))
-                .and(keywordContain(request.getKeyword()));
+                .and(keywordContain(request.getKeyword()))
+                .and(Boolean.TRUE.equals(request.getPrioritizeApprovedUrgent()) ? orderByApprovedUrgentFirst() : null);
     }
 
     private String displayRfqStatus(RfqStatus status) {
