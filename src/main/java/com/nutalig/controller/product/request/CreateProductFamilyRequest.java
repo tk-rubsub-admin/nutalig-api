@@ -8,4 +8,5 @@ public class CreateProductFamilyRequest {
     private String code;
     private String nameTh;
     private String nameEn;
+    private Boolean isActive;
 }

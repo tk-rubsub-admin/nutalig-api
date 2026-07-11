@@ -202,7 +202,7 @@ public class SupplierService {
             throw new InvalidRequestException("Product family code is required.");
         }
 
-        ProductFamilyEntity productFamily = productFamilyRepository.findById(productFamilyCode)
+        ProductFamilyEntity productFamily = productFamilyRepository.findByCodeAndIsActiveTrue(productFamilyCode)
                 .orElseThrow(() -> new DataNotFoundException("Product family code " + productFamilyCode + " not found."));
 
         if (supplierCapabilityRepository.existsBySupplier_IdAndProductFamilyCodeAndProductMaterialCodeIsNullAndStatus(
@@ -262,7 +262,7 @@ public class SupplierService {
                 );
             }
 
-            ProductFamilyEntity productFamily = productFamilyRepository.findById(productFamilyCode)
+            ProductFamilyEntity productFamily = productFamilyRepository.findByCodeAndIsActiveTrue(productFamilyCode)
                     .orElseThrow(() -> new DataNotFoundException("Product family code " + productFamilyCode + " not found."));
 
             List<ProductMaterialEntity> productMaterials = resolveProductMaterials(productFamilyCode, requestedCapability);

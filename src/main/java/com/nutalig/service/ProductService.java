@@ -47,7 +47,7 @@ public class ProductService {
     public List<ProductFamilyDto> getAllProductFamily() {
         log.info("Get all product families");
 
-        List<ProductFamilyDto> families = productFamilyRepository.findAll().stream()
+        List<ProductFamilyDto> families = productFamilyRepository.findAllByIsActiveTrueOrderByCodeAsc().stream()
                 .map(productFamilyMapper::toDto)
                 .toList();
 
@@ -130,6 +130,7 @@ public class ProductService {
         dto.setCode(request.getCode().trim());
         dto.setNameTh(StringUtils.trimToNull(request.getNameTh()));
         dto.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        dto.setIsActive(request.getIsActive() == null ? Boolean.TRUE : request.getIsActive());
 
         ProductFamilyEntity entity = productFamilyRepository.save(productFamilyMapper.toEntity(dto));
 
@@ -150,6 +151,10 @@ public class ProductService {
 
         if (request.getNameEn() != null) {
             entity.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        }
+
+        if (request.getIsActive() != null) {
+            entity.setIsActive(request.getIsActive());
         }
 
         entity = productFamilyRepository.save(entity);
@@ -357,7 +362,7 @@ public class ProductService {
     }
 
     private void validateProductFamilyExistsUnchecked(String familyCode) throws DataNotFoundException {
-        productFamilyRepository.findById(familyCode)
+        productFamilyRepository.findByCodeAndIsActiveTrue(familyCode)
                 .orElseThrow(() -> new DataNotFoundException("Product family code " + familyCode + " not found."));
     }
 

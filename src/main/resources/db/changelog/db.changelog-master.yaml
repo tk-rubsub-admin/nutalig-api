@@ -1,5 +1,25 @@
 databaseChangeLog:
   - changeSet:
+      id: 20260711-001-add-is-active-to-product-family
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: product_family
+                columnName: is_active
+      changes:
+        - addColumn:
+            tableName: product_family
+            columns:
+              - column:
+                  name: is_active
+                  type: TINYINT(1)
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+
+  - changeSet:
       id: 20260604-001-create-rfq-supplier-quote-tables
       author: codex
       validCheckSum:

@@ -9,6 +9,7 @@ public class ProductFamilyDto {
     private String code;
     private String nameTh;
     private String nameEn;
+    private Boolean isActive;
     private List<ProductMaterialDto> materialList;
     private List<ProductSubtype1Dto> subtype1List;
 }

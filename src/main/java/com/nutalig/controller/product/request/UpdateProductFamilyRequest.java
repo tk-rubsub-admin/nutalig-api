@@ -7,4 +7,5 @@ public class UpdateProductFamilyRequest {
 
     private String nameTh;
     private String nameEn;
+    private Boolean isActive;
 }

@@ -1441,7 +1441,7 @@ public class RFQService {
             return null;
         }
 
-        return productFamilyEntityRepository.findById(productFamilyCode.trim())
+        return productFamilyEntityRepository.findByCodeAndIsActiveTrue(productFamilyCode.trim())
                 .orElseThrow(() -> new DataNotFoundException("Product family code " + productFamilyCode + " not found."));
     }
 

@@ -21,4 +21,7 @@ public class ProductFamilyEntity {
     @Column(name = "name_en")
     private String nameEn;
 
+    @Column(name = "is_active")
+    private Boolean isActive;
+
 }
