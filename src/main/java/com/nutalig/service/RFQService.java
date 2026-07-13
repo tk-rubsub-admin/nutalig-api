@@ -573,6 +573,7 @@ public class RFQService {
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
         detailEntity.setRemark(updatedDetail.getRemark());
         detailEntity.setRecommend(updatedDetail.getRecommend());
+        detailEntity.setCommission(updatedDetail.getCommission());
         detailEntity.setPackageDimension(updatedDetail.getPackageDimension());
         detailEntity.setPackageWeight(updatedDetail.getPackageWeight());
         detailEntity.setPackageCapacity(updatedDetail.getPackageCapacity());
@@ -771,6 +772,8 @@ public class RFQService {
             throw new InvalidRequestException("Only RFQ with NEW status can be accepted.");
         }
 
+        SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
+        entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
         entity.setStatus(RfqStatus.IN_PROGRESS);
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
@@ -1288,6 +1291,7 @@ public class RFQService {
         detailEntity.setSortOrder(request.getSortOrder());
         detailEntity.setRemark(StringUtils.trimToNull(request.getRemark()));
         detailEntity.setRecommend(StringUtils.trimToNull(request.getRecommend()));
+        detailEntity.setCommission(request.getCommission());
         detailEntity.setPackageDimension(StringUtils.trimToNull(request.getPackageDimension()));
         detailEntity.setPackageWeight(StringUtils.trimToNull(request.getPackageWeight()));
         detailEntity.setPackageCapacity(StringUtils.trimToNull(request.getPackageCapacity()));
@@ -1311,6 +1315,7 @@ public class RFQService {
             tierEntity.setSupplier(supplier);
             tierEntity.setQuantity(tierRequest.getQuantity());
             tierEntity.setProductPrice(tierRequest.getProductPrice());
+            tierEntity.setCommission(tierRequest.getCommission());
             tierEntity.setCurrency(tierRequest.getCurrency());
             tierEntity.setExchangeRate(tierRequest.getExchangeRate());
             tierEntity.setLandFreightCost(tierRequest.getLandFreightCost());
@@ -1634,6 +1639,8 @@ public class RFQService {
                                 : request.getOrderType()
                 ))
                 .and(productFamilyEqual(request.getProductFamily()))
+                .and(productSubtype1Equal(request.getProductSubtype1()))
+                .and(productMaterialEqual(request.getProductMaterial()))
                 .and(requestedDateBetween(request.getRequestedDateStart(), request.getRequestedDateEnd()))
                 .and(keywordContain(request.getKeyword()))
                 .and(Boolean.TRUE.equals(request.getPrioritizeApprovedUrgent()) ? orderByApprovedUrgentFirst() : null);

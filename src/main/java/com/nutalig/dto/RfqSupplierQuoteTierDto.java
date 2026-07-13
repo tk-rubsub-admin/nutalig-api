@@ -13,6 +13,8 @@ public class RfqSupplierQuoteTierDto {
     private BigDecimal quantity;
     private BigDecimal productPrice;
     private BigDecimal shippingCost;
+    private Currency productPriceCurrency;
+    private Currency shippingCostCurrency;
     private Currency currency;
     private Integer sortOrder;
     private ZonedDateTime createdDate;

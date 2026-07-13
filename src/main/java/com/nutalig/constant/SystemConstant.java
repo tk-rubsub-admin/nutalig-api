@@ -7,6 +7,7 @@ public enum SystemConstant {
     CUSTOMER_TYPE,
     CUSTOMER_TIER,
     CUSTOMER_SEGMENT,
+    CURRENCY,
     ORDER_TYPE,
     REPORT_VAT,
     REPORT_NO_VAT,

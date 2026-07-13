@@ -14,6 +14,7 @@ public class CreateRequestPriceDetailRequest {
     private Integer sortOrder;
     private String remark;
     private String recommend;
+    private BigDecimal commission;
     private String packageDimension;
     private String packageWeight;
     private String packageCapacity;
@@ -24,6 +25,7 @@ public class CreateRequestPriceDetailRequest {
     public static class CreateRequestPriceTierRequest {
         private BigDecimal quantity;
         private BigDecimal productPrice;
+        private BigDecimal commission;
         private Currency currency;
         private BigDecimal exchangeRate;
         private BigDecimal landFreightCost;

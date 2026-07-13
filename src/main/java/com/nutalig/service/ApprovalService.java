@@ -631,6 +631,7 @@ public class ApprovalService {
                         List.of(ApprovalRequestStatus.PENDING)
                 )
                 .orElseThrow(() -> new DataNotFoundException("Pending approval request not found."));
+        hydrateAuditLogs(request);
 
         if (request.getStatus() != ApprovalRequestStatus.PENDING) {
             throw new InvalidRequestException("Approval request is not pending.");
@@ -639,8 +640,21 @@ public class ApprovalService {
     }
 
     private ApprovalRequestEntity getApprovalRequestById(Long requestId) throws DataNotFoundException {
-        return approvalRequestRepository.findById(requestId)
+        ApprovalRequestEntity request = approvalRequestRepository.findById(requestId)
                 .orElseThrow(() -> new DataNotFoundException("Approval request " + requestId + " not found."));
+        hydrateAuditLogs(request);
+        return request;
+    }
+
+    private void hydrateAuditLogs(ApprovalRequestEntity request) {
+        if (request == null || request.getId() == null) {
+            return;
+        }
+
+        List<ApprovalRequestAuditLogEntity> auditLogs =
+                approvalRequestAuditLogRepository.findAllByApprovalRequest_IdOrderByCreatedDateAscIdAsc(request.getId());
+        request.getAuditLogs().clear();
+        request.getAuditLogs().addAll(auditLogs);
     }
 
     private ApprovalRequestStepEntity getCurrentPendingStep(ApprovalRequestEntity request) throws InvalidRequestException {

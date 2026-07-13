@@ -2,6 +2,7 @@ package com.nutalig.dto;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -14,6 +15,7 @@ public class RfqDetailDto {
     private Integer sortOrder;
     private String remark;
     private String recommend;
+    private BigDecimal commission;
     private String packageDimension;
     private String packageWeight;
     private String packageCapacity;

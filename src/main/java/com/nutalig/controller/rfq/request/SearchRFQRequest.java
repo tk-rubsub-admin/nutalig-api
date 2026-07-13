@@ -16,6 +16,8 @@ public class SearchRFQRequest {
     private String salesId;
     private String procurementId;
     private String productFamily;
+    private String productSubtype1;
+    private String productMaterial;
     private String orderType;
     private String orderTypeCode;
     private String keyword;

@@ -1899,3 +1899,99 @@ databaseChangeLog:
             columns:
               - column:
                   name: reject_action_key
+  - changeSet:
+      id: 20260712-002-add-split-currencies-to-rfq-supplier-quote-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: product_price_currency
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_tier
+            columns:
+              - column:
+                  name: product_price_currency
+                  type: VARCHAR(10)
+              - column:
+                  name: shipping_cost_currency
+                  type: VARCHAR(10)
+        - sql:
+            splitStatements: true
+            sql: |
+              UPDATE rfq_supplier_quote_tier
+              SET product_price_currency = currency
+              WHERE product_price_currency IS NULL;
+
+              UPDATE rfq_supplier_quote_tier
+              SET shipping_cost_currency = currency
+              WHERE shipping_cost_currency IS NULL;
+  - changeSet:
+      id: 20260712-003-add-commission-to-rfq-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: commission
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: commission
+                  type: DECIMAL(18,2)
+  - changeSet:
+      id: 20260712-004-add-commission-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: commission
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: commission
+                  type: DECIMAL(18,2)
+  - changeSet:
+      id: 20260713-001-add-rfq-search-fields-product-subtype1-material
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO search_field (screen_code, field_code, label_th, label_en, input_type, sort_order, active, created_date, updated_date) VALUES
+              ('RFQ_LIST', 'productSubtype1', 'Product Subtype 1', 'Product Subtype 1', 'SELECT', 55, TRUE, NOW(6), NOW(6)),
+              ('RFQ_LIST', 'productMaterial', 'Product Material', 'Product Material', 'SELECT', 56, TRUE, NOW(6), NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  label_th = VALUES(label_th),
+                  label_en = VALUES(label_en),
+                  input_type = VALUES(input_type),
+                  sort_order = VALUES(sort_order),
+                  active = VALUES(active),
+                  updated_date = NOW(6);
+
+              INSERT INTO role_search_field_visibility (role_code, screen_code, field_code, visible, updated_by, created_date, updated_date)
+              SELECT role_code, screen_code, 'productSubtype1', visible, updated_by, NOW(6), NOW(6)
+              FROM role_search_field_visibility
+              WHERE screen_code = 'RFQ_LIST' AND field_code = 'productFamily'
+              ON DUPLICATE KEY UPDATE
+                  visible = VALUES(visible),
+                  updated_by = VALUES(updated_by),
+                  updated_date = NOW(6);
+
+              INSERT INTO role_search_field_visibility (role_code, screen_code, field_code, visible, updated_by, created_date, updated_date)
+              SELECT role_code, screen_code, 'productMaterial', visible, updated_by, NOW(6), NOW(6)
+              FROM role_search_field_visibility
+              WHERE screen_code = 'RFQ_LIST' AND field_code = 'productFamily'
+              ON DUPLICATE KEY UPDATE
+                  visible = VALUES(visible),
+                  updated_by = VALUES(updated_by),
+                  updated_date = NOW(6);

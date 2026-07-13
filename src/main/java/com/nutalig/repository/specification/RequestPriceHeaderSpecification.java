@@ -57,8 +57,8 @@ public class RequestPriceHeaderSpecification {
         }
 
         return (root, query, cb) -> {
-            Join<RfqHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
-            return cb.equal(cb.lower(salesJoin.get("id")), salesId.trim().toLowerCase());
+            Join<RfqHeaderEntity, EmployeeEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            return cb.equal(cb.lower(salesJoin.get("employeeId")), salesId.trim().toLowerCase());
         };
     }
 
@@ -69,7 +69,7 @@ public class RequestPriceHeaderSpecification {
 
         return (root, query, cb) -> {
             Join<RfqHeaderEntity, EmployeeEntity> procurementJoin = root.join("procurement", JoinType.LEFT);
-            return cb.equal(cb.lower(procurementJoin.get("id")), procurementId.trim().toLowerCase());
+            return cb.equal(cb.lower(procurementJoin.get("employeeId")), procurementId.trim().toLowerCase());
         };
     }
 
@@ -90,6 +90,25 @@ public class RequestPriceHeaderSpecification {
         }
 
         return (root, query, cb) -> cb.equal(cb.lower(root.get("productFamily")), productFamily.trim().toLowerCase());
+    }
+
+    public static Specification<RfqHeaderEntity> productSubtype1Equal(String productSubtype1) {
+        if (StringUtils.isBlank(productSubtype1)) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            Join<RfqHeaderEntity, ProductSubtype1Entity> subtype1Join = root.join("productUsage", JoinType.LEFT);
+            return cb.equal(cb.lower(subtype1Join.get("code")), productSubtype1.trim().toLowerCase());
+        };
+    }
+
+    public static Specification<RfqHeaderEntity> productMaterialEqual(String productMaterial) {
+        if (StringUtils.isBlank(productMaterial)) {
+            return null;
+        }
+
+        return (root, query, cb) -> cb.equal(cb.lower(root.get("materialCode")), productMaterial.trim().toLowerCase());
     }
 
     public static Specification<RfqHeaderEntity> requestedDateBetween(LocalDate start, LocalDate end) {
@@ -126,7 +145,8 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> {
             String pattern = "%" + keyword.trim().toLowerCase() + "%";
             Join<RfqHeaderEntity, CustomerEntity> customerJoin = root.join("customer", JoinType.LEFT);
-            Join<RfqHeaderEntity, SalesEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            Join<RfqHeaderEntity, EmployeeEntity> salesJoin = root.join("sales", JoinType.LEFT);
+            Join<RfqHeaderEntity, ProductFamilyEntity> productFamilyJoin = root.join("productFamilyEntity", JoinType.LEFT);
             Join<RfqHeaderEntity, ProductSubtype1Entity> subtype1Join = root.join("productUsage", JoinType.LEFT);
             Join<RfqHeaderEntity, ProductSubtype2Entity> subtype2Join = root.join("systemMechanic", JoinType.LEFT);
             Join<RfqHeaderEntity, ProductMaterialEntity> materialJoin = root.join("material", JoinType.LEFT);
@@ -136,12 +156,15 @@ public class RequestPriceHeaderSpecification {
                     cb.like(cb.lower(root.get("contactName")), pattern),
                     cb.like(cb.lower(root.get("contactPhone")), pattern),
                     cb.like(cb.lower(root.get("productFamily")), pattern),
+                    cb.like(cb.lower(productFamilyJoin.get("nameTh")), pattern),
+                    cb.like(cb.lower(productFamilyJoin.get("nameEn")), pattern),
                     cb.like(cb.lower(subtype1Join.get("code")), pattern),
                     cb.like(cb.lower(subtype1Join.get("nameTh")), pattern),
                     cb.like(cb.lower(subtype1Join.get("nameEn")), pattern),
                     cb.like(cb.lower(subtype2Join.get("code")), pattern),
                     cb.like(cb.lower(subtype2Join.get("nameTh")), pattern),
                     cb.like(cb.lower(subtype2Join.get("nameEn")), pattern),
+                    cb.like(cb.lower(root.get("materialCode")), pattern),
                     cb.like(cb.lower(materialJoin.get("code")), pattern),
                     cb.like(cb.lower(materialJoin.get("nameTh")), pattern),
                     cb.like(cb.lower(materialJoin.get("nameEn")), pattern),
@@ -149,8 +172,10 @@ public class RequestPriceHeaderSpecification {
                     cb.like(cb.lower(root.get("description")), pattern),
                     cb.like(cb.lower(customerJoin.get("customerName")), pattern),
                     cb.like(cb.lower(customerJoin.get("companyName")), pattern),
-                    cb.like(cb.lower(salesJoin.get("name")), pattern),
-                    cb.like(cb.lower(salesJoin.get("nickname")), pattern)
+                    cb.like(cb.lower(salesJoin.get("employeeId")), pattern),
+                    cb.like(cb.lower(salesJoin.get("firstNameTh")), pattern),
+                    cb.like(cb.lower(salesJoin.get("lastNameTh")), pattern),
+                    cb.like(cb.lower(salesJoin.get("nickName")), pattern)
             );
         };
     }

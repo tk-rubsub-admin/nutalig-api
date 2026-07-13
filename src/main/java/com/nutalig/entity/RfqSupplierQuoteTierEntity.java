@@ -36,10 +36,18 @@ public class RfqSupplierQuoteTierEntity extends AuditDateEntity {
     @Column(name = "shipping_cost", precision = 18, scale = 4)
     private BigDecimal shippingCost;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "product_price_currency", length = 10)
+    private Currency productPriceCurrency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipping_cost_currency", length = 10)
+    private Currency shippingCostCurrency;
+
     @Column(name = "sort_order")
     private Integer sortOrder;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "currency")
+    @Column(name = "currency", length = 10)
     private Currency currency;
 }

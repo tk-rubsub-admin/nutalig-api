@@ -1,6 +1,9 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nutalig.config.PromptTemplateEngine;
 import com.nutalig.constant.*;
 import com.nutalig.controller.rfq.request.UpdateRfqSupplierInquiryRequest;
@@ -28,6 +31,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class RFQSupplierService {
     private static final String RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE = "RFQ_SUPPLIER_INQUIRY_TH";
+    private static final String RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE = "RFQ_SUPPLIER_QUOTE_EXTRACTION";
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
@@ -36,6 +40,7 @@ public class RFQSupplierService {
     private final SupplierRepository supplierRepository;
     private final ActivityHistoryService activityHistoryService;
     private final UserProfileService userProfileService;
+    private final AiExecutionService aiExecutionService;
     private final OpenAiService openAiService;
     private final PromptService promptService;
     private final PromptTemplateEngine promptTemplateEngine;
@@ -235,6 +240,114 @@ public class RFQSupplierService {
         return toSupplierQuoteDto(quote);
     }
 
+    @Transactional
+    public UpsertRfqSupplierQuoteRequest extractSupplierQuoteRequest(
+            String rfqId,
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request
+    ) throws Exception {
+        if (request == null || StringUtils.isBlank(request.getSupplierId())) {
+            throw new InvalidRequestException("Supplier id is required.");
+        }
+        if (StringUtils.isBlank(request.getSupplierMessage())) {
+            throw new InvalidRequestException("Supplier message is required.");
+        }
+
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+        getSupplierEntity(request.getSupplierId());
+
+        Map<String, String> variables = new HashMap<>();
+        variables.put("supplierId", request.getSupplierId().trim());
+        variables.put("inquiryId_or_null", StringUtils.defaultIfBlank(StringUtils.trimToNull(request.getInquiryId()), "null"));
+        variables.put("defaultCurrency", String.valueOf(
+                request.getDefaultCurrency() == null ? com.nutalig.constant.Currency.CNY : request.getDefaultCurrency()
+        ));
+        variables.put("rfqId", rfq.getId());
+        variables.put("rfqDetailHints_json_or_empty_array", buildRfqDetailHintsJson(rfq));
+        variables.put("supplierMessage", request.getSupplierMessage().trim());
+
+        String rawResponse = aiExecutionService.execute(RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE, variables);
+        String cleanedJson = com.nutalig.utils.ObjectUtil.extractJsonObject(rawResponse);
+        String sanitizedJson = sanitizeExtractedSupplierQuoteJson(
+                cleanedJson,
+                request.getDefaultCurrency() == null ? com.nutalig.constant.Currency.CNY : request.getDefaultCurrency()
+        );
+        UpsertRfqSupplierQuoteRequest extractedRequest =
+                objectMapper.readValue(sanitizedJson, UpsertRfqSupplierQuoteRequest.class);
+
+        return normalizeExtractedSupplierQuoteRequest(extractedRequest, request);
+    }
+
+    private String sanitizeExtractedSupplierQuoteJson(
+            String cleanedJson,
+            com.nutalig.constant.Currency defaultCurrency
+    ) throws Exception {
+        JsonNode rootNode = objectMapper.readTree(cleanedJson);
+        if (!(rootNode instanceof ObjectNode rootObject)) {
+            return cleanedJson;
+        }
+
+        JsonNode detailsNode = rootObject.get("details");
+        if (detailsNode instanceof ArrayNode detailsArray) {
+            for (JsonNode detailNode : detailsArray) {
+                if (!(detailNode instanceof ObjectNode detailObject)) {
+                    continue;
+                }
+
+                JsonNode tiersNode = detailObject.get("tiers");
+                if (!(tiersNode instanceof ArrayNode tiersArray)) {
+                    continue;
+                }
+
+                for (JsonNode tierNode : tiersArray) {
+                    if (!(tierNode instanceof ObjectNode tierObject)) {
+                        continue;
+                    }
+
+                    String rawCurrency = getTextValue(tierObject, "currency");
+                    String rawProductPriceCurrency = getTextValue(tierObject, "productPriceCurrency");
+                    String rawShippingCostCurrency = getTextValue(tierObject, "shippingCostCurrency");
+
+                    com.nutalig.constant.Currency fallbackCurrency =
+                            parseSupportedCurrency(rawCurrency, defaultCurrency);
+                    com.nutalig.constant.Currency productPriceCurrency =
+                            parseSupportedCurrency(rawProductPriceCurrency, fallbackCurrency);
+                    com.nutalig.constant.Currency shippingCostCurrency =
+                            parseSupportedCurrency(rawShippingCostCurrency, fallbackCurrency);
+
+                    tierObject.put("currency", productPriceCurrency.name());
+                    tierObject.put("productPriceCurrency", productPriceCurrency.name());
+                    tierObject.put("shippingCostCurrency", shippingCostCurrency.name());
+                }
+            }
+        }
+
+        return objectMapper.writeValueAsString(rootObject);
+    }
+
+    private String getTextValue(ObjectNode objectNode, String fieldName) {
+        JsonNode valueNode = objectNode.get(fieldName);
+        if (valueNode == null || valueNode.isNull()) {
+            return null;
+        }
+
+        return StringUtils.trimToNull(valueNode.asText());
+    }
+
+    private com.nutalig.constant.Currency parseSupportedCurrency(
+            String rawCurrency,
+            com.nutalig.constant.Currency fallbackCurrency
+    ) {
+        if (StringUtils.isBlank(rawCurrency)) {
+            return fallbackCurrency;
+        }
+
+        try {
+            return com.nutalig.constant.Currency.valueOf(rawCurrency.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            return fallbackCurrency;
+        }
+    }
+
     private void saveRfqStatusTimeline(RfqHeaderEntity rfq, RfqStatus status, ZonedDateTime statusDatetime) {
         if (rfq == null || status == null || statusDatetime == null) {
             return;
@@ -252,6 +365,146 @@ public class RFQSupplierService {
         timeline.setRfqHeader(rfq);
         timeline.setStatusDatetime(statusDatetime);
         rfqStatusTimelineRepository.save(timeline);
+    }
+
+    private String buildRfqDetailHintsJson(RfqHeaderEntity rfq) {
+        try {
+            List<Map<String, Object>> detailHints = Optional.ofNullable(rfq.getDetails())
+                    .orElse(List.of())
+                    .stream()
+                    .sorted(Comparator.comparing(RfqDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                            .thenComparing(RfqDetailEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                    .map(detail -> {
+                        Map<String, Object> hint = new LinkedHashMap<>();
+                        hint.put("id", detail.getId());
+                        hint.put("optionName", StringUtils.trimToNull(detail.getOptionName()));
+                        hint.put("spec", StringUtils.trimToNull(detail.getSpec()));
+                        hint.put("remark", StringUtils.trimToNull(detail.getRemark()));
+                        return hint;
+                    })
+                    .toList();
+            return objectMapper.writeValueAsString(detailHints);
+        } catch (Exception exception) {
+            log.warn("Serialize rfq detail hints failed for rfq {}", rfq.getId(), exception);
+            return "[]";
+        }
+    }
+
+    private UpsertRfqSupplierQuoteRequest normalizeExtractedSupplierQuoteRequest(
+            UpsertRfqSupplierQuoteRequest extractedRequest,
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest contextRequest
+    ) {
+        UpsertRfqSupplierQuoteRequest normalized = extractedRequest == null
+                ? new UpsertRfqSupplierQuoteRequest()
+                : extractedRequest;
+
+        normalized.setSupplierId(StringUtils.trimToNull(contextRequest.getSupplierId()));
+        normalized.setInquiryId(StringUtils.trimToNull(contextRequest.getInquiryId()));
+        normalized.setStatus(RfqSupplierQuoteStatus.RESPONDED);
+        normalized.setRemark(StringUtils.trimToNull(normalized.getRemark()));
+
+        List<UpsertRfqSupplierQuoteRequest.DetailRequest> normalizedDetails = new ArrayList<>();
+        List<UpsertRfqSupplierQuoteRequest.DetailRequest> detailRequests =
+                Optional.ofNullable(normalized.getDetails()).orElse(List.of());
+        for (int detailIndex = 0; detailIndex < detailRequests.size(); detailIndex++) {
+            UpsertRfqSupplierQuoteRequest.DetailRequest detail = detailRequests.get(detailIndex);
+            if (detail == null) {
+                continue;
+            }
+
+            detail.setOptionName(StringUtils.trimToNull(detail.getOptionName()));
+            detail.setSpec(StringUtils.trimToNull(detail.getSpec()));
+            detail.setRemark(StringUtils.trimToNull(detail.getRemark()));
+            detail.setPackageName(StringUtils.trimToNull(detail.getPackageName()));
+            detail.setPackageDimension(StringUtils.trimToNull(detail.getPackageDimension()));
+            detail.setPackageWeight(StringUtils.trimToNull(detail.getPackageWeight()));
+            detail.setPackageCapacity(StringUtils.trimToNull(detail.getPackageCapacity()));
+            detail.setSortOrder(detailIndex + 1);
+
+            List<UpsertRfqSupplierQuoteRequest.PackageRequest> normalizedPackages = new ArrayList<>();
+            List<UpsertRfqSupplierQuoteRequest.PackageRequest> packageRequests =
+                    Optional.ofNullable(detail.getPackages()).orElse(List.of());
+            for (int packageIndex = 0; packageIndex < packageRequests.size(); packageIndex++) {
+                UpsertRfqSupplierQuoteRequest.PackageRequest packageRequest = packageRequests.get(packageIndex);
+                if (packageRequest == null) {
+                    continue;
+                }
+
+                packageRequest.setPackageName(StringUtils.trimToNull(packageRequest.getPackageName()));
+                packageRequest.setPackageDimension(StringUtils.trimToNull(packageRequest.getPackageDimension()));
+                packageRequest.setPackageWeight(StringUtils.trimToNull(packageRequest.getPackageWeight()));
+                packageRequest.setPackageCapacity(StringUtils.trimToNull(packageRequest.getPackageCapacity()));
+                packageRequest.setSortOrder(packageIndex + 1);
+                normalizedPackages.add(packageRequest);
+            }
+            detail.setPackages(normalizedPackages);
+
+            if ((detail.getPackageName() == null || detail.getPackageDimension() == null || detail.getPackageWeight() == null || detail.getPackageCapacity() == null)
+                    && !normalizedPackages.isEmpty()) {
+                UpsertRfqSupplierQuoteRequest.PackageRequest firstPackage = normalizedPackages.get(0);
+                if (detail.getPackageName() == null) {
+                    detail.setPackageName(firstPackage.getPackageName());
+                }
+                if (detail.getPackageDimension() == null) {
+                    detail.setPackageDimension(firstPackage.getPackageDimension());
+                }
+                if (detail.getPackageWeight() == null) {
+                    detail.setPackageWeight(firstPackage.getPackageWeight());
+                }
+                if (detail.getPackageCapacity() == null) {
+                    detail.setPackageCapacity(firstPackage.getPackageCapacity());
+                }
+            }
+
+            List<UpsertRfqSupplierQuoteRequest.TierRequest> normalizedTiers = new ArrayList<>();
+            List<UpsertRfqSupplierQuoteRequest.TierRequest> tierRequests =
+                    Optional.ofNullable(detail.getTiers()).orElse(List.of());
+            for (int tierIndex = 0; tierIndex < tierRequests.size(); tierIndex++) {
+                UpsertRfqSupplierQuoteRequest.TierRequest tierRequest = tierRequests.get(tierIndex);
+                if (tierRequest == null) {
+                    continue;
+                }
+
+                tierRequest.setShippingCost(tierRequest.getShippingCost() == null ? BigDecimal.ZERO : tierRequest.getShippingCost());
+                com.nutalig.constant.Currency defaultCurrency = contextRequest.getDefaultCurrency() == null
+                        ? com.nutalig.constant.Currency.CNY
+                        : contextRequest.getDefaultCurrency();
+                com.nutalig.constant.Currency fallbackCurrency = tierRequest.getCurrency() == null
+                        ? defaultCurrency
+                        : tierRequest.getCurrency();
+                tierRequest.setProductPriceCurrency(tierRequest.getProductPriceCurrency() == null
+                        ? fallbackCurrency
+                        : tierRequest.getProductPriceCurrency());
+                tierRequest.setShippingCostCurrency(tierRequest.getShippingCostCurrency() == null
+                        ? fallbackCurrency
+                        : tierRequest.getShippingCostCurrency());
+                tierRequest.setCurrency(tierRequest.getProductPriceCurrency());
+                tierRequest.setSortOrder(tierIndex + 1);
+                normalizedTiers.add(tierRequest);
+            }
+            detail.setTiers(normalizedTiers);
+            normalizedDetails.add(detail);
+        }
+        normalized.setDetails(normalizedDetails);
+
+        List<UpsertRfqSupplierQuoteRequest.AdditionalCostRequest> normalizedAdditionalCosts = new ArrayList<>();
+        List<UpsertRfqSupplierQuoteRequest.AdditionalCostRequest> additionalCostRequests =
+                Optional.ofNullable(normalized.getAdditionalCosts()).orElse(List.of());
+        for (int additionalCostIndex = 0; additionalCostIndex < additionalCostRequests.size(); additionalCostIndex++) {
+            UpsertRfqSupplierQuoteRequest.AdditionalCostRequest additionalCost = additionalCostRequests.get(additionalCostIndex);
+            if (additionalCost == null || StringUtils.isBlank(additionalCost.getDescription())) {
+                continue;
+            }
+
+            additionalCost.setDescription(additionalCost.getDescription().trim());
+            additionalCost.setUnit(StringUtils.trimToNull(additionalCost.getUnit()));
+            additionalCost.setValue(StringUtils.trimToNull(additionalCost.getValue()));
+            additionalCost.setSortOrder(normalizedAdditionalCosts.size() + 1);
+            normalizedAdditionalCosts.add(additionalCost);
+        }
+        normalized.setAdditionalCosts(normalizedAdditionalCosts);
+
+        return normalized;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -407,7 +660,13 @@ public class RFQSupplierService {
         dto.setQuantity(entity.getQuantity());
         dto.setProductPrice(entity.getProductPrice());
         dto.setShippingCost(entity.getShippingCost());
-        dto.setCurrency(entity.getCurrency());
+        dto.setProductPriceCurrency(entity.getProductPriceCurrency() == null
+                ? entity.getCurrency()
+                : entity.getProductPriceCurrency());
+        dto.setShippingCostCurrency(entity.getShippingCostCurrency() == null
+                ? entity.getCurrency()
+                : entity.getShippingCostCurrency());
+        dto.setCurrency(dto.getProductPriceCurrency());
         dto.setSortOrder(entity.getSortOrder());
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setUpdatedDate(entity.getUpdatedDate());
@@ -519,7 +778,15 @@ public class RFQSupplierService {
         detail.put("quantity", entity.getQuantity());
         detail.put("productPrice", entity.getProductPrice());
         detail.put("shippingCost", entity.getShippingCost());
-        detail.put("currency", entity.getCurrency());
+        detail.put("productPriceCurrency", entity.getProductPriceCurrency() == null
+                ? entity.getCurrency()
+                : entity.getProductPriceCurrency());
+        detail.put("shippingCostCurrency", entity.getShippingCostCurrency() == null
+                ? entity.getCurrency()
+                : entity.getShippingCostCurrency());
+        detail.put("currency", entity.getProductPriceCurrency() == null
+                ? entity.getCurrency()
+                : entity.getProductPriceCurrency());
         detail.put("sortOrder", entity.getSortOrder());
         return detail;
     }
@@ -678,9 +945,9 @@ public class RFQSupplierService {
 
         List<UpsertRfqSupplierQuoteRequest.PackageRequest> packageRequests =
                 Optional.ofNullable(request.getPackages()).orElse(List.of());
-        String packageDimension = StringUtils.trimToNull(request.getPackageDimension());
-        String packageWeight = StringUtils.trimToNull(request.getPackageWeight());
-        String packageCapacity = StringUtils.trimToNull(request.getPackageCapacity());
+        String packageDimension = normalizePackageDimension(request.getPackageDimension());
+        String packageWeight = normalizePackageWeight(request.getPackageWeight());
+        String packageCapacity = normalizePackageCapacity(request.getPackageCapacity());
         if (!packageRequests.isEmpty()) {
             UpsertRfqSupplierQuoteRequest.PackageRequest firstPackageRequest = packageRequests.stream()
                     .sorted(Comparator.comparing(UpsertRfqSupplierQuoteRequest.PackageRequest::getSortOrder,
@@ -688,13 +955,13 @@ public class RFQSupplierService {
                     .findFirst()
                     .orElse(null);
             if (StringUtils.isBlank(packageDimension) && firstPackageRequest != null) {
-                packageDimension = StringUtils.trimToNull(firstPackageRequest.getPackageDimension());
+                packageDimension = normalizePackageDimension(firstPackageRequest.getPackageDimension());
             }
             if (StringUtils.isBlank(packageWeight) && firstPackageRequest != null) {
-                packageWeight = StringUtils.trimToNull(firstPackageRequest.getPackageWeight());
+                packageWeight = normalizePackageWeight(firstPackageRequest.getPackageWeight());
             }
             if (StringUtils.isBlank(packageCapacity) && firstPackageRequest != null) {
-                packageCapacity = StringUtils.trimToNull(firstPackageRequest.getPackageCapacity());
+                packageCapacity = normalizePackageCapacity(firstPackageRequest.getPackageCapacity());
             }
             int packageSortOrder = 1;
             for (UpsertRfqSupplierQuoteRequest.PackageRequest packageRequest : packageRequests) {
@@ -745,7 +1012,13 @@ public class RFQSupplierService {
         entity.setQuantity(request.getQuantity());
         entity.setProductPrice(request.getProductPrice());
         entity.setShippingCost(defaultZero(request.getShippingCost()));
-        entity.setCurrency(request.getCurrency());
+        entity.setProductPriceCurrency(request.getProductPriceCurrency() == null
+                ? request.getCurrency()
+                : request.getProductPriceCurrency());
+        entity.setShippingCostCurrency(request.getShippingCostCurrency() == null
+                ? request.getCurrency()
+                : request.getShippingCostCurrency());
+        entity.setCurrency(entity.getProductPriceCurrency());
         entity.setSortOrder(sortOrder);
         return entity;
     }
@@ -791,11 +1064,38 @@ public class RFQSupplierService {
     ) {
         RfqSupplierQuoteDetailPackageEntity entity = new RfqSupplierQuoteDetailPackageEntity();
         entity.setPackageName(StringUtils.trimToNull(packageName));
-        entity.setPackageDimension(StringUtils.trimToNull(packageDimension));
-        entity.setPackageWeight(StringUtils.trimToNull(packageWeight));
-        entity.setPackageCapacity(StringUtils.trimToNull(packageCapacity));
+        entity.setPackageDimension(normalizePackageDimension(packageDimension));
+        entity.setPackageWeight(normalizePackageWeight(packageWeight));
+        entity.setPackageCapacity(normalizePackageCapacity(packageCapacity));
         entity.setSortOrder(sortOrder);
         return entity;
+    }
+
+    private String normalizePackageDimension(String value) {
+        return appendPackageUnit(value, "cm.");
+    }
+
+    private String normalizePackageWeight(String value) {
+        return appendPackageUnit(value, "kg.");
+    }
+
+    private String normalizePackageCapacity(String value) {
+        return appendPackageUnit(value, "pcs.");
+    }
+
+    private String appendPackageUnit(String value, String unit) {
+        String normalizedValue = StringUtils.trimToNull(value);
+        if (normalizedValue == null) {
+            return null;
+        }
+
+        String valueWithoutDot = normalizedValue.replaceAll("\\.$", "");
+        String normalizedUnit = unit.toLowerCase(Locale.ROOT);
+        if (valueWithoutDot.toLowerCase(Locale.ROOT).endsWith(normalizedUnit)) {
+            return valueWithoutDot + ".";
+        }
+
+        return normalizedValue + " " + normalizedUnit + ".";
     }
 
     private void validatePositive(BigDecimal value, String fieldName) throws InvalidRequestException {

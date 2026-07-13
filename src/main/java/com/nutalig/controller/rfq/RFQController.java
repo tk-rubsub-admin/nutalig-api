@@ -183,6 +183,19 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{id}/supplier-quotes/extract")
+    public GeneralResponse<UpsertRfqSupplierQuoteRequest> extractSupplierQuote(
+            @PathVariable("id") String id,
+            @RequestBody ExtractRfqSupplierQuoteRequest request
+    ) throws Exception {
+        log.info("=== Start extract supplier quote rfq {} supplier {} ===", id, request == null ? null : request.getSupplierId());
+
+        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.extractSupplierQuoteRequest(id, request);
+
+        log.info("=== End extract supplier quote rfq {} supplier {} ===", id, response == null ? null : response.getSupplierId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/{id}/supplier-quotes/{quoteId}")
     public GeneralResponse<RfqSupplierQuoteDto> updateSupplierQuote(
             @PathVariable("id") String id,

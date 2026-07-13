@@ -13,6 +13,7 @@ public class RfqTierDto {
     private SupplierDto supplier;
     private BigDecimal quantity;
     private BigDecimal productPrice;
+    private BigDecimal commission;
     private Currency currency;
     private BigDecimal exchangeRate;
     private BigDecimal landFreightCost;

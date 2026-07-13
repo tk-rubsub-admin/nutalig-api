@@ -13,10 +13,10 @@ import java.util.Optional;
 @Repository
 public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequestEntity, Long> {
 
-    @EntityGraph(attributePaths = {"steps", "steps.approverUser", "steps.actedByUser", "auditLogs", "auditLogs.actorUser"})
+    @EntityGraph(attributePaths = {"steps", "steps.approverUser", "steps.actedByUser"})
     Optional<ApprovalRequestEntity> findById(Long id);
 
-    @EntityGraph(attributePaths = {"steps", "steps.approverUser", "steps.actedByUser", "auditLogs", "auditLogs.actorUser"})
+    @EntityGraph(attributePaths = {"steps", "steps.approverUser", "steps.actedByUser"})
     Optional<ApprovalRequestEntity> findFirstByEntityTypeAndReferenceIdAndStatusInOrderByCreatedDateDesc(
             ActivityEntityType entityType,
             String referenceId,
