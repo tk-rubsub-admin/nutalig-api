@@ -15,8 +15,8 @@ public class PurchaseOrderDto {
     private Integer productionLeadTimeDay;
     private Integer shippingLeadTimeDay;
     private PurchaseOrderStatus status;
+    private DocumentStatusProfileDto statusProfile;
     private Currency currency;
-    private BigDecimal exchangeRate;
     private SupplierDto supplier;
     private SupplierShippingDto supplierShipping;
     private BigDecimal subTotal;

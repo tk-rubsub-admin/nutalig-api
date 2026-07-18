@@ -13,10 +13,13 @@ public class UpdateSalesOrderRequest {
     private String coSaleId;
     private BigDecimal amount;
     private BigDecimal commission;
+    private BigDecimal coSaleCommission;
     private BigDecimal discount;
     private BigDecimal freight;
     private Boolean isVat;
     private String shippingType;
+    private Boolean requestCoa;
+    private Boolean requestPo;
     private String remark;
     private List<UpdateSalesOrderDetailRequest> items;
 }

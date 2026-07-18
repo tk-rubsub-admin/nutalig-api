@@ -1,5 +1,6 @@
 package com.nutalig.entity;
 
+import com.nutalig.constant.InvoicePaymentStatus;
 import com.nutalig.constant.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -59,6 +60,10 @@ public class InvoicePaymentEntity extends AuditDateEntity {
 
     @Column(name = "receipt_no", length = 50)
     private String receiptNo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 30, nullable = false)
+    private InvoicePaymentStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")

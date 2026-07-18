@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import static com.nutalig.constant.ResponseStatus.SUCCESS;
@@ -78,6 +79,34 @@ public class SalesOrderController {
         SalesOrderDto response = salesOrderService.updateSalesOrder(id, request, userId);
 
         log.info("=== End update sales order {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping(path = "/{id}/attachments", consumes = "multipart/form-data")
+    public GeneralResponse<SalesOrderDto> addAttachments(
+            @PathVariable(name = "id") String id,
+            @RequestPart("attachments") java.util.List<MultipartFile> attachments,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start add sales order attachments {} ===", id);
+
+        SalesOrderDto response = salesOrderService.addAttachments(id, attachments, userId);
+
+        log.info("=== End add sales order attachments {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    public GeneralResponse<SalesOrderDto> deleteAttachment(
+            @PathVariable(name = "id") String id,
+            @PathVariable(name = "attachmentId") Long attachmentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start delete sales order attachment {} from {} ===", attachmentId, id);
+
+        SalesOrderDto response = salesOrderService.deleteAttachment(id, attachmentId, userId);
+
+        log.info("=== End delete sales order attachment {} from {} ===", attachmentId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

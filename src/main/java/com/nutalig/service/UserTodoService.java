@@ -3,10 +3,13 @@ package com.nutalig.service;
 import com.nutalig.constant.UserTodoPriority;
 import com.nutalig.constant.UserTodoStatus;
 import com.nutalig.constant.UserTodoType;
+import com.nutalig.controller.user.request.CreateUserTodoRequest;
 import com.nutalig.dto.UserTodoDto;
 import com.nutalig.entity.UserEntity;
 import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
+import com.nutalig.exception.InvalidRequestException;
+import com.nutalig.repository.UserRepository;
 import com.nutalig.repository.UserTodoRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,7 @@ import java.util.Objects;
 public class UserTodoService {
 
     private final UserTodoRepository userTodoRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public List<UserTodoDto> getTodosByUser(String userId, List<UserTodoStatus> statuses, UserTodoType todoType) {
@@ -71,6 +75,34 @@ public class UserTodoService {
         entity.setUpdatedBy(userId);
 
         return toDto(userTodoRepository.save(entity));
+    }
+
+    @Transactional
+    public UserTodoDto createTodoForUser(String userId, CreateUserTodoRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getTitle())) {
+            throw new InvalidRequestException("Title is required.");
+        }
+
+        UserEntity ownerUser = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        UserTodoEntity entity = buildUserTodoEntity(
+                ownerUser,
+                request.getTodoType() != null ? request.getTodoType() : UserTodoType.GENERAL,
+                request.getTitle(),
+                request.getDescription(),
+                UserTodoStatus.TODO,
+                request.getPriority() != null ? request.getPriority() : UserTodoPriority.MEDIUM,
+                request.getTargetModule(),
+                request.getTargetId(),
+                request.getTargetPath(),
+                request.getDueDate(),
+                request.getSortOrder(),
+                userId
+        );
+
+        return toDto(entity);
     }
 
     public UserTodoEntity buildUserTodoEntity(

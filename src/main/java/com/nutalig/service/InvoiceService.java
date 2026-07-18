@@ -1,8 +1,13 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.*;
+import com.nutalig.config.LineConfiguration;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
+import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pageable;
@@ -24,21 +29,28 @@ import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.UserRepository;
+import com.nutalig.security.JwtUtil;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -50,6 +62,11 @@ import static com.nutalig.repository.specification.InvoiceSpecification.*;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
+    private static final String CLAIM_ACTION = "action";
+    private static final String CLAIM_PAYMENT_ID = "paymentId";
+    private static final String ACTION_AWAITING_VALIDATION_VIEW = "awaiting-validation-view";
+    private static final long AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS = 24 * 60 * 60;
+    private static final String PUBLIC_TOKEN_ACTOR = "PUBLIC_TOKEN";
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final ActivityHistoryService activityHistoryService;
@@ -63,6 +80,9 @@ public class InvoiceService {
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
     private final UserMapper userMapper;
+    private final ObjectMapper objectMapper;
+    private final LineMessageService lineMessageService;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional(rollbackFor = Exception.class)
     public InvoiceEntity createInvoice(CreateInvoiceRequest request, String userId)
@@ -144,6 +164,97 @@ public class InvoiceService {
         InvoiceEntity entity = invoiceRepository.findById(invoiceNo)
                 .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
         return mapToDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public InvoiceAwaitingValidationResponse resolveAwaitingValidationToken(String token) throws DataNotFoundException, InvalidRequestException {
+        AwaitingValidationTokenClaims claims = parseAwaitingValidationToken(token);
+        InvoiceEntity entity = invoiceRepository.findById(claims.invoiceNo())
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + claims.invoiceNo() + " not found."));
+        resolvePayment(entity, claims.paymentId());
+        return InvoiceAwaitingValidationResponse.builder()
+                .invoice(mapToDto(entity))
+                .paymentId(claims.paymentId())
+                .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceAwaitingValidationResponse approveAwaitingValidationByToken(String token)
+            throws DataNotFoundException, InvalidRequestException {
+        AwaitingValidationTokenClaims claims = parseAwaitingValidationToken(token);
+        InvoiceEntity invoice = invoiceRepository.findById(claims.invoiceNo())
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + claims.invoiceNo() + " not found."));
+        InvoicePaymentEntity payment = resolvePayment(invoice, claims.paymentId());
+
+        if (payment.getStatus() != InvoicePaymentStatus.PENDING) {
+            throw new InvalidRequestException("Invoice payment is already processed.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        payment.setStatus(InvoicePaymentStatus.APPROVE);
+        payment.setUpdatedBy(null);
+        payment.setUpdatedDate(now);
+        invoice.setStatus(resolveValidatedInvoiceStatus(invoice));
+        invoice.setUpdatedBy(null);
+        invoice.setUpdatedDate(now);
+
+        markSalesOrderReadyForProcurementIfDepositPaid(invoice, PUBLIC_TOKEN_ACTOR);
+        InvoiceEntity saved = invoiceRepository.save(invoice);
+        recordAwaitingValidationDecisionActivity(
+                saved,
+                payment,
+                ActivityAction.APPROVE,
+                "อนุมัติการรับชำระเงินผ่านลิงก์สาธารณะ"
+        );
+        return InvoiceAwaitingValidationResponse.builder()
+                .invoice(mapToDto(saved))
+                .paymentId(payment.getId())
+                .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceAwaitingValidationResponse rejectAwaitingValidationByToken(String token)
+            throws DataNotFoundException, InvalidRequestException {
+        AwaitingValidationTokenClaims claims = parseAwaitingValidationToken(token);
+        InvoiceEntity invoice = invoiceRepository.findById(claims.invoiceNo())
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + claims.invoiceNo() + " not found."));
+        InvoicePaymentEntity payment = resolvePayment(invoice, claims.paymentId());
+
+        if (payment.getStatus() != InvoicePaymentStatus.PENDING) {
+            throw new InvalidRequestException("Invoice payment is already processed.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        BigDecimal nextPaidTotal = defaultIfNull(invoice.getPaidTotal()).subtract(defaultIfNull(payment.getAmount()));
+        if (nextPaidTotal.compareTo(BigDecimal.ZERO) < 0) {
+            nextPaidTotal = BigDecimal.ZERO;
+        }
+
+        BigDecimal nextOutstandingTotal = defaultIfNull(invoice.getGrandTotal()).subtract(nextPaidTotal);
+        if (nextOutstandingTotal.compareTo(BigDecimal.ZERO) < 0) {
+            nextOutstandingTotal = BigDecimal.ZERO;
+        }
+
+        payment.setStatus(InvoicePaymentStatus.REJECT);
+        payment.setUpdatedBy(null);
+        payment.setUpdatedDate(now);
+        invoice.setPaidTotal(nextPaidTotal);
+        invoice.setOutstandingTotal(nextOutstandingTotal);
+        invoice.setStatus(resolveValidatedInvoiceStatus(invoice));
+        invoice.setUpdatedBy(null);
+        invoice.setUpdatedDate(now);
+
+        InvoiceEntity saved = invoiceRepository.save(invoice);
+        recordAwaitingValidationDecisionActivity(
+                saved,
+                payment,
+                ActivityAction.REJECT,
+                "ปฏิเสธการรับชำระเงินผ่านลิงก์สาธารณะ"
+        );
+        return InvoiceAwaitingValidationResponse.builder()
+                .invoice(mapToDto(saved))
+                .paymentId(payment.getId())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -238,7 +349,7 @@ public class InvoiceService {
         InvoiceStatus beforeStatus = invoice.getStatus();
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
-        com.nutalig.controller.file.response.UploadFileResponse uploadedSlip = null;
+        UploadFileResponse uploadedSlip = null;
         if (slipFile != null && !slipFile.isEmpty()) {
             uploadedSlip = fileStorageService.uploadFile(slipFile);
         }
@@ -253,6 +364,7 @@ public class InvoiceService {
         payment.setChequeBranch(StringUtils.trimToNull(chequeBranch));
         payment.setSlipFileName(uploadedSlip != null ? uploadedSlip.getFileName() : null);
         payment.setSlipFileUrl(uploadedSlip != null ? uploadedSlip.getUrl() : null);
+        payment.setStatus(InvoicePaymentStatus.PENDING);
         payment.setCreatedBy(user);
         payment.setUpdatedBy(user);
         payment.setCreatedDate(now);
@@ -267,16 +379,51 @@ public class InvoiceService {
 
         invoice.setPaidTotal(nextPaidTotal);
         invoice.setOutstandingTotal(nextOutstandingTotal);
-        invoice.setStatus(nextOutstandingTotal.compareTo(BigDecimal.ZERO) == 0
-                ? InvoiceStatus.PAID
-                : InvoiceStatus.PARTIALLY_PAID);
+        invoice.setStatus(InvoiceStatus.AWAITING_VALIDATION);
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
         markSalesOrderReadyForProcurementIfDepositPaid(invoice, userId);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
         recordReceivePaymentActivity(saved, payment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
+        sendAwaitingValidationNotifications(saved, payment);
         return mapToDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto sendAwaitingValidationNotification(String invoiceNo, Long paymentId, String userId) throws Exception {
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        InvoicePaymentEntity payment = invoice.getPayments().stream()
+                .filter(item -> Objects.equals(item.getId(), paymentId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Invoice payment " + paymentId + " not found."));
+
+        if (invoice.getStatus() != InvoiceStatus.AWAITING_VALIDATION) {
+            throw new InvalidRequestException("Invoice status must be AWAITING_VALIDATION.");
+        }
+
+        sendAwaitingValidationNotifications(invoice, payment);
+
+        activityHistoryService.record(
+                ActivityEntityType.INVOICE,
+                invoice.getInvoiceNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.WEB,
+                "ส่งแจ้งเตือนตรวจสอบการรับชำระเงิน Invoice เลขที่ " + invoice.getInvoiceNo(),
+                Map.of(
+                        "paymentId", payment.getId(),
+                        "paymentAmount", payment.getAmount(),
+                        "paymentMethod", payment.getPaymentMethod()
+                )
+        );
+
+        return mapToDto(invoice);
     }
 
     @Transactional(readOnly = true)
@@ -525,6 +672,7 @@ public class InvoiceService {
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setDueDate(entity.getDueDate() != null ? entity.getDueDate().format(DateUtil.DD_MM_YY) : null);
         dto.setStatus(entity.getStatus());
+        dto.setStatusProfile(DocumentStatusResolver.resolveInvoice(entity.getStatus(), entity.getPayments()));
         dto.setCurrency(entity.getCurrency());
         dto.setCustomer(customerMapper.toDto(entity.getCustomer()));
         dto.setCustomerAddress(customerMapper.toAddressDto(entity.getCustomerAddress()));
@@ -585,6 +733,7 @@ public class InvoiceService {
             paymentDto.setSlipFileName(payment.getSlipFileName());
             paymentDto.setSlipFileUrl(payment.getSlipFileUrl());
             paymentDto.setReceiptNo(payment.getReceiptNo());
+            paymentDto.setStatus(payment.getStatus());
             paymentDto.setCreatedBy(userMapper.toDto(payment.getCreatedBy()));
             paymentDto.setUpdatedBy(userMapper.toDto(payment.getUpdatedBy()));
             paymentDto.setCreatedDate(payment.getCreatedDate());
@@ -752,5 +901,154 @@ public class InvoiceService {
                 "รับชำระเงิน Invoice เลขที่ " + invoice.getInvoiceNo(),
                 detail
         );
+    }
+
+    private void sendAwaitingValidationNotifications(InvoiceEntity invoice, InvoicePaymentEntity payment) {
+        try {
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("SUPER_ADMIN")).stream()
+                    .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                    .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                    .toList();
+
+            if (adminUsers.isEmpty()) {
+                log.warn("No active ADMIN users with LINE binding found for invoice {}", invoice.getInvoiceNo());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "มีรายการรับชำระเงินรอตรวจสอบ " + invoice.getInvoiceNo());
+            placeholders.put("title", "รอตรวจสอบการรับชำระเงิน");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "Invoice %s ของ %s มียอดรับชำระ %s บาท และอยู่ในสถานะรอตรวจสอบ",
+                            StringUtils.defaultString(invoice.getInvoiceNo(), "-"),
+                            invoice.getCustomer() != null
+                                    ? StringUtils.defaultString(invoice.getCustomer().getCustomerName(), "-")
+                                    : "-",
+                            String.format(
+                                    "%,.2f",
+                                    defaultIfNull(invoice.getPaidTotal()).setScale(2, RoundingMode.HALF_UP)
+                            )
+                    )
+            );
+            placeholders.put("detailUrl", buildAwaitingValidationUrl(invoice.getInvoiceNo(), payment.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            for (UserEntity adminUser : adminUsers) {
+                try {
+                    lineMessageService.sendFlexMessage(adminUser.getLineUserId(), message);
+                } catch (Exception exception) {
+                    log.warn("Cannot send awaiting validation notification to admin {}", adminUser.getId(), exception);
+                }
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send awaiting validation notifications for invoice {}", invoice.getInvoiceNo(), exception);
+        }
+    }
+
+    private JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
+        ClassPathResource resource = new ClassPathResource("line/notification.json");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            String rendered = template;
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                rendered = rendered.replace("${" + entry.getKey() + "}", StringUtils.defaultString(entry.getValue()));
+            }
+            return objectMapper.readTree(rendered);
+        }
+    }
+
+    private String buildAwaitingValidationUrl(String invoiceNo, Long paymentId) throws InvalidRequestException {
+        String token = buildAwaitingValidationToken(invoiceNo, paymentId);
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/invoice-awaiting-validation")
+                .queryParam("token", token)
+                .build()
+                .toUriString();
+    }
+
+    private String buildAwaitingValidationToken(String invoiceNo, Long paymentId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(CLAIM_ACTION, ACTION_AWAITING_VALIDATION_VIEW);
+        claims.put(CLAIM_PAYMENT_ID, paymentId);
+        return JwtUtil.generateToken(invoiceNo, claims, AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS);
+    }
+
+    private AwaitingValidationTokenClaims parseAwaitingValidationToken(String token) throws InvalidRequestException {
+        if (StringUtils.isBlank(token) || !JwtUtil.isValid(token)) {
+            throw new InvalidRequestException("Awaiting validation token is invalid or expired.");
+        }
+
+        String action = JwtUtil.getClaim(token, CLAIM_ACTION);
+        if (!StringUtils.equalsIgnoreCase(ACTION_AWAITING_VALIDATION_VIEW, action)) {
+            throw new InvalidRequestException("Awaiting validation token action mismatch.");
+        }
+
+        String invoiceNo = JwtUtil.getSubject(token);
+        String paymentIdValue = JwtUtil.getClaim(token, CLAIM_PAYMENT_ID);
+        if (StringUtils.isBlank(invoiceNo) || StringUtils.isBlank(paymentIdValue)) {
+            throw new InvalidRequestException("Awaiting validation token payload is invalid.");
+        }
+
+        try {
+            return new AwaitingValidationTokenClaims(invoiceNo, Long.valueOf(paymentIdValue));
+        } catch (NumberFormatException exception) {
+            throw new InvalidRequestException("Awaiting validation token payload is invalid.");
+        }
+    }
+
+    private InvoicePaymentEntity resolvePayment(InvoiceEntity invoice, Long paymentId) throws DataNotFoundException {
+        return invoice.getPayments().stream()
+                .filter(item -> Objects.equals(item.getId(), paymentId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Invoice payment " + paymentId + " not found."));
+    }
+
+    private InvoiceStatus resolveValidatedInvoiceStatus(InvoiceEntity invoice) {
+        BigDecimal paidTotal = defaultIfNull(invoice.getPaidTotal());
+        BigDecimal outstandingTotal = defaultIfNull(invoice.getOutstandingTotal());
+
+        if (paidTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return InvoiceStatus.ISSUED;
+        }
+        if (outstandingTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return InvoiceStatus.PAID;
+        }
+        return InvoiceStatus.PARTIALLY_PAID;
+    }
+
+    private void recordAwaitingValidationDecisionActivity(
+            InvoiceEntity invoice,
+            InvoicePaymentEntity payment,
+            ActivityAction action,
+            String summary
+    ) {
+        activityHistoryService.record(
+                ActivityEntityType.INVOICE,
+                invoice.getInvoiceNo(),
+                PUBLIC_TOKEN_ACTOR,
+                ActivityActorType.SYSTEM,
+                action,
+                ActivitySource.WEB,
+                summary + " Invoice เลขที่ " + invoice.getInvoiceNo(),
+                Map.of(
+                        "paymentId", payment.getId(),
+                        "paymentAmount", payment.getAmount(),
+                        "paymentStatus", payment.getStatus(),
+                        "invoiceStatus", invoice.getStatus()
+                )
+        );
+    }
+
+    private record AwaitingValidationTokenClaims(String invoiceNo, Long paymentId) {}
+
+    private String buildFrontendBaseUrl() throws InvalidRequestException {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new InvalidRequestException("LINE frontend redirect URL is not configured");
+        }
+        URI uri = URI.create(loginSuccessUrl);
+        return uri.getScheme() + "://" + uri.getAuthority();
     }
 }

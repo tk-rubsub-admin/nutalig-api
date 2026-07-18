@@ -14,6 +14,8 @@ public class RfqHeaderDto {
     private String id;
     private ZonedDateTime requestedDate;
     private RfqStatus status;
+    private String referenceRfqId;
+    private RfqReferenceDto referenceRfq;
     private String contactName;
     private String contactPhone;
     private EmployeeDto sales;
@@ -50,6 +52,7 @@ public class RfqHeaderDto {
     private ZonedDateTime quotedDate;
     private String quotationNo;
     private String saleOrderId;
+    private Boolean isCreatedPurchaseOrder;
     private String shippingMethod;
     private String requestInformation;
     private String remark;

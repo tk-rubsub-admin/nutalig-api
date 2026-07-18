@@ -3,7 +3,9 @@ package com.nutalig.controller.invoice;
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.PaymentMethod;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
+import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
+import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.invoice.response.CreateInvoiceResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
@@ -70,6 +72,42 @@ public class InvoiceController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @GetMapping("/awaiting-validation")
+    public GeneralResponse<InvoiceAwaitingValidationResponse> resolveAwaitingValidationToken(
+            @RequestParam(name = "token") String token
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start resolve awaiting validation token ===");
+
+        InvoiceAwaitingValidationResponse response = invoiceService.resolveAwaitingValidationToken(token);
+
+        log.info("=== End resolve awaiting validation token {} ===", response.getInvoice().getInvoiceNo());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/awaiting-validation/approve")
+    public GeneralResponse<InvoiceAwaitingValidationResponse> approveAwaitingValidationByToken(
+            @RequestBody InvoiceAwaitingValidationActionRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start approve awaiting validation by token ===");
+
+        InvoiceAwaitingValidationResponse response = invoiceService.approveAwaitingValidationByToken(request.getToken());
+
+        log.info("=== End approve awaiting validation by token {} ===", response.getInvoice().getInvoiceNo());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/awaiting-validation/reject")
+    public GeneralResponse<InvoiceAwaitingValidationResponse> rejectAwaitingValidationByToken(
+            @RequestBody InvoiceAwaitingValidationActionRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start reject awaiting validation by token ===");
+
+        InvoiceAwaitingValidationResponse response = invoiceService.rejectAwaitingValidationByToken(request.getToken());
+
+        log.info("=== End reject awaiting validation by token {} ===", response.getInvoice().getInvoiceNo());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/sales-orders/{salesOrderId}")
     public GeneralResponse<java.util.List<InvoiceDto>> getInvoicesBySalesOrderId(
             @PathVariable(name = "salesOrderId") String salesOrderId
@@ -130,6 +168,20 @@ public class InvoiceController {
         );
 
         log.info("=== End receive invoice payment {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/payments/{paymentId}/send-awaiting-validation-notification")
+    public GeneralResponse<InvoiceDto> sendAwaitingValidationNotification(
+            @PathVariable(name = "id") String id,
+            @PathVariable(name = "paymentId") Long paymentId,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start send awaiting validation notification invoice {} payment {} ===", id, paymentId);
+
+        InvoiceDto response = invoiceService.sendAwaitingValidationNotification(id, paymentId, userId);
+
+        log.info("=== End send awaiting validation notification invoice {} payment {} ===", id, paymentId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 }

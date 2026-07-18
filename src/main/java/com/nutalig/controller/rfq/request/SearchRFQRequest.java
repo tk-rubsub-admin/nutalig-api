@@ -15,6 +15,7 @@ public class SearchRFQRequest {
     private String customerId;
     private String salesId;
     private String procurementId;
+    private String rfqTypeCode;
     private String productFamily;
     private String productSubtype1;
     private String productMaterial;
@@ -24,5 +25,6 @@ public class SearchRFQRequest {
     private LocalDate requestedDateStart;
     private LocalDate requestedDateEnd;
     private Boolean prioritizeApprovedUrgent;
+    private Boolean isCreatedPurchaseOrder;
 
 }

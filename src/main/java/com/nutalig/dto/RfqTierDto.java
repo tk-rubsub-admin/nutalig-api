@@ -15,9 +15,9 @@ public class RfqTierDto {
     private BigDecimal productPrice;
     private BigDecimal commission;
     private Currency currency;
-    private BigDecimal exchangeRate;
     private BigDecimal landFreightCost;
     private BigDecimal seaFreightCost;
+    private Boolean isFcl;
     private BigDecimal landTotalPrice;
     private BigDecimal seaTotalPrice;
     private Long supplierQuoteTierId;

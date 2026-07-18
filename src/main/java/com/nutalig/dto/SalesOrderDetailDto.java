@@ -25,7 +25,6 @@ public class SalesOrderDetailDto {
     private String shippingMethod;
     private Currency supplierCurrency;
     private BigDecimal supplierUnitPrice;
-    private BigDecimal exchangeRate;
     private BigDecimal supplierShippingCost;
     private BigDecimal supplierTotalUnitCost;
     private Long supplierQuoteTierId;

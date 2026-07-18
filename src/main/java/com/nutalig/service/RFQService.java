@@ -59,6 +59,7 @@ public class RFQService {
     private final ProductSubtype2Repository productSubtype2Repository;
     private final ProductMaterialRepository productMaterialRepository;
     private final QuotationRepository quotationRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
@@ -90,7 +91,11 @@ public class RFQService {
 
         com.nutalig.controller.response.Pageable<RfqHeaderDto> response =
                 new com.nutalig.controller.response.Pageable<>();
-        response.setRecords(page.getContent());
+        List<RfqHeaderDto> records = new ArrayList<>(page.getContent());
+        if (Boolean.TRUE.equals(searchRequest != null ? searchRequest.getIsCreatedPurchaseOrder() : null)) {
+            enrichAndFilterCreatedPurchaseOrders(records);
+        }
+        response.setRecords(records);
         response.setPagination(Pagination.build(page));
         return response;
     }
@@ -292,7 +297,8 @@ public class RFQService {
                 request.getCustomerId(),
                 request.getRfqTypeCode(),
                 request.getOrderTypeCode(),
-                request.getProcurementId()
+                request.getProcurementId(),
+                request.getReferenceRfqId()
         );
         applyProductHierarchy(
                 entity,
@@ -324,6 +330,7 @@ public class RFQService {
         detail.put("urgentRequestReason", entity.getUrgentRequestReason());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
+        detail.put("referenceRfqId", entity.getReferenceRfqId());
         detail.put("shippingMethod", entity.getShippingMethod());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
 
@@ -492,38 +499,18 @@ public class RFQService {
         if (request == null || StringUtils.isBlank(request.getSaleOrderId())) {
             throw new InvalidRequestException("saleOrderId is required");
         }
-        if (request.getDetailId() == null) {
-            throw new InvalidRequestException("detailId is required");
-        }
-        if (request.getTierId() == null) {
-            throw new InvalidRequestException("tierId is required");
-        }
         if (StringUtils.isNotBlank(entity.getSaleOrderId())
                 && !entity.getSaleOrderId().equals(request.getSaleOrderId().trim())) {
             throw new InvalidRequestException("RFQ " + rfqId + " already linked to sale order " + entity.getSaleOrderId());
         }
-
-        RfqDetailEntity detail = getDetailFromHeader(entity, request.getDetailId());
-        RfqTierEntity tier = detail.getTiers().stream()
-                .filter(item -> Objects.equals(item.getId(), request.getTierId()))
-                .findFirst()
-                .orElseThrow(() -> new DataNotFoundException("Tier " + request.getTierId() + " not found."));
-
-        String shippingMethod = StringUtils.trimToNull(request.getShippingMethod());
-        if (!"LAND".equalsIgnoreCase(shippingMethod) && !"SEA".equalsIgnoreCase(shippingMethod)) {
-            throw new InvalidRequestException("shippingMethod must be LAND or SEA");
-        }
-
-        BigDecimal confirmedPrice = request.getPrice();
-        if (confirmedPrice == null) {
-            confirmedPrice = "SEA".equalsIgnoreCase(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
-        }
+        List<ResolvedLinkSelection> selections = resolveLinkSelections(entity, request);
+        ResolvedLinkSelection primarySelection = selections.get(0);
 
         entity.setSaleOrderId(request.getSaleOrderId().trim());
-        entity.setConfirmedDetailId(detail.getId());
-        entity.setConfirmedTierId(tier.getId());
-        entity.setConfirmedShippingMethod(shippingMethod.toUpperCase(Locale.ROOT));
-        entity.setConfirmedPrice(confirmedPrice);
+        entity.setConfirmedDetailId(primarySelection.getDetail().getId());
+        entity.setConfirmedTierId(primarySelection.getTier().getId());
+        entity.setConfirmedShippingMethod(primarySelection.getShippingMethod());
+        entity.setConfirmedPrice(primarySelection.getConfirmedPrice());
         entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         entity.setStatus(RfqStatus.COMPLETED);
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
@@ -536,6 +523,15 @@ public class RFQService {
         activityDetail.put("tierId", entity.getConfirmedTierId());
         activityDetail.put("shippingMethod", entity.getConfirmedShippingMethod());
         activityDetail.put("price", entity.getConfirmedPrice());
+        activityDetail.put("selectedCount", selections.size());
+        activityDetail.put("selections", selections.stream().map(selection -> {
+            Map<String, Object> selectionDetail = new LinkedHashMap<>();
+            selectionDetail.put("detailId", selection.getDetail().getId());
+            selectionDetail.put("tierId", selection.getTier().getId());
+            selectionDetail.put("shippingMethod", selection.getShippingMethod());
+            selectionDetail.put("price", selection.getConfirmedPrice());
+            return selectionDetail;
+        }).toList());
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -551,6 +547,74 @@ public class RFQService {
         saveRfqStatusTimeline(entity, RfqStatus.COMPLETED, entity.getConfirmedDate());
 
         return mapToDto(entity);
+    }
+
+    private List<ResolvedLinkSelection> resolveLinkSelections(
+            RfqHeaderEntity entity,
+            LinkRfqSalesOrderRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        List<LinkRfqSalesOrderRequest.Selection> requestedSelections =
+                request.getSelections() == null ? new ArrayList<>() : new ArrayList<>(request.getSelections());
+
+        if (requestedSelections.isEmpty()
+                && request.getDetailId() != null
+                && request.getTierId() != null
+                && StringUtils.isNotBlank(request.getShippingMethod())) {
+            LinkRfqSalesOrderRequest.Selection fallbackSelection = new LinkRfqSalesOrderRequest.Selection();
+            fallbackSelection.setDetailId(request.getDetailId());
+            fallbackSelection.setTierId(request.getTierId());
+            fallbackSelection.setShippingMethod(request.getShippingMethod());
+            fallbackSelection.setPrice(request.getPrice());
+            requestedSelections.add(fallbackSelection);
+        }
+
+        if (requestedSelections.isEmpty()) {
+            throw new InvalidRequestException("at least one selection is required");
+        }
+
+        List<ResolvedLinkSelection> resolvedSelections = new ArrayList<>();
+
+        for (LinkRfqSalesOrderRequest.Selection selection : requestedSelections) {
+            if (selection.getDetailId() == null) {
+                throw new InvalidRequestException("detailId is required");
+            }
+            if (selection.getTierId() == null) {
+                throw new InvalidRequestException("tierId is required");
+            }
+
+            RfqDetailEntity detail = getDetailFromHeader(entity, selection.getDetailId());
+            RfqTierEntity tier = detail.getTiers().stream()
+                    .filter(item -> Objects.equals(item.getId(), selection.getTierId()))
+                    .findFirst()
+                    .orElseThrow(() -> new DataNotFoundException("Tier " + selection.getTierId() + " not found."));
+
+            String shippingMethod = StringUtils.trimToNull(selection.getShippingMethod());
+            if (!"LAND".equalsIgnoreCase(shippingMethod) && !"SEA".equalsIgnoreCase(shippingMethod)) {
+                throw new InvalidRequestException("shippingMethod must be LAND or SEA");
+            }
+
+            BigDecimal confirmedPrice = selection.getPrice();
+            if (confirmedPrice == null) {
+                confirmedPrice = "SEA".equalsIgnoreCase(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
+            }
+
+            resolvedSelections.add(new ResolvedLinkSelection(
+                    detail,
+                    tier,
+                    shippingMethod.toUpperCase(Locale.ROOT),
+                    confirmedPrice
+            ));
+        }
+
+        return resolvedSelections;
+    }
+
+    @Data
+    private static class ResolvedLinkSelection {
+        private final RfqDetailEntity detail;
+        private final RfqTierEntity tier;
+        private final String shippingMethod;
+        private final BigDecimal confirmedPrice;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -808,6 +872,49 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto requestSpecialPrice(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity entity = getEntityById(id);
+        String actor = userProfileService.getNameFromId(userId);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        if (!RfqStatus.QUOTED.equals(entity.getStatus())) {
+            throw new InvalidRequestException("Only RFQ with QUOTED status can request special price review.");
+        }
+
+        String currentRfqTypeCode = entity.getRfqType() != null && entity.getRfqType().getId() != null
+                ? entity.getRfqType().getId().getCode()
+                : null;
+        if (StringUtils.equals(currentRfqTypeCode, "SPECIAL_PRICE_REVIEW")) {
+            return mapToDto(entity);
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("beforeRfqTypeCode", currentRfqTypeCode);
+
+        entity.setRfqType(resolveRfqType("SPECIAL_PRICE_REVIEW"));
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+        entity = requestPriceHeaderRepository.save(entity);
+
+        detail.put("afterRfqTypeCode", entity.getRfqType() != null && entity.getRfqType().getId() != null
+                ? entity.getRfqType().getId().getCode()
+                : null);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "ขอทบทวนราคาพิเศษสำหรับคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto rejectUrgentRequest(String id, RejectUrgentRfqRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
         validateSuperAdmin(userId);
 
@@ -846,6 +953,7 @@ public class RFQService {
         }
 
         String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
+        String requestReferenceRfqId = normalizeRequestValue(request.getReferenceRfqId());
         if (StringUtils.isNotEmpty(requestOrderTypeCode) && !StringUtils.equals(
                 requestOrderTypeCode,
                 entity.getOrderType() != null && entity.getOrderType().getId() != null
@@ -855,6 +963,10 @@ public class RFQService {
             entity.setRfqType(resolveRfqType(request.getRfqTypeCode()));
             entity.setOrderType(resolveOrderType(requestOrderTypeCode));
             editFields.add("ประเภทงาน");
+        }
+        if (!StringUtils.equals(requestReferenceRfqId, entity.getReferenceRfqId())) {
+            applyReferenceRfq(entity, requestReferenceRfqId);
+            editFields.add("RFQ ตัวหลัก");
         }
         String requestProductFamily = normalizeRequestValue(request.getProductFamily());
         if (StringUtils.isNotEmpty(requestProductFamily)
@@ -952,6 +1064,7 @@ public class RFQService {
         }
 
         String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
+        String requestReferenceRfqId = normalizeRequestValue(request.getReferenceRfqId());
         String requestProductFamily = normalizeRequestValue(request.getProductFamily());
         String requestProductUsage = normalizeRequestValue(request.getProductUsage());
         String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
@@ -967,7 +1080,8 @@ public class RFQService {
                 entity.getOrderType() != null && entity.getOrderType().getId() != null
                         ? entity.getOrderType().getId().getCode()
                         : null
-        ) || !StringUtils.equals(requestProductFamily, entity.getProductFamily())
+        ) || !StringUtils.equals(requestReferenceRfqId, entity.getReferenceRfqId())
+                || !StringUtils.equals(requestProductFamily, entity.getProductFamily())
                 || !StringUtils.equals(
                 requestProductUsage,
                 entity.getProductUsage() != null ? entity.getProductUsage().getCode() : null
@@ -1016,6 +1130,12 @@ public class RFQService {
                 StringUtils.isNotEmpty(systemMechanic) ? systemMechanic : currentSystemMechanic,
                 StringUtils.isNotEmpty(material) ? material : currentMaterial
         );
+    }
+
+    private void applyReferenceRfq(RfqHeaderEntity entity, String referenceRfqId) throws DataNotFoundException {
+        String normalizedReferenceRfqId = normalizeRequestValue(referenceRfqId);
+        entity.setReferenceRfqId(normalizedReferenceRfqId);
+        entity.setReferenceRfq(resolveReferenceRfq(normalizedReferenceRfqId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -1186,6 +1306,7 @@ public class RFQService {
         detail.put("contactPhone", entity.getContactPhone());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
+        detail.put("referenceRfqId", entity.getReferenceRfqId());
         detail.put("rfqTypeCode", entity.getRfqType() != null ? entity.getRfqType().getId().getCode() : null);
         detail.put("orderTypeCode", entity.getOrderType() != null ? entity.getOrderType().getId().getCode() : null);
         detail.put("shippingMethod", entity.getShippingMethod());
@@ -1256,6 +1377,40 @@ public class RFQService {
         }
     }
 
+    private void enrichAndFilterCreatedPurchaseOrders(List<RfqHeaderDto> rfqs) {
+        if (rfqs == null || rfqs.isEmpty()) {
+            return;
+        }
+
+        List<String> salesOrderIds = rfqs.stream()
+                .map(RfqHeaderDto::getSaleOrderId)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .toList();
+
+        if (salesOrderIds.isEmpty()) {
+            rfqs.clear();
+            return;
+        }
+
+        Set<String> activePurchaseOrderSalesOrderIds = purchaseOrderRepository.findBySalesOrderSalesOrderNoIn(salesOrderIds)
+                .stream()
+                .filter(purchaseOrder -> purchaseOrder.getStatus() != PurchaseOrderStatus.CANCELLED)
+                .map(PurchaseOrderEntity::getSalesOrder)
+                .filter(Objects::nonNull)
+                .map(SalesOrderEntity::getSalesOrderNo)
+                .filter(StringUtils::isNotBlank)
+                .collect(java.util.stream.Collectors.toSet());
+
+        rfqs.removeIf(rfq -> {
+            boolean isCreatedPurchaseOrder = StringUtils.isNotBlank(rfq.getSaleOrderId())
+                    && activePurchaseOrderSalesOrderIds.contains(rfq.getSaleOrderId());
+            rfq.setIsCreatedPurchaseOrder(isCreatedPurchaseOrder);
+            return !isCreatedPurchaseOrder;
+        });
+        log.info("rfqs : {}", rfqs);
+    }
+
     private void extractChangedDetails(
             Map<String, Object> beforeDetail,
             Map<String, Object> afterDetail,
@@ -1317,9 +1472,9 @@ public class RFQService {
             tierEntity.setProductPrice(tierRequest.getProductPrice());
             tierEntity.setCommission(tierRequest.getCommission());
             tierEntity.setCurrency(tierRequest.getCurrency());
-            tierEntity.setExchangeRate(tierRequest.getExchangeRate());
             tierEntity.setLandFreightCost(tierRequest.getLandFreightCost());
             tierEntity.setSeaFreightCost(tierRequest.getSeaFreightCost());
+            tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()));
             tierEntity.setLandTotalPrice(tierRequest.getLandTotalPrice());
             tierEntity.setSeaTotalPrice(tierRequest.getSeaTotalPrice());
             tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
@@ -1369,7 +1524,8 @@ public class RFQService {
             String customerId,
             String rfqTypeCode,
             String orderTypeCode,
-            String procurementId
+            String procurementId,
+            String referenceRfqId
     )
             throws DataNotFoundException {
         entity.setSales(resolveSales(salesId));
@@ -1377,6 +1533,8 @@ public class RFQService {
         entity.setRfqType(resolveRfqType(rfqTypeCode));
         entity.setOrderType(resolveOrderType(orderTypeCode));
         entity.setProcurement(resolveProcurement(procurementId));
+        entity.setReferenceRfqId(StringUtils.trimToNull(referenceRfqId));
+        entity.setReferenceRfq(resolveReferenceRfq(referenceRfqId));
     }
 
     private void applyProductHierarchy(
@@ -1520,6 +1678,15 @@ public class RFQService {
         return rfqType;
     }
 
+    private RfqHeaderEntity resolveReferenceRfq(String referenceRfqId) throws DataNotFoundException {
+        if (StringUtils.isBlank(referenceRfqId)) {
+            return null;
+        }
+
+        return requestPriceHeaderRepository.findById(referenceRfqId.trim())
+                .orElseThrow(() -> new DataNotFoundException("Reference RFQ " + referenceRfqId + " not found."));
+    }
+
     private String normalizeRfqShippingMethod(String shippingMethod) throws InvalidRequestException {
         String normalized = StringUtils.defaultIfBlank(shippingMethod, "ALL").trim().toUpperCase(Locale.ROOT);
         if (!List.of("ALL", "LAND", "SEA").contains(normalized)) {
@@ -1633,6 +1800,7 @@ public class RFQService {
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(procurementIdEqual(request.getProcurementId()))
+                .and(rfqTypeCodeEqual(request.getRfqTypeCode()))
                 .and(orderTypeCodeEqual(
                         request.getOrderTypeCode() != null && !request.getOrderTypeCode().isBlank()
                                 ? request.getOrderTypeCode()

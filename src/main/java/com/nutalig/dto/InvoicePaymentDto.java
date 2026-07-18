@@ -1,5 +1,6 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.InvoicePaymentStatus;
 import com.nutalig.constant.PaymentMethod;
 import lombok.Data;
 
@@ -20,6 +21,7 @@ public class InvoicePaymentDto {
     private String slipFileName;
     private String slipFileUrl;
     private String receiptNo;
+    private InvoicePaymentStatus status;
     private UserDto createdBy;
     private ZonedDateTime createdDate;
     private UserDto updatedBy;

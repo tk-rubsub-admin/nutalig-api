@@ -73,6 +73,15 @@ public class CustomerService {
             entity.setCustomerCreditTerm(customerCreditTerm);
         }
 
+        if (StringUtils.isNotBlank(request.getPaymentTerm())) {
+            SystemConfigEntity customerPaymentTerm = systemConfigRepository
+                    .findByIdGroupCodeAndIdCode(SystemConstant.CUSTOMER_PAYMENT_TERM, request.getPaymentTerm())
+                    .orElseThrow(() -> new InvalidRequestException(
+                            "Config " + request.getPaymentTerm() + " not found."
+                    ));
+            entity.setCustomerPaymentTerm(customerPaymentTerm);
+        }
+
         if (StringUtils.isNotBlank(request.getCustomerSegment())) {
             SystemConfigEntity customerSegment = systemConfigRepository
                     .findByIdGroupCodeAndIdCode(SystemConstant.CUSTOMER_SEGMENT, request.getCustomerSegment())
@@ -341,6 +350,13 @@ public class CustomerService {
                     "Customer credit term"
             ));
         }
+        if (request.getPaymentTerm() != null) {
+            entity.setCustomerPaymentTerm(getOptionalSystemConfig(
+                    SystemConstant.CUSTOMER_PAYMENT_TERM,
+                    request.getPaymentTerm(),
+                    "Customer payment term"
+            ));
+        }
         if (request.getSalesAccount() != null) {
             entity.setSalesAccount(StringUtils.trimToNull(request.getSalesAccount()));
         }
@@ -575,6 +591,7 @@ public class CustomerService {
         detail.put("customerTier", entity.getCustomerTier() != null ? entity.getCustomerTier().getId().getCode() : null);
         detail.put("customerSegment", entity.getCustomerSegment() != null ? entity.getCustomerSegment().getId().getCode() : null);
         detail.put("creditTerm", entity.getCustomerCreditTerm() != null ? entity.getCustomerCreditTerm().getId().getCode() : null);
+        detail.put("paymentTerm", entity.getCustomerPaymentTerm() != null ? entity.getCustomerPaymentTerm().getId().getCode() : null);
         detail.put("companyName", entity.getCompanyName());
         detail.put("branchNumber", entity.getBranchNumber());
         detail.put("branchName", entity.getBranchName());

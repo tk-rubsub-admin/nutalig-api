@@ -22,6 +22,7 @@ import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.RfqAttachmentUtil;
 import lombok.RequiredArgsConstructor;
@@ -106,10 +107,9 @@ public class PurchaseOrderService {
         }
 
         Currency currency = null;
-        BigDecimal exchangeRate = null;
         for (SalesOrderDetailEntity item : sourceItems) {
             if (item.getSupplierCurrency() == null || item.getSupplierUnitPrice() == null
-                    || item.getSupplierTotalUnitCost() == null || item.getExchangeRate() == null) {
+                    || item.getSupplierTotalUnitCost() == null) {
                 throw new InvalidRequestException("Sales order detail " + item.getId() + " is missing supplier cost snapshot");
             }
 
@@ -117,12 +117,6 @@ public class PurchaseOrderService {
                 currency = item.getSupplierCurrency();
             } else if (currency != item.getSupplierCurrency()) {
                 throw new InvalidRequestException("All selected items must use the same supplier currency");
-            }
-
-            if (exchangeRate == null) {
-                exchangeRate = item.getExchangeRate();
-            } else if (exchangeRate.compareTo(item.getExchangeRate()) != 0) {
-                throw new InvalidRequestException("All selected items must use the same exchange rate");
             }
         }
 
@@ -141,7 +135,6 @@ public class PurchaseOrderService {
         entity.setShippingLeadTimeDay(request.getShippingLeadTimeDay());
         entity.setStatus(PurchaseOrderStatus.CREATED);
         entity.setCurrency(currency);
-        entity.setExchangeRate(exchangeRate);
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
         entity.setRevNo(1);
         entity.setSupplierNameSnapshot(supplier.getSupplierName());
@@ -168,16 +161,13 @@ public class PurchaseOrderService {
             detail.setQuantity(defaultIfNull(sourceItem.getQuantity()));
             detail.setSupplierCurrency(sourceItem.getSupplierCurrency());
             detail.setSupplierUnitPrice(defaultIfNull(sourceItem.getSupplierUnitPrice()));
-            detail.setExchangeRate(defaultIfNull(sourceItem.getExchangeRate()));
             detail.setSupplierShippingCost(defaultIfNull(sourceItem.getSupplierShippingCost()));
             detail.setSupplierTotalUnitCost(defaultIfNull(sourceItem.getSupplierTotalUnitCost()));
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
                     .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal amountThb = amountSupplierCurrency
-                    .multiply(detail.getExchangeRate())
-                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal amountThb = amountSupplierCurrency;
 
             detail.setAmountSupplierCurrency(amountSupplierCurrency);
             detail.setAmountThb(amountThb);
@@ -564,7 +554,6 @@ public class PurchaseOrderService {
             detail.setQuantity(defaultIfNull(itemRequest.getQuantity()));
             detail.setSupplierCurrency(itemRequest.getSupplierCurrency() != null ? itemRequest.getSupplierCurrency() : entity.getCurrency());
             detail.setSupplierUnitPrice(defaultIfNull(itemRequest.getSupplierUnitPrice()));
-            detail.setExchangeRate(defaultIfNull(itemRequest.getExchangeRate() != null ? itemRequest.getExchangeRate() : entity.getExchangeRate()));
             detail.setSupplierShippingCost(defaultIfNull(itemRequest.getSupplierShippingCost()));
             detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
             detail.setImageUrl(StringUtils.trimToNull(itemRequest.getImageUrl()));
@@ -620,17 +609,15 @@ public class PurchaseOrderService {
             BigDecimal quantity = defaultIfNull(detail.getQuantity());
             BigDecimal supplierUnitPrice = defaultIfNull(detail.getSupplierUnitPrice());
             BigDecimal supplierShippingCost = defaultIfNull(detail.getSupplierShippingCost());
-            BigDecimal exchangeRate = defaultIfNull(detail.getExchangeRate());
             BigDecimal supplierTotalUnitCost = supplierUnitPrice.add(supplierShippingCost);
 
             detail.setQuantity(quantity);
             detail.setSupplierUnitPrice(supplierUnitPrice);
             detail.setSupplierShippingCost(supplierShippingCost);
-            detail.setExchangeRate(exchangeRate);
             detail.setSupplierTotalUnitCost(supplierTotalUnitCost);
 
             BigDecimal amountSupplierCurrency = supplierTotalUnitCost.multiply(quantity).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal amountThb = amountSupplierCurrency.multiply(exchangeRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal amountThb = amountSupplierCurrency;
             detail.setAmountSupplierCurrency(amountSupplierCurrency);
             detail.setAmountThb(amountThb);
 
@@ -849,8 +836,8 @@ public class PurchaseOrderService {
         dto.setProductionLeadTimeDay(entity.getProductionLeadTimeDay());
         dto.setShippingLeadTimeDay(entity.getShippingLeadTimeDay());
         dto.setStatus(entity.getStatus());
+        dto.setStatusProfile(DocumentStatusResolver.resolvePurchaseOrder(entity.getStatus()));
         dto.setCurrency(entity.getCurrency());
-        dto.setExchangeRate(entity.getExchangeRate());
         dto.setSupplier(supplierMapper.toDto(entity.getSupplier()));
         dto.setSupplierShipping(buildSupplierShippingDto(entity.getSupplierShipping()));
         dto.setSubTotal(entity.getSubTotal());
@@ -899,7 +886,6 @@ public class PurchaseOrderService {
             item.setQuantity(detail.getQuantity());
             item.setSupplierCurrency(detail.getSupplierCurrency());
             item.setSupplierUnitPrice(detail.getSupplierUnitPrice());
-            item.setExchangeRate(detail.getExchangeRate());
             item.setSupplierShippingCost(detail.getSupplierShippingCost());
             item.setSupplierTotalUnitCost(detail.getSupplierTotalUnitCost());
             item.setAmountSupplierCurrency(detail.getAmountSupplierCurrency());
@@ -957,7 +943,6 @@ public class PurchaseOrderService {
         snapshot.put("productionLeadTimeDay", entity.getProductionLeadTimeDay());
         snapshot.put("shippingLeadTimeDay", entity.getShippingLeadTimeDay());
         snapshot.put("currency", entity.getCurrency() != null ? entity.getCurrency().name() : null);
-        snapshot.put("exchangeRate", entity.getExchangeRate());
         snapshot.put("subTotal", entity.getSubTotal());
         snapshot.put("subTotalThb", entity.getSubTotalThb());
         snapshot.put("grandTotal", entity.getGrandTotal());
@@ -976,7 +961,6 @@ public class PurchaseOrderService {
         detail.put("shippingMethod", entity.getSupplierShipping() != null ? entity.getSupplierShipping().getShippingMethod() : null);
         detail.put("status", entity.getStatus());
         detail.put("currency", entity.getCurrency());
-        detail.put("exchangeRate", entity.getExchangeRate());
         detail.put("subTotal", entity.getSubTotal());
         detail.put("subTotalThb", entity.getSubTotalThb());
         detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);

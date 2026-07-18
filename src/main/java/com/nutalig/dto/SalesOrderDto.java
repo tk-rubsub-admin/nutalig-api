@@ -14,6 +14,7 @@ public class SalesOrderDto {
     private String docDate;
     private String expireDate;
     private SalesOrderStatus status;
+    private DocumentStatusProfileDto statusProfile;
     private Currency currency;
     private CustomerDto customer;
     private CustomerAddressDto customerAddress;
@@ -28,6 +29,9 @@ public class SalesOrderDto {
     private BigDecimal grandTotal;
     private BigDecimal amount;
     private BigDecimal commission;
+    private BigDecimal coSaleCommission;
+    private Boolean requestCoa;
+    private Boolean requestPo;
     private ProcurementStatus procurementStatus;
     private String shippingType;
     private BigDecimal vatRate;
@@ -35,5 +39,6 @@ public class SalesOrderDto {
     private UserDto createdBy;
     private UserDto updatedBy;
     private Integer revNo;
+    private List<SalesOrderAttachmentDto> attachments;
     private List<SalesOrderDetailDto> items;
 }

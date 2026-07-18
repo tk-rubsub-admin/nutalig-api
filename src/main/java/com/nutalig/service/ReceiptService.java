@@ -24,6 +24,7 @@ import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.ReceiptRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
@@ -441,6 +442,7 @@ public class ReceiptService {
         dto.setReceiptNo(entity.getReceiptNo());
         dto.setReceiptType(entity.getReceiptType());
         dto.setStatus(entity.getStatus());
+        dto.setStatusProfile(DocumentStatusResolver.resolveReceipt(entity.getStatus()));
         dto.setInvoiceNo(entity.getInvoice() != null ? entity.getInvoice().getInvoiceNo() : null);
         dto.setInvoicePaymentId(entity.getInvoicePayment() != null ? entity.getInvoicePayment().getId() : null);
         dto.setSalesOrderNo(entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);

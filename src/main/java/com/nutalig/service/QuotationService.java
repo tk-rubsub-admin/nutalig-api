@@ -25,6 +25,7 @@ import com.nutalig.repository.EmployeeRepository;
 import com.nutalig.repository.QuotationRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.RfqAttachmentUtil;
 import com.nutalig.utils.ThaiBahtText;
@@ -807,6 +808,7 @@ public class QuotationService {
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setQuotationNo(entity.getQuotationNo());
         dto.setStatus(entity.getStatus());
+        dto.setStatusProfile(DocumentStatusResolver.resolveQuotation(entity.getStatus()));
         dto.setRemark(entity.getRemark());
         dto.setDiscount(entity.getDiscount());
         dto.setFreight(entity.getFreight());

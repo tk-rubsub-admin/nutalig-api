@@ -73,6 +73,17 @@ public class RequestPriceHeaderSpecification {
         };
     }
 
+    public static Specification<RfqHeaderEntity> rfqTypeCodeEqual(String rfqTypeCode) {
+        if (StringUtils.isBlank(rfqTypeCode)) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            Join<RfqHeaderEntity, SystemConfigEntity> rfqTypeJoin = root.join("rfqType", JoinType.LEFT);
+            return cb.equal(cb.lower(rfqTypeJoin.get("id").get("code")), rfqTypeCode.trim().toLowerCase());
+        };
+    }
+
     public static Specification<RfqHeaderEntity> orderTypeCodeEqual(String orderTypeCode) {
         if (StringUtils.isBlank(orderTypeCode)) {
             return null;

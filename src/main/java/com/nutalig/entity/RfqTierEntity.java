@@ -55,14 +55,14 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "currency", length = 10)
     private Currency currency;
 
-    @Column(name = "exchange_rate", precision = 18, scale = 4)
-    private BigDecimal exchangeRate;
-
     @Column(name = "land_freight_cost", precision = 18, scale = 4)
     private BigDecimal landFreightCost;
 
     @Column(name = "sea_freight_cost", precision = 18, scale = 4)
     private BigDecimal seaFreightCost;
+
+    @Column(name = "is_fcl")
+    private Boolean isFcl;
 
     @Column(name = "land_total_price", precision = 18, scale = 4)
     private BigDecimal landTotalPrice;

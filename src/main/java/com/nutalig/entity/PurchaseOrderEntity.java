@@ -57,9 +57,6 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "currency", length = 10)
     private Currency currency;
 
-    @Column(name = "exchange_rate", precision = 18, scale = 4)
-    private BigDecimal exchangeRate;
-
     @Column(name = "sub_total", precision = 18, scale = 2)
     private BigDecimal subTotal;
 

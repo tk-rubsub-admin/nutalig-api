@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 public class UpdateRequestPriceHeaderRequest {
 
+    private String referenceRfqId;
     private String rfqTypeCode;
     private String orderTypeCode;
     private String productFamily;

@@ -17,6 +17,7 @@ public class QuotationDto {
     private EmployeeDto saleAccount;
     private String coSaleId;
     private QuotationStatus status;
+    private DocumentStatusProfileDto statusProfile;
     private String remark;
     private BigDecimal discount;
     private BigDecimal freight;

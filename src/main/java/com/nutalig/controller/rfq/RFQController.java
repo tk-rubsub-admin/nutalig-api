@@ -92,6 +92,19 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{id}/inquiries/generate-final")
+    public GeneralResponse<String> generateFinalInquiry(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start generate final inquiry rfq {} by {} ===", id, userId);
+
+        String response = rfqSupplierService.generateFinalInquiry(id, userId);
+
+        log.info("=== End generate final inquiry for rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/{id}/inquiries")
     public GeneralResponse<java.util.List<RfqSupplierInquiryDto>> getInquiries(@PathVariable("id") String id)
             throws DataNotFoundException {
@@ -193,6 +206,19 @@ public class RFQController {
         UpsertRfqSupplierQuoteRequest response = rfqSupplierService.extractSupplierQuoteRequest(id, request);
 
         log.info("=== End extract supplier quote rfq {} supplier {} ===", id, response == null ? null : response.getSupplierId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/supplier-quotes/final-extract")
+    public GeneralResponse<UpsertRfqSupplierQuoteRequest> finalExtractSupplierQuote(
+            @PathVariable("id") String id,
+            @RequestBody ExtractRfqSupplierQuoteRequest request
+    ) throws Exception {
+        log.info("=== Start final extract supplier quote rfq {} supplier {} ===", id, request == null ? null : request.getSupplierId());
+
+        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.finalExtractSupplierQuoteRequest(id, request);
+
+        log.info("=== End final extract supplier quote rfq {} supplier {} ===", id, response == null ? null : response.getSupplierId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
@@ -362,6 +388,19 @@ public class RFQController {
         RfqHeaderDto response = rfqService.updateRFQ(id, request, userId);
 
         log.info("=== End update rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/request-special-price")
+    public GeneralResponse<RfqHeaderDto> requestSpecialPrice(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start request special price review rfq {} by {} ===", id, userId);
+
+        RfqHeaderDto response = rfqService.requestSpecialPrice(id, userId);
+
+        log.info("=== End request special price review rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

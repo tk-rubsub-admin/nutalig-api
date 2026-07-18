@@ -31,7 +31,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class RFQSupplierService {
     private static final String RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE = "RFQ_SUPPLIER_INQUIRY_TH";
+    private static final String RFQ_FINAL_QUOTE_INQUIRY_TH = "RFQ_FINAL_QUOTE_INQUIRY_TH";
     private static final String RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE = "RFQ_SUPPLIER_QUOTE_EXTRACTION";
+    private static final String FINAL_RFQ_EXTRACTION = "FINAL_RFQ_EXTRACTION";
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
@@ -98,6 +100,20 @@ public class RFQSupplierService {
 
 
         return toInquiryDto(inquiry);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public String generateFinalInquiry(String rfqId, String userId) throws Exception {
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+        RfqSupplierQuoteEntity supplierQuote = rfqSupplierQuoteRepository
+                .findAllByRequestPriceHeader_IdOrderByUpdatedDateDesc(rfqId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException(
+                        "Supplier quote is required before generate final inquiry."
+                ));
+
+        return buildThaiFinalQuoteInquiryMessage(rfq, supplierQuote);
     }
 
     @Transactional(readOnly = true)
@@ -245,6 +261,22 @@ public class RFQSupplierService {
             String rfqId,
             com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request
     ) throws Exception {
+        return extractSupplierQuoteRequestByTemplate(rfqId, request, RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public UpsertRfqSupplierQuoteRequest finalExtractSupplierQuoteRequest(
+            String rfqId,
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request
+    ) throws Exception {
+        return extractSupplierQuoteRequestByTemplate(rfqId, request, FINAL_RFQ_EXTRACTION);
+    }
+
+    private UpsertRfqSupplierQuoteRequest extractSupplierQuoteRequestByTemplate(
+            String rfqId,
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request,
+            String templateCode
+    ) throws Exception {
         if (request == null || StringUtils.isBlank(request.getSupplierId())) {
             throw new InvalidRequestException("Supplier id is required.");
         }
@@ -262,10 +294,11 @@ public class RFQSupplierService {
                 request.getDefaultCurrency() == null ? com.nutalig.constant.Currency.CNY : request.getDefaultCurrency()
         ));
         variables.put("rfqId", rfq.getId());
+        variables.put("rfqContext_json_or_empty_object", buildRfqContextJson(rfq));
         variables.put("rfqDetailHints_json_or_empty_array", buildRfqDetailHintsJson(rfq));
         variables.put("supplierMessage", request.getSupplierMessage().trim());
 
-        String rawResponse = aiExecutionService.execute(RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE, variables);
+        String rawResponse = aiExecutionService.execute(templateCode, variables);
         String cleanedJson = com.nutalig.utils.ObjectUtil.extractJsonObject(rawResponse);
         String sanitizedJson = sanitizeExtractedSupplierQuoteJson(
                 cleanedJson,
@@ -390,6 +423,25 @@ public class RFQSupplierService {
         }
     }
 
+    private String buildRfqContextJson(RfqHeaderEntity rfq) {
+        try {
+            Map<String, Object> context = new LinkedHashMap<>();
+            context.put("rfqId", rfq.getId());
+            context.put("productFamily", displayProductFamily(rfq));
+            context.put("productSubtype1", displayProductSubtype1(rfq));
+            context.put("productSubtype2", displayProductSubtype2(rfq));
+            context.put("material", displayProductMaterial(rfq));
+            context.put("capacity", safeValue(rfq.getCapacity()));
+            context.put("description", safeValue(rfq.getDescription()));
+            context.put("shippingType", displayShippingType(rfq));
+            context.put("detailHints", objectMapper.readValue(buildRfqDetailHintsJson(rfq), Object.class));
+            return objectMapper.writeValueAsString(context);
+        } catch (Exception exception) {
+            log.warn("Serialize rfq context failed for rfq {}", rfq.getId(), exception);
+            return "{}";
+        }
+    }
+
     private UpsertRfqSupplierQuoteRequest normalizeExtractedSupplierQuoteRequest(
             UpsertRfqSupplierQuoteRequest extractedRequest,
             com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest contextRequest
@@ -402,6 +454,7 @@ public class RFQSupplierService {
         normalized.setInquiryId(StringUtils.trimToNull(contextRequest.getInquiryId()));
         normalized.setStatus(RfqSupplierQuoteStatus.RESPONDED);
         normalized.setRemark(StringUtils.trimToNull(normalized.getRemark()));
+        normalized.setRecommend(StringUtils.trimToNull(normalized.getRecommend()));
 
         List<UpsertRfqSupplierQuoteRequest.DetailRequest> normalizedDetails = new ArrayList<>();
         List<UpsertRfqSupplierQuoteRequest.DetailRequest> detailRequests =
@@ -831,6 +884,38 @@ public class RFQSupplierService {
         return promptTemplateEngine.render(template, variables).trim();
     }
 
+    private String buildThaiFinalQuoteInquiryMessage(
+            RfqHeaderEntity rfq,
+            RfqSupplierQuoteEntity supplierQuote
+    ) throws DataNotFoundException {
+        String template = promptService.getActivePrompt(RFQ_FINAL_QUOTE_INQUIRY_TH).getUserPromptTemplate();
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("rfqId", safeValue(rfq.getId()));
+        variables.put("supplier", supplierQuote.getSupplier() == null ? "-" : safeValue(supplierQuote.getSupplier().getSupplierName()));
+        variables.put("sales", rfq.getSales().getNickName());
+        variables.put("procurement", rfq.getProcurement().getNickName());
+        variables.put("customer", rfq.getContactName());
+        variables.put("productFamily", displayProductFamily(rfq));
+        variables.put("productSubtype1", displayProductSubtype1(rfq));
+        variables.put("productSubtype2", displayProductSubtype2(rfq));
+        variables.put("material", displayProductMaterial(rfq));
+        variables.put("capacity", safeValue(rfq.getCapacity()));
+        variables.put("shippingType", displayShippingType(rfq));
+        variables.put("description", safeValue(rfq.getDescription()));
+        variables.put("detailSection", buildFinalQuoteInquiryDetailSection(supplierQuote));
+        variables.put("additionalCostSection", buildFinalQuoteInquiryAdditionalCostSection(supplierQuote));
+        return promptTemplateEngine.render(template, variables).trim();
+    }
+
+    private String displayShippingType(RfqHeaderEntity rfq) {
+        switch (rfq.getShippingMethod()) {
+            case "ALL" : return "ขนส่งทางรถ/ขนส่งทางเรือ";
+            case "SHIP" : return "ขนส่งทางเรือ";
+            case "LAND" : return "ขนส่งทางรถ";
+            default: return "";
+        }
+    }
+
     private String translateToChinese(String thaiMessage) {
         String prompt = """
                 Translate the following Thai procurement inquiry into Simplified Chinese for a supplier WeChat group.
@@ -1131,7 +1216,7 @@ public class RFQSupplierService {
 
     private String displayProductFamily(RfqHeaderEntity rfq) {
         if (rfq.getProductFamilyEntity() != null) {
-            return safeValue(rfq.getProductFamilyEntity().getNameEn() != null ? rfq.getProductFamilyEntity().getNameEn() : rfq.getProductFamilyEntity().getNameTh())
+            return safeValue(rfq.getProductFamilyEntity().getNameTh() != null ? rfq.getProductFamilyEntity().getNameTh() : rfq.getProductFamilyEntity().getNameTh())
                     + " (" + safeValue(rfq.getProductFamilyEntity().getCode()) + ")";
         }
         return safeValue(rfq.getProductFamily());
@@ -1139,7 +1224,7 @@ public class RFQSupplierService {
 
     private String displayProductSubtype1(RfqHeaderEntity rfq) {
         if (rfq.getProductUsage() != null) {
-            return safeValue(rfq.getProductUsage().getNameEn() != null ? rfq.getProductUsage().getNameEn() : rfq.getProductUsage().getNameTh())
+            return safeValue(rfq.getProductUsage().getNameTh() != null ? rfq.getProductUsage().getNameTh() : rfq.getProductUsage().getNameTh())
                     + " (" + safeValue(rfq.getProductUsage().getCode()) + ")";
         }
         return "-";
@@ -1147,7 +1232,7 @@ public class RFQSupplierService {
 
     private String displayProductSubtype2(RfqHeaderEntity rfq) {
         if (rfq.getSystemMechanic() != null) {
-            return safeValue(rfq.getSystemMechanic().getNameEn() != null ? rfq.getSystemMechanic().getNameEn() : rfq.getSystemMechanic().getNameTh())
+            return safeValue(rfq.getSystemMechanic().getNameTh() != null ? rfq.getSystemMechanic().getNameTh() : rfq.getSystemMechanic().getNameTh())
                     + " (" + safeValue(rfq.getSystemMechanic().getCode()) + ")";
         }
         return "-";
@@ -1155,7 +1240,7 @@ public class RFQSupplierService {
 
     private String displayProductMaterial(RfqHeaderEntity rfq) {
         if (rfq.getMaterial() != null) {
-            return safeValue(rfq.getMaterial().getNameEn() != null ? rfq.getMaterial().getNameEn() : rfq.getMaterial().getNameTh())
+            return safeValue(rfq.getMaterial().getNameTh() != null ? rfq.getMaterial().getNameTh() : rfq.getMaterial().getNameTh())
                     + " (" + safeValue(rfq.getMaterial().getCode()) + ")";
         }
         return safeValue(rfq.getMaterialCode());
@@ -1203,6 +1288,87 @@ public class RFQSupplierService {
                 .toList()) {
             lines.add("- " + safeValue(additionalCost.getDescription())
                     + (StringUtils.isNotBlank(additionalCost.getValue()) ? ": " + additionalCost.getValue().trim() : ""));
+        }
+        return String.join("\n", lines);
+    }
+
+    private String buildFinalQuoteInquiryDetailSection(RfqSupplierQuoteEntity supplierQuote) {
+        if (supplierQuote.getDetails() == null || supplierQuote.getDetails().isEmpty()) {
+            return "-";
+        }
+
+        List<String> lines = new ArrayList<>();
+        int index = 1;
+        for (RfqSupplierQuoteDetailEntity detail : supplierQuote.getDetails().stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteDetailEntity::getId))
+                .toList()) {
+            lines.add("Option ที่ " + index + ". " + safeValue(detail.getOptionName()));
+            lines.add("Spec: " + safeValue(detail.getSpec()));
+            if (StringUtils.isNotBlank(detail.getRemark())) {
+                lines.add("Remark: " + detail.getRemark().trim());
+            }
+            if (detail.getPackages() != null && !detail.getPackages().isEmpty()) {
+                lines.add("Packing lists:");
+                for (RfqSupplierQuoteDetailPackageEntity packageEntity : detail.getPackages()) {
+                    StringBuilder packages = new StringBuilder(packageEntity.getPackageName());
+                    packages.append(" ");
+                    packages.append(StringUtils.isNotEmpty(packageEntity.getPackageDimension()) ? packageEntity.getPackageDimension() : "");
+                    packages.append(" ");
+                    packages.append(StringUtils.isNotEmpty(packageEntity.getPackageWeight()) ? packageEntity.getPackageWeight() : "");
+                    packages.append(" ");
+                    packages.append(StringUtils.isNotEmpty(packageEntity.getPackageCapacity()) ? packageEntity.getPackageCapacity() : "");
+                    lines.add(packages.toString());
+                }
+            }
+            if (detail.getTiers() != null && !detail.getTiers().isEmpty()) {
+                lines.add("Quantity tiers:");
+                for (RfqSupplierQuoteTierEntity tier : detail.getTiers().stream()
+                        .sorted(Comparator.comparing(RfqSupplierQuoteTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(RfqSupplierQuoteTierEntity::getId))
+                        .toList()) {
+                    StringBuilder tierLine = new StringBuilder("- MOQ ")
+                            .append(tier.getQuantity() == null ? "-" : tier.getQuantity().stripTrailingZeros().toPlainString());
+                    if (tier.getProductPrice() != null) {
+                        tierLine.append(", ราคาสินค้า: ")
+                                .append(tier.getProductPrice().stripTrailingZeros().toPlainString());
+                        if (tier.getProductPriceCurrency() != null) {
+                            tierLine.append(" ").append(tier.getProductPriceCurrency().name());
+                        }
+                    }
+                    if (tier.getShippingCost() != null) {
+                        tierLine.append(", ค่าขนส่ง: ")
+                                .append(tier.getShippingCost().stripTrailingZeros().toPlainString());
+                        if (tier.getShippingCostCurrency() != null) {
+                            tierLine.append(" ").append(tier.getShippingCostCurrency().name());
+                        }
+                    }
+                    lines.add(tierLine.toString());
+                }
+            }
+            index++;
+        }
+        return String.join("\n", lines);
+    }
+
+    private String buildFinalQuoteInquiryAdditionalCostSection(RfqSupplierQuoteEntity supplierQuote) {
+        if (supplierQuote.getAdditionalCosts() == null || supplierQuote.getAdditionalCosts().isEmpty()) {
+            return "-";
+        }
+
+        List<String> lines = new ArrayList<>();
+        for (RfqSupplierQuoteAdditionalCostEntity additionalCost : supplierQuote.getAdditionalCosts().stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteAdditionalCostEntity::getId))
+                .toList()) {
+            String line = "- " + safeValue(additionalCost.getDescription());
+            if (StringUtils.isNotBlank(additionalCost.getValue())) {
+                line += ": " + additionalCost.getValue().trim();
+            }
+            if (StringUtils.isNotBlank(additionalCost.getUnit())) {
+                line += " " + additionalCost.getUnit().trim();
+            }
+            lines.add(line.trim());
         }
         return String.join("\n", lines);
     }

@@ -1435,6 +1435,23 @@ databaseChangeLog:
                   type: BIGINT
 
   - changeSet:
+      id: 20260717-003-add-request-coa-request-po-to-sales-order
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: request_coa
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE sales_order
+                  ADD COLUMN request_coa BIT(1) NOT NULL DEFAULT b'0' AFTER shipping_type,
+                  ADD COLUMN request_po BIT(1) NOT NULL DEFAULT b'0' AFTER request_coa;
+
+  - changeSet:
       id: 20260630-006-add-source-fields-to-sales-order-detail
       author: codex
       preConditions:
@@ -1995,3 +2012,206 @@ databaseChangeLog:
                   visible = VALUES(visible),
                   updated_by = VALUES(updated_by),
                   updated_date = NOW(6);
+  - changeSet:
+      id: 20260714-001-add-reference-rfq-id-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: reference_rfq_id
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: reference_rfq_id
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260717-004-add-is-fcl-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: is_fcl
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: is_fcl
+                  type: BIT(1)
+                  defaultValueBoolean: false
+
+  - changeSet:
+      id: 20260717-005-create-freelance-sale-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: freelance_sale
+      changes:
+        - createTable:
+            tableName: freelance_sale
+            columns:
+              - column:
+                  name: id
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: contact_number
+                  type: VARCHAR(50)
+              - column:
+                  name: sale_coverage
+                  type: VARCHAR(255)
+              - column:
+                  name: additional
+                  type: VARCHAR(1000)
+
+  - changeSet:
+      id: 20260717-006-add-customer-payment-term-to-customer
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer
+                columnName: customer_payment_term
+      changes:
+        - addColumn:
+            tableName: customer
+            columns:
+              - column:
+                  name: customer_payment_term
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260717-007-add-co-sale-commission-to-sales-order
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: co_sale_commission
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column:
+                  name: co_sale_commission
+                  type: DECIMAL(18,2)
+
+  - changeSet:
+      id: 20260717-008-create-sales-order-attachment-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: sales_order_attachment
+      changes:
+        - createTable:
+            tableName: sales_order_attachment
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: sales_order_no
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: file_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: original_file_name
+                  type: VARCHAR(255)
+              - column:
+                  name: file_url
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: VARCHAR(100)
+              - column:
+                  name: file_size
+                  type: BIGINT
+              - column:
+                  name: remark
+                  type: VARCHAR(1000)
+              - column:
+                  name: sort_order
+                  type: INT
+              - column:
+                  name: active
+                  type: BIT(1)
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_date
+                  type: DATETIME
+              - column:
+                  name: updated_date
+                  type: DATETIME
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260717-009-add-status-to-invoice-payment
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: invoice_payment
+                columnName: status
+      changes:
+        - addColumn:
+            tableName: invoice_payment
+            columns:
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  defaultValue: APPROVE
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 20260718-001-normalize-cancelled-status-on-quotation-and-sales-order
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE quotation
+              SET status = 'CANCELLED'
+              WHERE status = 'CANCELED';
+
+              UPDATE sales_order
+              SET status = 'CANCELLED'
+              WHERE status = 'CANCELED';

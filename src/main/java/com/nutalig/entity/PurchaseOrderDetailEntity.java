@@ -60,9 +60,6 @@ public class PurchaseOrderDetailEntity {
     @Column(name = "supplier_unit_price", precision = 18, scale = 4)
     private BigDecimal supplierUnitPrice;
 
-    @Column(name = "exchange_rate", precision = 18, scale = 4)
-    private BigDecimal exchangeRate;
-
     @Column(name = "supplier_shipping_cost", precision = 18, scale = 4)
     private BigDecimal supplierShippingCost;
 

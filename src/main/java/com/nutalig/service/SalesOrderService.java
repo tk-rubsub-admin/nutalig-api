@@ -2,11 +2,13 @@ package com.nutalig.service;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.*;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.salesorder.request.*;
+import com.nutalig.dto.SalesOrderAttachmentDto;
 import com.nutalig.dto.SalesOrderDetailDto;
 import com.nutalig.dto.SalesOrderDto;
 import com.nutalig.dto.SystemConfigDto;
@@ -22,6 +24,7 @@ import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -54,6 +58,7 @@ public class SalesOrderService {
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
@@ -66,6 +71,8 @@ public class SalesOrderService {
     private final ActivityHistoryService activityHistoryService;
     private final SystemConfigService systemConfigService;
     private final ReportService reportService;
+    private final FileStorageService fileStorageService;
+    private final SalesOrderAttachmentRepository salesOrderAttachmentRepository;
 
     record SalesOrderSummary(
             BigDecimal subTotal,
@@ -102,9 +109,12 @@ public class SalesOrderService {
         entity.setCustomerContact(customerContact);
         entity.setSales(sales);
         entity.setCoSalesId(request.getCoSaleId());
+        entity.setCoSaleCommission(request.getCoSaleCommission());
         entity.setDiscount(defaultIfNull(request.getDiscount()));
         entity.setFreight(defaultIfNull(request.getFreight()));
         entity.setShippingType(normalizeShippingType(request.getShippingType()));
+        entity.setRequestCoa(Boolean.TRUE.equals(request.getRequestCoa()));
+        entity.setRequestPo(Boolean.TRUE.equals(request.getRequestPo()));
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
         entity.setProcurementStatus(ProcurementStatus.NOT_READY);
         entity.setRemark(request.getRemark());
@@ -176,6 +186,12 @@ public class SalesOrderService {
         if (request.getShippingType() != null) {
             entity.setShippingType(normalizeShippingType(request.getShippingType()));
         }
+        if (request.getRequestCoa() != null) {
+            entity.setRequestCoa(request.getRequestCoa());
+        }
+        if (request.getRequestPo() != null) {
+            entity.setRequestPo(request.getRequestPo());
+        }
         if (request.getRemark() != null) {
             entity.setRemark(request.getRemark());
         }
@@ -190,6 +206,9 @@ public class SalesOrderService {
         }
         if (request.getCommission() != null) {
             entity.setCommission(request.getCommission());
+        }
+        if (request.getCoSaleCommission() != null) {
+            entity.setCoSaleCommission(request.getCoSaleCommission());
         }
 
         if (SalesOrderStatus.DRAFT.equals(entity.getStatus())) {
@@ -213,6 +232,74 @@ public class SalesOrderService {
 
         salesOrderRepository.save(entity);
         recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto addAttachments(String salesOrderNo, List<MultipartFile> attachments, String userId)
+            throws Exception {
+        if (attachments == null || attachments.isEmpty()) {
+            throw new InvalidRequestException("Attachments are required");
+        }
+
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        attachFiles(entity, attachments, user, now);
+
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+        salesOrderRepository.save(entity);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.WEB,
+                "เพิ่มไฟล์แนบของใบยืนยันสั่งซื้อเลขที่ " + entity.getSalesOrderNo(),
+                null
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto deleteAttachment(String salesOrderNo, Long attachmentId, String userId)
+            throws DataNotFoundException {
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        SalesOrderAttachmentEntity attachment = salesOrderAttachmentRepository
+                .findByIdAndSalesOrderSalesOrderNoAndActiveTrue(attachmentId, salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order attachment " + attachmentId + " not found."));
+
+        attachment.setActive(Boolean.FALSE);
+        attachment.setUpdatedBy(user);
+        attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        salesOrderAttachmentRepository.save(attachment);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.WEB,
+                "ลบไฟล์แนบของใบยืนยันสั่งซื้อเลขที่ " + entity.getSalesOrderNo(),
+                Map.of(
+                        "attachmentId", attachment.getId(),
+                        "fileName", attachment.getFileName(),
+                        "originalFileName", attachment.getOriginalFileName()
+                )
+        );
 
         return mapToDto(entity);
     }
@@ -436,7 +523,6 @@ public class SalesOrderService {
         detail.setShippingMethod(normalizeShippingType(request.getShippingMethod()));
         detail.setSupplierCurrency(request.getSupplierCurrency());
         detail.setSupplierUnitPrice(request.getSupplierUnitPrice());
-        detail.setExchangeRate(request.getExchangeRate());
         detail.setSupplierShippingCost(request.getSupplierShippingCost());
         detail.setSupplierTotalUnitCost(request.getSupplierTotalUnitCost());
         detail.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
@@ -472,7 +558,6 @@ public class SalesOrderService {
             detail.setShippingMethod(normalizeShippingType(itemRequest.getShippingMethod()));
             detail.setSupplierCurrency(itemRequest.getSupplierCurrency());
             detail.setSupplierUnitPrice(itemRequest.getSupplierUnitPrice());
-            detail.setExchangeRate(itemRequest.getExchangeRate());
             detail.setSupplierShippingCost(itemRequest.getSupplierShippingCost());
             detail.setSupplierTotalUnitCost(itemRequest.getSupplierTotalUnitCost());
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
@@ -500,7 +585,6 @@ public class SalesOrderService {
             request.setShippingMethod(item.getShippingMethod());
             request.setSupplierCurrency(item.getSupplierCurrency());
             request.setSupplierUnitPrice(item.getSupplierUnitPrice());
-            request.setExchangeRate(item.getExchangeRate());
             request.setSupplierShippingCost(item.getSupplierShippingCost());
             request.setSupplierTotalUnitCost(item.getSupplierTotalUnitCost());
             request.setSupplierQuoteTierId(item.getSupplierQuoteTierId());
@@ -592,8 +676,12 @@ public class SalesOrderService {
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("shippingType", entity.getShippingType());
+        detail.put("coSaleCommission", entity.getCoSaleCommission());
+        detail.put("requestCoa", entity.getRequestCoa());
+        detail.put("requestPo", entity.getRequestPo());
         detail.put("procurementStatus", entity.getProcurementStatus());
         detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
+        detail.put("attachmentCount", entity.getAttachments() != null ? entity.getAttachments().size() : 0);
         detail.put("subTotal", entity.getSubTotal());
         detail.put("vat", entity.getVat());
         detail.put("grandTotal", entity.getGrandTotal());
@@ -649,7 +737,10 @@ public class SalesOrderService {
         detail.put("coSaleId", entity.getCoSalesId());
         detail.put("discount", entity.getDiscount());
         detail.put("freight", entity.getFreight());
+        detail.put("coSaleCommission", entity.getCoSaleCommission());
         detail.put("shippingType", entity.getShippingType());
+        detail.put("requestCoa", entity.getRequestCoa());
+        detail.put("requestPo", entity.getRequestPo());
         detail.put("procurementStatus", entity.getProcurementStatus());
         detail.put("vatRate", entity.getVatRate());
         detail.put("remark", entity.getRemark());
@@ -657,7 +748,43 @@ public class SalesOrderService {
         detail.put("vat", entity.getVat());
         detail.put("grandTotal", entity.getGrandTotal());
         detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
+        detail.put("attachmentCount", entity.getAttachments() != null ? entity.getAttachments().size() : 0);
         return detail;
+    }
+
+    private void attachFiles(
+            SalesOrderEntity entity,
+            List<MultipartFile> attachments,
+            UserEntity user,
+            ZonedDateTime now
+    ) throws Exception {
+        int nextSortOrder = entity.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
+                .map(SalesOrderAttachmentEntity::getSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+
+        for (MultipartFile attachment : attachments) {
+            if (attachment == null || attachment.isEmpty()) {
+                continue;
+            }
+
+            UploadFileResponse upload = fileStorageService.uploadFile(attachment);
+            SalesOrderAttachmentEntity attachmentEntity = new SalesOrderAttachmentEntity();
+            attachmentEntity.setFileName(upload.getFileName());
+            attachmentEntity.setOriginalFileName(StringUtils.trimToNull(attachment.getOriginalFilename()));
+            attachmentEntity.setFileUrl(upload.getUrl());
+            attachmentEntity.setContentType(StringUtils.trimToNull(upload.getContentType()));
+            attachmentEntity.setFileSize(attachment.getSize());
+            attachmentEntity.setSortOrder(nextSortOrder++);
+            attachmentEntity.setActive(Boolean.TRUE);
+            attachmentEntity.setCreatedBy(user);
+            attachmentEntity.setUpdatedBy(user);
+            attachmentEntity.setCreatedDate(now);
+            attachmentEntity.setUpdatedDate(now);
+            entity.addAttachment(attachmentEntity);
+        }
     }
 
     private String generateSalesOrderNo() {
@@ -721,6 +848,7 @@ public class SalesOrderService {
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setExpireDate(entity.getExpireDate() != null ? entity.getExpireDate().format(DateUtil.DD_MM_YY) : null);
         dto.setStatus(entity.getStatus());
+        dto.setStatusProfile(DocumentStatusResolver.resolveSalesOrder(entity.getStatus()));
         dto.setCurrency(entity.getCurrency());
         dto.setCustomer(customerMapper.toDto(entity.getCustomer()));
         dto.setCustomerAddress(customerMapper.toAddressDto(entity.getCustomerAddress()));
@@ -733,15 +861,47 @@ public class SalesOrderService {
         dto.setVat(entity.getVat());
         dto.setGrandTotal(entity.getGrandTotal());
         dto.setAmount(entity.getAmount());
-        dto.setCommission(entity.getCommission());
+        if (entity.getCommission() != null) {
+            dto.setCommission(entity.getCommission());
+        } else {
+            BigDecimal fallbackCommission = entity.getItems().stream()
+                    .findFirst()
+                    .map(SalesOrderDetailEntity::getRfqTierId)
+                    .flatMap(requestPriceTierRepository::findById)
+                    .map(RfqTierEntity::getCommission)
+                    .orElse(null);
+            dto.setCommission(fallbackCommission);
+        }
+        dto.setCoSaleCommission(entity.getCoSaleCommission());
         dto.setProcurementStatus(entity.getProcurementStatus());
         dto.setShippingType(entity.getShippingType());
+        dto.setRequestCoa(Boolean.TRUE.equals(entity.getRequestCoa()));
+        dto.setRequestPo(Boolean.TRUE.equals(entity.getRequestPo()));
         dto.setVatRate(entity.getVatRate());
         dto.setRemark(entity.getRemark());
         dto.setRfqId(resolveRfq(entity.getSalesOrderNo()));
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
         dto.setRevNo(entity.getRevNo());
+
+        List<SalesOrderAttachmentDto> attachments = new ArrayList<>();
+        for (SalesOrderAttachmentEntity attachment : entity.getAttachments()) {
+            if (!Boolean.TRUE.equals(attachment.getActive())) {
+                continue;
+            }
+            SalesOrderAttachmentDto attachmentDto = new SalesOrderAttachmentDto();
+            attachmentDto.setId(attachment.getId());
+            attachmentDto.setSalesOrderNo(entity.getSalesOrderNo());
+            attachmentDto.setFileName(attachment.getFileName());
+            attachmentDto.setOriginalFileName(attachment.getOriginalFileName());
+            attachmentDto.setFileUrl(attachment.getFileUrl());
+            attachmentDto.setContentType(attachment.getContentType());
+            attachmentDto.setFileSize(attachment.getFileSize());
+            attachmentDto.setRemark(attachment.getRemark());
+            attachmentDto.setSortOrder(attachment.getSortOrder());
+            attachments.add(attachmentDto);
+        }
+        dto.setAttachments(attachments);
 
         List<SalesOrderDetailDto> items = new ArrayList<>();
         for (SalesOrderDetailEntity detail : entity.getItems()) {
@@ -764,7 +924,6 @@ public class SalesOrderService {
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierCurrency(detail.getSupplierCurrency());
             item.setSupplierUnitPrice(detail.getSupplierUnitPrice());
-            item.setExchangeRate(detail.getExchangeRate());
             item.setSupplierShippingCost(detail.getSupplierShippingCost());
             item.setSupplierTotalUnitCost(detail.getSupplierTotalUnitCost());
             item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());

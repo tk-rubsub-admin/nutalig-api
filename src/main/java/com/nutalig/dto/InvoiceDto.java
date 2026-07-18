@@ -15,6 +15,7 @@ public class InvoiceDto {
     private String docDate;
     private String dueDate;
     private InvoiceStatus status;
+    private DocumentStatusProfileDto statusProfile;
     private Currency currency;
     private CustomerDto customer;
     private CustomerAddressDto customerAddress;

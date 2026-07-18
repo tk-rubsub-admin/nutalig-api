@@ -79,6 +79,15 @@ public class CustomerEntity extends AuditDateEntity {
     @ToString.Include
     private SystemConfigEntity customerCreditTerm;
 
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula= @JoinFormula(value="'CUSTOMER_PAYMENT_TERM'", referencedColumnName="group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "customer_payment_term", referencedColumnName ="code"))
+    })
+    @EqualsAndHashCode.Exclude
+    @ToString.Include
+    private SystemConfigEntity customerPaymentTerm;
+
     @Column(name = "tax_id")
     @ToString.Include
     private String taxId;

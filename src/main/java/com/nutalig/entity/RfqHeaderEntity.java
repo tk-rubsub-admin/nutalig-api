@@ -62,6 +62,15 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @ToString.Exclude
     private CustomerEntity customer;
 
+    @Column(name = "reference_rfq_id")
+    private String referenceRfqId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "reference_rfq_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private RfqHeaderEntity referenceRfq;
+
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqPicturesEntity> pictures = new ArrayList<>();
 

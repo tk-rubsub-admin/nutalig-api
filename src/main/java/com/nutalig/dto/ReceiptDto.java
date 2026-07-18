@@ -15,6 +15,7 @@ public class ReceiptDto {
     private String receiptNo;
     private ReceiptType receiptType;
     private ReceiptStatus status;
+    private DocumentStatusProfileDto statusProfile;
     private String invoiceNo;
     private Long invoicePaymentId;
     private String salesOrderNo;

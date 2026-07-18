@@ -3,11 +3,15 @@ package com.nutalig.controller.user;
 import com.nutalig.constant.UserTodoStatus;
 import com.nutalig.constant.UserTodoType;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.controller.user.request.CreateMyCalendarEventRequest;
 import com.nutalig.controller.user.request.CreateUserRequest;
+import com.nutalig.controller.user.request.CreateUserTodoRequest;
+import com.nutalig.dto.CalendarEventDto;
 import com.nutalig.dto.RolePermissionDto;
 import com.nutalig.dto.UserDto;
 import com.nutalig.dto.UserRoleDto;
 import com.nutalig.dto.UserTodoDto;
+import com.nutalig.service.CalendarEventService;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.UserRoleRepository;
@@ -36,6 +40,7 @@ public class UserController {
     private final UserRoleRepository userRoleRepository;
     private final PermissionService permissionService;
     private final UserTodoService userTodoService;
+    private final CalendarEventService calendarEventService;
 
     @PostMapping("/v1/users")
     @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
@@ -133,6 +138,24 @@ public class UserController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/v1/me/to-dos")
+    public GeneralResponse<UserTodoDto> createMyTodo(
+            Authentication authentication,
+            @RequestBody CreateUserTodoRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start create user todo title {} ===", request != null ? request.getTitle() : null);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        UserTodoDto response = userTodoService.createTodoForUser(userDto.getId(), request);
+
+        log.info("=== End create user todo {} by user {} ===", response.getId(), userDto.getId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/v1/me/to-dos/{id}/done")
     public GeneralResponse<UserTodoDto> markTodoAsDone(
             Authentication authentication,
@@ -148,6 +171,24 @@ public class UserController {
         UserTodoDto response = userTodoService.markTodoAsDone(userDto.getId(), todoId);
 
         log.info("=== End mark user todo {} as done by user {} ===", todoId, userDto.getId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/v1/me/calendar-events")
+    public GeneralResponse<CalendarEventDto> createMyCalendarEvent(
+            Authentication authentication,
+            @RequestBody CreateMyCalendarEventRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start create my calendar event title {} ===", request != null ? request.getTitle() : null);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        CalendarEventDto response = calendarEventService.createMyCalendarEvent(userDto.getId(), request);
+
+        log.info("=== End create my calendar event {} by user {} ===", response.getId(), userDto.getId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

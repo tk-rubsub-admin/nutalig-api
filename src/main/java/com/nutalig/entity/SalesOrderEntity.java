@@ -106,14 +106,40 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "commission", precision = 18, scale = 2)
     private BigDecimal commission;
 
+    @Column(name = "co_sale_commission", precision = 18, scale = 2)
+    private BigDecimal coSaleCommission;
+
+    @Column(name = "request_coa")
+    private Boolean requestCoa;
+
+    @Column(name = "request_po")
+    private Boolean requestPo;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "procurement_status", length = 30)
     private ProcurementStatus procurementStatus;
 
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder asc, id asc")
+    @ToString.Exclude
+    private Set<SalesOrderAttachmentEntity> attachments = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineNo asc")
     @ToString.Exclude
     private Set<SalesOrderDetailEntity> items = new LinkedHashSet<>();
+
+    public void addAttachment(SalesOrderAttachmentEntity attachment) {
+        if (attachment == null) return;
+        attachments.add(attachment);
+        attachment.setSalesOrder(this);
+    }
+
+    public void removeAttachment(SalesOrderAttachmentEntity attachment) {
+        if (attachment == null) return;
+        attachments.remove(attachment);
+        attachment.setSalesOrder(null);
+    }
 
     public void addItem(SalesOrderDetailEntity item) {
         if (item == null) return;

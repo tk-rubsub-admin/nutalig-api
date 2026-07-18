@@ -24,6 +24,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "productSubType2", source = "systemMechanic")
     @Mapping(target = "rfqStatusTimeline", source = "statusTimelines")
     @Mapping(target = "requestedMoqs", source = "requestedMoq")
+    @Mapping(target = "referenceRfq", source = "referenceRfq", qualifiedByName = "toReferenceDto")
     RfqHeaderDto toDto(RfqHeaderEntity entity);
 
     List<RfqHeaderDto> toDtoList(List<RfqHeaderEntity> entities);
@@ -34,6 +35,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "requestedDate", ignore = true)
     @Mapping(target = "sales", ignore = true)
     @Mapping(target = "customer", ignore = true)
+    @Mapping(target = "referenceRfq", ignore = true)
     @Mapping(target = "rfqType", ignore = true)
     @Mapping(target = "orderType", ignore = true)
     @Mapping(target = "pictures", ignore = true)
@@ -61,6 +63,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "sales", ignore = true)
     @Mapping(target = "customer", ignore = true)
+    @Mapping(target = "referenceRfq", ignore = true)
     @Mapping(target = "rfqType", ignore = true)
     @Mapping(target = "orderType", ignore = true)
     @Mapping(target = "pictures", ignore = true)
@@ -108,6 +111,12 @@ public interface RequestPriceHeaderMapper {
     List<RfqStatusTimelineDto> toRfqStatusTimelineDtoList(List<RfqStatusTimelineEntity> entities);
 
     SalesAccountDto toSalesDto(SalesEntity entity);
+
+    @Named("toReferenceDto")
+    @Mapping(target = "productFamily", source = "productFamilyEntity")
+    @Mapping(target = "productSubtype1", source = "productUsage")
+    @Mapping(target = "productSubType2", source = "systemMechanic")
+    RfqReferenceDto toReferenceDto(RfqHeaderEntity entity);
 
     default String mapRequestedMoqs(List<BigDecimal> requestedMoqs) {
         if (requestedMoqs == null || requestedMoqs.isEmpty()) {

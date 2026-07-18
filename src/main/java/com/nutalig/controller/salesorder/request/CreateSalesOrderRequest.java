@@ -18,10 +18,13 @@ public class CreateSalesOrderRequest {
     private String customerContactId;
     private String salesId;
     private String coSaleId;
+    private BigDecimal coSaleCommission;
     private BigDecimal discount;
     private BigDecimal freight;
     private Boolean isVat;
     private String shippingType;
+    private Boolean requestCoa;
+    private Boolean requestPo;
     private String remark;
     private List<CreateSalesOrderDetailRequest> items;
 }

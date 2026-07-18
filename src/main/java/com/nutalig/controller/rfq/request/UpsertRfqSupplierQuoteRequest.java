@@ -14,6 +14,7 @@ public class UpsertRfqSupplierQuoteRequest {
     private String inquiryId;
     private RfqSupplierQuoteStatus status;
     private String remark;
+    private String recommend;
     private List<DetailRequest> details;
     private List<AdditionalCostRequest> additionalCosts;
 
@@ -46,6 +47,10 @@ public class UpsertRfqSupplierQuoteRequest {
         private BigDecimal quantity;
         private BigDecimal productPrice;
         private BigDecimal shippingCost;
+        private BigDecimal commission;
+        private BigDecimal landTotalPrice;
+        private BigDecimal seaTotalPrice;
+        private Boolean isFcl;
         private Currency productPriceCurrency;
         private Currency shippingCostCurrency;
         private Currency currency;

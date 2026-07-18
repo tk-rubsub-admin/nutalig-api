@@ -14,6 +14,7 @@ public class CreateRequestPriceHeaderRequest {
     private String salesId;
     private String customerId;
     private String procurementId;
+    private String referenceRfqId;
     private String rfqTypeCode;
     private String orderTypeCode;
     private String shippingMethod;

@@ -14,6 +14,7 @@ public class UpdateCustomerRequest {
     private String branchNumber;
     private String branchName;
     private String creditTerm;
+    private String paymentTerm;
     private String salesAccount;
     private String coSalesAccount;
 
