@@ -18,9 +18,14 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -59,6 +64,32 @@ public class LineMessageService {
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
         log.info("Response from Line API: " + response.getBody());
+    }
+
+    public void sendTestNotificationCard(String userId) throws Exception {
+        log.info("Send test notification card to user {}", userId);
+
+        UserEntity userEntity = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found"));
+
+        if (StringUtils.isBlank(userEntity.getLineUserId())) {
+            throw new InvalidRequestException("User " + userId + " doesn't have line user id");
+        }
+
+        Map<String, String> placeholders = new HashMap<>();
+        placeholders.put("altText", "ทดสอบการแจ้งเตือนจากระบบ");
+        placeholders.put("title", "ทดสอบการแจ้งเตือน");
+        placeholders.put(
+                "detail",
+                String.format(
+                        "สวัสดี %s นี่คือข้อความทดสอบการแจ้งเตือนจากระบบ NUTALIG",
+                        StringUtils.defaultIfBlank(userEntity.getDisplayName(), userEntity.getUsername())
+                )
+        );
+        placeholders.put("detailUrl", buildTestNotificationDetailUrl());
+
+        JsonNode message = renderNotificationTemplate(placeholders);
+        sendFlexMessage(userEntity.getLineUserId(), message);
     }
 
     public void sendTextMessageToLineUser(String lineUserId, String message) throws Exception {
@@ -129,5 +160,31 @@ public class LineMessageService {
         try (InputStream inputStream = resource.getInputStream()) {
             return objectMapper.readTree(inputStream);
         }
+    }
+
+    private JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
+        ClassPathResource resource = new ClassPathResource("line/notification.json");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            String rendered = template;
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                rendered = rendered.replace("${" + entry.getKey() + "}", StringUtils.defaultString(entry.getValue()));
+            }
+            return objectMapper.readTree(rendered);
+        }
+    }
+
+    private String buildTestNotificationDetailUrl() throws InvalidRequestException {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new InvalidRequestException("LINE frontend redirect URL is not configured");
+        }
+
+        URI uri = URI.create(loginSuccessUrl);
+        String frontendBaseUrl = uri.getScheme() + "://" + uri.getAuthority();
+        return UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                .path("/")
+                .build()
+                .toUriString();
     }
 }

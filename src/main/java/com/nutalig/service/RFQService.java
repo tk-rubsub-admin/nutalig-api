@@ -209,6 +209,12 @@ public class RFQService {
                 detail
         );
 
+        sendRequestInformationNotificationToSales(
+                entity,
+                StringUtils.trimToEmpty(request.getRequestInformation()),
+                updatedBy
+        );
+
         return mapToDto(entity);
     }
 
@@ -1915,9 +1921,69 @@ public class RFQService {
         }
     }
 
+    private void sendRequestInformationNotificationToSales(
+            RfqHeaderEntity entity,
+            String requestInformationText,
+            String requestedBy
+    ) {
+        try {
+            EmployeeEntity salesOwner = entity.getSales();
+
+            if (salesOwner == null || StringUtils.isBlank(salesOwner.getEmployeeId())) {
+                log.warn("No sales owner found for rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(salesOwner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No LINE-bound sales owner found for rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ " + entity.getId() + " มีคำขอข้อมูลเพิ่มเติม");
+            placeholders.put("title", "RFQ ขอข้อมูลเพิ่มเติม");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s ถูกขอข้อมูลเพิ่มเติมโดย %s%s",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            StringUtils.defaultIfBlank(requestedBy, "-"),
+                            StringUtils.isNotBlank(requestInformationText)
+                                    ? " : " + StringUtils.abbreviate(requestInformationText, 180)
+                                    : ""
+                    )
+            );
+            placeholders.put("detailUrl", buildSalesRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn(
+                        "Cannot send request information notification to sales owner {} for rfq {}",
+                        userEntityOptional.get().getId(),
+                        entity.getId(),
+                        exception
+                );
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send request information notification for rfq {}", entity.getId(), exception);
+        }
+    }
+
     private String buildRfqDetailUrl(String rfqId) throws InvalidRequestException {
         return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
                 .path("/price-inquiry/")
+                .path(StringUtils.defaultString(rfqId))
+                .build()
+                .toUriString();
+    }
+
+    private String buildSalesRfqDetailUrl(String rfqId) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/rfq/")
                 .path(StringUtils.defaultString(rfqId))
                 .build()
                 .toUriString();

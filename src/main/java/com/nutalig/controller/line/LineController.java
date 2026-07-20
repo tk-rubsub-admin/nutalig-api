@@ -64,35 +64,11 @@ public class LineController {
         return new ResponseEntity<>("OK", HttpStatus.OK);
     }
 
-    private void handleWebhookEvent(Event event) throws Exception {
-        if (event == null || event.getSource() == null || StringUtils.isBlank(event.getSource().getUserId())) {
-            return;
-        }
-
-        String lineUserId = event.getSource().getUserId();
-        if ("postback".equalsIgnoreCase(event.getType())) {
-            if (event.getPostback() == null || StringUtils.isBlank(event.getPostback().getData())) {
-                return;
-            }
-            approvalService.handleLinePostback(lineUserId, event.getWebhookEventId(), event.getPostback().getData());
-            return;
-        }
-
-        Message message = event.getMessage();
-        if (!"message".equalsIgnoreCase(event.getType()) || message == null || StringUtils.isBlank(message.getText())) {
-            return;
-        }
-
-        UserDto userDto = userProfileService.getUserByLineUserId(lineUserId);
-        log.info("Receive message {} from user {} with {}", message.getText(), lineUserId, userDto.getId());
-        lineHandleMessageService.handleTextMessage(userDto.getId(), message.getText());
-    }
-
     @GetMapping("/v1/line/test")
     public GeneralResponse testLineConnect(@RequestParam("userId") String userId) throws Exception {
         log.info("=== Start test line connect ===");
 
-        lineMessageService.sendTextMessage(userId, "ทดสอบการแจ้งเตือน");
+        lineMessageService.sendTestNotificationCard(userId);
 
         log.info("=== End test line connect ===");
         return new GeneralResponse(SUCCESS);
@@ -134,6 +110,32 @@ public class LineController {
 
     ) {
 
+    }
+
+
+
+    private void handleWebhookEvent(Event event) throws Exception {
+        if (event == null || event.getSource() == null || StringUtils.isBlank(event.getSource().getUserId())) {
+            return;
+        }
+
+        String lineUserId = event.getSource().getUserId();
+        if ("postback".equalsIgnoreCase(event.getType())) {
+            if (event.getPostback() == null || StringUtils.isBlank(event.getPostback().getData())) {
+                return;
+            }
+            approvalService.handleLinePostback(lineUserId, event.getWebhookEventId(), event.getPostback().getData());
+            return;
+        }
+
+        Message message = event.getMessage();
+        if (!"message".equalsIgnoreCase(event.getType()) || message == null || StringUtils.isBlank(message.getText())) {
+            return;
+        }
+
+        UserDto userDto = userProfileService.getUserByLineUserId(lineUserId);
+        log.info("Receive message {} from user {} with {}", message.getText(), lineUserId, userDto.getId());
+        lineHandleMessageService.handleTextMessage(userDto.getId(), message.getText());
     }
 
 }

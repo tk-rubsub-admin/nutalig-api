@@ -4,24 +4,34 @@
   "contents": {
     "type": "bubble",
     "size": "mega",
+    "styles": {
+      "header": {
+        "backgroundColor": "#1F3F37"
+      },
+      "body": {
+        "backgroundColor": "#F7F3EE"
+      },
+      "footer": {
+        "backgroundColor": "#F7F3EE"
+      }
+    },
     "header": {
       "type": "box",
       "layout": "vertical",
       "paddingAll": "20px",
-      "backgroundColor": "#1E3A5F",
       "contents": [
         {
           "type": "text",
           "text": "แจ้งเตือนจากระบบ",
           "size": "sm",
-          "color": "#D8E6F3"
+          "color": "#D4C5BA"
         },
         {
           "type": "text",
           "text": "${title}",
           "weight": "bold",
           "size": "xl",
-          "color": "#FFFFFF",
+          "color": "#F7F3EE",
           "wrap": true,
           "margin": "sm"
         }
@@ -38,20 +48,22 @@
           "text": "รายละเอียด",
           "size": "sm",
           "weight": "bold",
-          "color": "#64748B"
+          "color": "#925944"
         },
         {
           "type": "box",
           "layout": "vertical",
           "cornerRadius": "md",
           "paddingAll": "14px",
-          "backgroundColor": "#F8FAFC",
+          "backgroundColor": "#D4C5BA",
+          "borderWidth": "1px",
+          "borderColor": "#925944",
           "contents": [
             {
               "type": "text",
               "text": "${detail}",
               "size": "sm",
-              "color": "#111827",
+              "color": "#30302F",
               "wrap": true
             }
           ]
@@ -67,12 +79,20 @@
           "type": "button",
           "style": "primary",
           "height": "sm",
-          "color": "#2563EB",
+          "color": "#1F3F37",
           "action": {
             "type": "uri",
             "label": "ดูรายละเอียด",
             "uri": "${detailUrl}"
           }
+        },
+        {
+          "type": "text",
+          "text": "NUTALIG | Strategic Packaging Partner",
+          "size": "xs",
+          "color": "#925944",
+          "align": "center",
+          "margin": "md"
         }
       ]
     }
