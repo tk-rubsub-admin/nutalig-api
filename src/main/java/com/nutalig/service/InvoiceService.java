@@ -914,7 +914,6 @@ public class InvoiceService {
                 log.warn("No active ADMIN users with LINE binding found for invoice {}", invoice.getInvoiceNo());
                 return;
             }
-
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("altText", "มีรายการรับชำระเงินรอตรวจสอบ " + invoice.getInvoiceNo());
             placeholders.put("title", "รอตรวจสอบการรับชำระเงิน");

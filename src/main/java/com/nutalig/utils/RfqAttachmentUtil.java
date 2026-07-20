@@ -14,6 +14,11 @@ public final class RfqAttachmentUtil {
             return null;
         }
 
+        int uploadsIndex = pictureUrl.indexOf("/uploads/");
+        if (uploadsIndex >= 0) {
+            return pictureUrl.substring(uploadsIndex + "/uploads/".length());
+        }
+
         int lastSlashIndex = pictureUrl.lastIndexOf('/');
         return lastSlashIndex >= 0 ? pictureUrl.substring(lastSlashIndex + 1) : pictureUrl;
     }

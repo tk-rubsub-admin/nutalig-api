@@ -1,6 +1,8 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.config.PromptTemplateEngine;
 import com.nutalig.config.TemplateProperties;
 import com.nutalig.constant.*;
@@ -24,14 +26,19 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -75,6 +82,7 @@ public class RFQService {
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final PromptTemplateEngine promptTemplateEngine;
     private final TemplateProperties templateProperties;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
@@ -105,23 +113,6 @@ public class RFQService {
         log.info("Get RFQ by id : {}", id);
         RfqHeaderEntity entity = getEntityById(id);
 
-//        if (shouldMoveToInProgressOnView(entity, userId)) {
-//            entity.setStatus(RfqStatus.IN_PROGRESS);
-//            entity.setUpdatedBy(userProfileService.getNameFromId(userId));
-//            entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-//            entity = requestPriceHeaderRepository.save(entity);
-//
-//            activityHistoryService.record(
-//                    ActivityEntityType.RFQ,
-//                    entity.getId(),
-//                    userId,
-//                    ActivityActorType.USER,
-//                    ActivityAction.VIEW,
-//                    ActivitySource.API,
-//                    "จัดซื้อดูคำขอราคาเลขที่ " + entity.getId(),
-//                    null
-//            );
-//        }
         return mapToDto(entity);
     }
 
@@ -318,9 +309,6 @@ public class RFQService {
             entity.setContactPhone(request.getContactPhone());
         }
 
-//        SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
-//        entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
-
         entity = requestPriceHeaderRepository.save(entity);
 
         java.util.Map<String, Object> detail = new LinkedHashMap<>();
@@ -349,6 +337,26 @@ public class RFQService {
 
         if (Boolean.TRUE.equals(entity.getUrgentRequest())) {
             approvalService.createUrgentRfqApprovalRequest(entity, userId);
+        } else {
+            sendAwaitingAcceptNotifications(entity);
+            Optional<UserEntity> userEntityOptional = userRepository.findByEmployeeEntity_EmployeeId(entity.getProcurement().getEmployeeId());
+
+            if (userEntityOptional.isPresent()) {
+                userTodoService.buildUserTodoEntity(
+                        userEntityOptional.get(),
+                        UserTodoType.PRICE_INQUIRY,
+                        entity.getId() + " รอรับงาน",
+                        null,
+                        UserTodoStatus.TODO,
+                        UserTodoPriority.HIGH,
+                        ActivityEntityType.PRICE_INQUIRY.name(),
+                        entity.getId(),
+                        null,
+                        now.plusDays(1),
+                        1,
+                        userId
+                );
+            }
         }
 
         saveRfqStatusTimeline(entity, entity.getStatus(), entity.getRequestedDate());
@@ -1189,7 +1197,7 @@ public class RFQService {
 
         RfqHeaderEntity entity = getEntityById(rfqId);
         RfqPicturesEntity picture = getPictureFromHeader(entity, pictureId);
-        UploadFileResponse uploadedFile = fileStorageService.uploadFile(pictureFile);
+        UploadFileResponse uploadedFile = fileStorageService.uploadFile(pictureFile, entity.getId());
 
         picture.setPictureUrl(uploadedFile.getUrl());
         picture.setFileName(uploadedFile.getFileName());
@@ -1736,7 +1744,7 @@ public class RFQService {
                 continue;
             }
 
-            UploadFileResponse uploadedFile = fileStorageService.uploadFile(picture);
+            UploadFileResponse uploadedFile = fileStorageService.uploadFile(picture, entity.getId());
 
             RfqPicturesEntity pictureEntity = new RfqPicturesEntity();
             pictureEntity.setPictureUrl(uploadedFile.getUrl());
@@ -1865,5 +1873,75 @@ public class RFQService {
             String requestedBy,
             ZonedDateTime requestedDate
     ) {
+    }
+
+    private void sendAwaitingAcceptNotifications(RfqHeaderEntity entity) {
+        try {
+            EmployeeEntity procurementUser = entity.getProcurement();
+
+            if (procurementUser == null) {
+                log.warn("No procurement user found for rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional = userRepository.findByEmployeeEntity_EmployeeId(procurementUser.getEmployeeId());
+            if (userEntityOptional.isEmpty()) {
+                log.warn("No user with LINE binding found for rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "มีรายการ RFQ รอรับงาน " + entity.getId());
+            placeholders.put("title", "RFQ รอรับงาน");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s ของ %s อยู่ในสถานะรอกดรับงาน",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            entity.getSales().getEmployeeId() + ":" + entity.getSales().getNickName())
+            );
+            placeholders.put("detailUrl", buildRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            UserEntity userEntity = userEntityOptional.get();
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn("Cannot send awaiting validation notification to user {}", userEntity.getId(), exception);
+            }
+
+        } catch (Exception exception) {
+            log.warn("Cannot send awaiting validation notifications for rfq {}", entity.getId(), exception);
+        }
+    }
+
+    private String buildRfqDetailUrl(String rfqId) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/price-inquiry/")
+                .path(StringUtils.defaultString(rfqId))
+                .build()
+                .toUriString();
+    }
+
+    private String buildFrontendBaseUrl() throws InvalidRequestException {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new InvalidRequestException("LINE frontend redirect URL is not configured");
+        }
+
+        URI uri = URI.create(loginSuccessUrl);
+        return uri.getScheme() + "://" + uri.getAuthority();
+    }
+
+    private JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
+        ClassPathResource resource = new ClassPathResource("line/notification.json");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            String rendered = template;
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                rendered = rendered.replace("${" + entry.getKey() + "}", StringUtils.defaultString(entry.getValue()));
+            }
+            return objectMapper.readTree(rendered);
+        }
     }
 }

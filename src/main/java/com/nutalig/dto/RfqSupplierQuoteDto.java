@@ -13,6 +13,7 @@ public class RfqSupplierQuoteDto {
     private String rfqId;
     private SupplierDto supplier;
     private String inquiryId;
+    private Integer revisionNo;
     private RfqSupplierQuoteStatus status;
     private String remark;
     private List<RfqSupplierQuoteDetailDto> details;

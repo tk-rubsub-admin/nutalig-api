@@ -18,8 +18,8 @@ import java.util.List;
 @Table(
         name = "rfq_supplier_quote",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_rfq_supplier_quote_rfq_supplier",
-                columnNames = {"rfq_header_id", "supplier_id"}
+                name = "uk_rfq_supplier_quote_rfq_supplier_revision",
+                columnNames = {"rfq_header_id", "supplier_id", "revision_no"}
         )
 )
 @Entity(name = "RfqSupplierQuote")
@@ -48,6 +48,9 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "inquiry_id", referencedColumnName = "id")
     private RfqSupplierInquiryEntity inquiry;
+
+    @Column(name = "revision_no", nullable = false)
+    private Integer revisionNo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)

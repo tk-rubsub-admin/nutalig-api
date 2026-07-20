@@ -217,15 +217,15 @@ public class RFQSupplierService {
             throw new InvalidRequestException("Supplier id is required.");
         }
         SupplierEntity supplier = getSupplierEntity(request.getSupplierId());
-        if (rfqSupplierQuoteRepository.findByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId()).isPresent()) {
-            throw new InvalidRequestException("Supplier quote already exists for supplier " + supplier.getId() + ".");
-        }
-
         String actor = userProfileService.getNameFromId(userId);
+        Integer maxRevisionNo = rfqSupplierQuoteRepository
+                .findMaxRevisionNoByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId());
+        int nextRevisionNo = (maxRevisionNo == null ? 0 : maxRevisionNo) + 1;
 
         RfqSupplierQuoteEntity quote = new RfqSupplierQuoteEntity();
         quote.setRequestPriceHeader(rfq);
         quote.setSupplier(supplier);
+        quote.setRevisionNo(nextRevisionNo);
         quote.setStatus(request.getStatus() == null ? RfqSupplierQuoteStatus.RESPONDED : request.getStatus());
         quote.setCreatedBy(actor);
         applySupplierQuoteRequest(rfq, quote, request, userId);
@@ -577,12 +577,11 @@ public class RFQSupplierService {
         if (StringUtils.isNotBlank(request.getSupplierId())
                 && !Objects.equals(request.getSupplierId(), quote.getSupplier().getId())) {
             SupplierEntity supplier = getSupplierEntity(request.getSupplierId());
-            Optional<RfqSupplierQuoteEntity> existingQuote =
-                    rfqSupplierQuoteRepository.findByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId());
-            if (existingQuote.isPresent() && !Objects.equals(existingQuote.get().getId(), quote.getId())) {
-                throw new InvalidRequestException("Supplier quote already exists for supplier " + supplier.getId() + ".");
-            }
             quote.setSupplier(supplier);
+            Integer maxRevisionNo = rfqSupplierQuoteRepository
+                    .findMaxRevisionNoByRequestPriceHeader_IdAndSupplier_Id(rfqId, supplier.getId());
+            int nextRevisionNo = (maxRevisionNo == null ? 0 : maxRevisionNo) + 1;
+            quote.setRevisionNo(nextRevisionNo);
         }
 
         quote.getDetails().clear();
@@ -654,6 +653,7 @@ public class RFQSupplierService {
         dto.setRfqId(entity.getRequestPriceHeader().getId());
         dto.setSupplier(supplierMapper.toDto(entity.getSupplier()));
         dto.setInquiryId(entity.getInquiry() == null ? null : entity.getInquiry().getId());
+        dto.setRevisionNo(entity.getRevisionNo());
         dto.setStatus(entity.getStatus());
         dto.setRemark(entity.getRemark());
         dto.setDetails(entity.getDetails().stream()
@@ -787,6 +787,7 @@ public class RFQSupplierService {
         detail.put("id", entity.getId());
         detail.put("rfqId", entity.getRequestPriceHeader() == null ? null : entity.getRequestPriceHeader().getId());
         detail.put("supplierId", entity.getSupplier() == null ? null : entity.getSupplier().getId());
+        detail.put("revisionNo", entity.getRevisionNo());
         detail.put("status", entity.getStatus());
         detail.put("remark", entity.getRemark());
         detail.put("details", entity.getDetails().stream()

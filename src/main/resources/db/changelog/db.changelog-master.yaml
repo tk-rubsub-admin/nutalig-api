@@ -2203,15 +2203,50 @@ databaseChangeLog:
                     nullable: false
 
   - changeSet:
-      id: 20260718-001-normalize-cancelled-status-on-quotation-and-sales-order
+      id: 20260718-001-normalize-cancelled-status-on-quotations-and-sales-order
       author: codex
       changes:
         - sql:
             sql: |
-              UPDATE quotation
+              UPDATE quotations
               SET status = 'CANCELLED'
               WHERE status = 'CANCELED';
 
               UPDATE sales_order
               SET status = 'CANCELLED'
               WHERE status = 'CANCELED';
+
+  - changeSet:
+      id: 20260719-001-add-revision-no-to-rfq-supplier-quote
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote
+                columnName: revision_no
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote
+            columns:
+              - column:
+                  name: revision_no
+                  type: INT
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: rfq_supplier_quote
+            indexName: idx_rfq_supplier_quote_rfq_supplier_pair
+            columns:
+              - column:
+                  name: rfq_header_id
+              - column:
+                  name: supplier_id
+        - dropUniqueConstraint:
+            tableName: rfq_supplier_quote
+            constraintName: uk_rfq_supplier_quote_rfq_supplier
+        - addUniqueConstraint:
+            tableName: rfq_supplier_quote
+            columnNames: rfq_header_id, supplier_id, revision_no
+            constraintName: uk_rfq_supplier_quote_rfq_supplier_revision

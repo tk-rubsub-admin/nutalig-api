@@ -52,8 +52,10 @@ public class AuthController {
     }
 
     @GetMapping("/v1/auth/line/login/url")
-    public GeneralResponse<LineAuthorizeUrlResponse> getLineLoginUrl() throws InvalidRequestException {
-        return new GeneralResponse<>(SUCCESS, lineAuthService.buildLoginAuthorizeUrl());
+    public GeneralResponse<LineAuthorizeUrlResponse> getLineLoginUrl(
+            @RequestParam(value = "redirect", required = false) String redirect
+    ) throws InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, lineAuthService.buildLoginAuthorizeUrl(redirect));
     }
 
     @GetMapping("/v1/auth/line/register/url")

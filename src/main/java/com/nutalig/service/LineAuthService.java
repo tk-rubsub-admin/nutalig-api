@@ -101,9 +101,10 @@ public class LineAuthService {
         return new LineRegisterResponse(sessionToken, userDetailsService.getUserById(user.getId()), true);
     }
 
-    public LineAuthorizeUrlResponse buildLoginAuthorizeUrl() throws InvalidRequestException {
+    public LineAuthorizeUrlResponse buildLoginAuthorizeUrl(String redirect) throws InvalidRequestException {
         return new LineAuthorizeUrlResponse(buildAuthorizeUrl(LineStatePayload.builder()
                 .intent(INTENT_LOGIN)
+                .redirectPath(normalizeRedirectPath(redirect))
                 .nonce(randomToken())
                 .build()));
     }
@@ -192,14 +193,17 @@ public class LineAuthService {
 
         if (INTENT_LOGIN.equals(intent)) {
             UserDto user = getAuthenticatedUserByAccessToken(tokenResponse.getAccessToken());
+            Map<String, String> queryParams = new java.util.LinkedHashMap<>();
+            queryParams.put("status", "success");
+            queryParams.put("mode", INTENT_LOGIN);
+            queryParams.put("access_token", tokenResponse.getAccessToken());
+            queryParams.put("userId", user.getId());
+            if (StringUtils.isNotBlank(payload.getRedirectPath())) {
+                queryParams.put("redirect", payload.getRedirectPath());
+            }
             return buildSuccessRedirect(
                     lineConfiguration.getLoginSuccessUrl(),
-                    Map.of(
-                            "status", "success",
-                            "mode", INTENT_LOGIN,
-                            "access_token", tokenResponse.getAccessToken(),
-                            "userId", user.getId()
-                    )
+                    queryParams
             );
         }
 
@@ -235,6 +239,7 @@ public class LineAuthService {
                         "intent", payload.getIntent(),
                         "userId", StringUtils.defaultString(payload.getUserId()),
                         "registrationToken", StringUtils.defaultString(payload.getRegistrationToken()),
+                        "redirectPath", StringUtils.defaultString(payload.getRedirectPath()),
                         "nonce", payload.getNonce()
                 ),
                 STATE_EXPIRATION_SECONDS
@@ -261,6 +266,7 @@ public class LineAuthService {
         String intent = JwtUtil.getClaim(state, "intent");
         String userId = JwtUtil.getClaim(state, "userId");
         String registrationToken = JwtUtil.getClaim(state, "registrationToken");
+        String redirectPath = JwtUtil.getClaim(state, "redirectPath");
         String nonce = JwtUtil.getClaim(state, "nonce");
 
         if (StringUtils.isBlank(intent) || StringUtils.isBlank(nonce)) {
@@ -271,6 +277,7 @@ public class LineAuthService {
                 .intent(intent)
                 .userId(StringUtils.trimToNull(userId))
                 .registrationToken(StringUtils.trimToNull(registrationToken))
+                .redirectPath(StringUtils.trimToNull(redirectPath))
                 .nonce(nonce)
                 .build();
     }
@@ -477,6 +484,19 @@ public class LineAuthService {
                 .path("/line-register-success")
                 .build()
                 .toUriString();
+    }
+
+    private String normalizeRedirectPath(String redirect) {
+        String trimmedRedirect = StringUtils.trimToNull(redirect);
+        if (trimmedRedirect == null) {
+            return null;
+        }
+
+        if (!trimmedRedirect.startsWith("/") || trimmedRedirect.startsWith("//")) {
+            return null;
+        }
+
+        return trimmedRedirect;
     }
 
     private String buildFrontendBaseUrl() throws InvalidRequestException {

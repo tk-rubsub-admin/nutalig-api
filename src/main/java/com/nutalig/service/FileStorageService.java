@@ -19,7 +19,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,10 @@ public class FileStorageService {
     private final AppProperties appProperties;
 
     public UploadFileResponse uploadFile(MultipartFile file) throws Exception {
+        return uploadFile(file, null);
+    }
+
+    public UploadFileResponse uploadFile(MultipartFile file, String relativeDir) throws Exception {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File is empty.");
         }
@@ -35,20 +41,30 @@ public class FileStorageService {
         String contentType = StringUtils.trimToNull(file.getContentType());
         String extension = resolveExtension(file.getOriginalFilename(), contentType);
 
-        String fileName = UUID.randomUUID() +
+        String generatedFileName = UUID.randomUUID() +
                 ((extension == null || extension.isBlank()) ? "" : "." + extension);
+        String normalizedRelativeDir = normalizeRelativeDir(relativeDir);
+        String storedFileName = StringUtils.isBlank(normalizedRelativeDir)
+                ? generatedFileName
+                : normalizedRelativeDir + "/" + generatedFileName;
 
         Path uploadPath = Paths.get(appProperties.getUpload().getDir()).toAbsolutePath().normalize();
-        Files.createDirectories(uploadPath);
+        Path targetDirectory = StringUtils.isBlank(normalizedRelativeDir)
+                ? uploadPath
+                : uploadPath.resolve(normalizedRelativeDir).normalize();
+        if (!targetDirectory.startsWith(uploadPath)) {
+            throw new IllegalArgumentException("Invalid upload directory.");
+        }
+        Files.createDirectories(targetDirectory);
 
-        Path targetPath = uploadPath.resolve(fileName);
+        Path targetPath = targetDirectory.resolve(generatedFileName).normalize();
         try (InputStream inputStream = file.getInputStream()) {
             Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        String url = buildPublicFileUrl(fileName);
+        String url = buildPublicFileUrl(storedFileName);
 
-        return new UploadFileResponse(fileName, url, contentType);
+        return new UploadFileResponse(storedFileName, url, contentType);
     }
 
     public UploadFileResponse uploadGeneratedFile(byte[] content, String fileBaseName, String contentType) throws IOException {
@@ -114,6 +130,34 @@ public class FileStorageService {
         sanitized = StringUtils.removeStart(sanitized, ".");
         sanitized = StringUtils.removeEnd(sanitized, ".");
         return StringUtils.defaultIfBlank(sanitized, UUID.randomUUID().toString());
+    }
+
+    private String normalizeRelativeDir(String relativeDir) {
+        if (StringUtils.isBlank(relativeDir)) {
+            return null;
+        }
+
+        String normalized = relativeDir.replace("\\", "/").trim();
+        normalized = StringUtils.strip(normalized, "/");
+        if (StringUtils.isBlank(normalized)) {
+            return null;
+        }
+
+        String sanitized = Arrays.stream(normalized.split("/"))
+                .map(this::sanitizePathSegment)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.joining("/"));
+
+        return StringUtils.defaultIfBlank(sanitized, null);
+    }
+
+    private String sanitizePathSegment(String pathSegment) {
+        String sanitized = StringUtils.defaultString(pathSegment).trim();
+        sanitized = sanitized.replaceAll("[^A-Za-z0-9._-]", "_");
+        sanitized = sanitized.replaceAll("_+", "_");
+        sanitized = StringUtils.removeStart(sanitized, ".");
+        sanitized = StringUtils.removeEnd(sanitized, ".");
+        return sanitized;
     }
 
     private String resolveExtensionFromContentType(String contentType) {
