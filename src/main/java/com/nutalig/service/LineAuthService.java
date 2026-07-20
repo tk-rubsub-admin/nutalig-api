@@ -61,7 +61,7 @@ public class LineAuthService {
         UserDto user = getAuthenticatedUserByAccessToken(request.getAccessToken());
         UserEntity userEntity = userRepository.findById(user.getId())
                 .orElseThrow(() -> new DataNotFoundException("User " + user.getId() + " not found."));
-        String sessionToken = appSessionService.issueSessionToken(userEntity);
+        String sessionToken = appSessionService.issueSessionToken(userEntity, request.getDeviceType());
         return new LineLoginResponse(sessionToken, userDetailsService.getUserById(userEntity.getId()));
     }
 
@@ -82,7 +82,7 @@ public class LineAuthService {
 
         if (StringUtils.isNotBlank(user.getLineUserId())) {
             if (StringUtils.equals(user.getLineUserId(), profile.getUserId())) {
-                String sessionToken = appSessionService.issueSessionToken(user);
+                String sessionToken = appSessionService.issueSessionToken(user, request.getDeviceType());
                 return new LineRegisterResponse(sessionToken, userDetailsService.getUserById(user.getId()), false);
             }
             throw new InvalidRequestException("บัญชีนี้ผูก LINE แล้ว");
@@ -97,7 +97,7 @@ public class LineAuthService {
         bindLineProfile(user, profile, LINE_REGISTER_ACTOR);
         userRepository.save(user);
 
-        String sessionToken = appSessionService.issueSessionToken(user);
+        String sessionToken = appSessionService.issueSessionToken(user, request.getDeviceType());
         return new LineRegisterResponse(sessionToken, userDetailsService.getUserById(user.getId()), true);
     }
 
@@ -175,6 +175,7 @@ public class LineAuthService {
         user.setCurrentSessionId(null);
         user.setUpdatedBy(SUPER_ADMIN_ACTOR);
         userRepository.save(user);
+        appSessionService.revokeSession(userId);
     }
 
     public URI handleCallback(String code, String state, String error, String errorDescription)

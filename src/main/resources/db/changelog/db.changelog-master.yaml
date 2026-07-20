@@ -2291,3 +2291,69 @@ databaseChangeLog:
               FROM customer
               WHERE sales_account IS NOT NULL
                 AND TRIM(sales_account) <> '';
+
+  - changeSet:
+      id: 20260720-002-create-user-app-session-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: user_app_session
+      changes:
+        - createTable:
+            tableName: user_app_session
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: device_type
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: session_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_date
+                  type: DATETIME
+              - column:
+                  name: updated_date
+                  type: DATETIME
+        - addUniqueConstraint:
+            tableName: user_app_session
+            columnNames: user_id, device_type
+            constraintName: uk_user_app_session_user_device
+        - createIndex:
+            tableName: user_app_session
+            indexName: idx_user_app_session_user_session_device
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: session_id
+              - column:
+                  name: device_type
+        - addForeignKeyConstraint:
+            baseTableName: user_app_session
+            baseColumnNames: user_id
+            referencedTableName: user
+            referencedColumnNames: id
+            constraintName: fk_user_app_session_user
