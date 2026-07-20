@@ -5,6 +5,7 @@ import com.nutalig.entity.CustomerEntity;
 import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.utils.SqlUtil;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.domain.Specification;
@@ -70,20 +71,32 @@ public class CustomerSpecification {
 
     public static Specification<CustomerEntity> saleAccountEqual(String saleAccountEqual) {
         if (StringUtils.isNotEmpty(saleAccountEqual)) {
-            return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("salesAccount"), saleAccountEqual);
+            return (root, query, criteriaBuilder) -> {
+                query.distinct(true);
+                Join<CustomerEntity, String> salesAccountsJoin = root.join("salesAccounts", JoinType.LEFT);
+                return criteriaBuilder.or(
+                        criteriaBuilder.equal(root.get("salesAccount"), saleAccountEqual),
+                        criteriaBuilder.equal(salesAccountsJoin, saleAccountEqual)
+                );
+            };
         }
         return null;
     }
 
     public static Specification<CustomerEntity> keywordContain(String keyword) {
         if (StringUtils.isNotEmpty(keyword)) {
-            return (root, query, criteriaBuilder) -> criteriaBuilder.or(
-                    criteriaBuilder.like(root.get("id"), SqlUtil.buildContainString(keyword)),
-                    criteriaBuilder.like(root.get("customerName"), SqlUtil.buildContainString(keyword)),
-                    criteriaBuilder.like(root.get("companyName"), SqlUtil.buildContainString(keyword)),
-                    criteriaBuilder.like(root.get("taxId"), SqlUtil.buildContainString(keyword)),
-                    criteriaBuilder.like(root.get("salesAccount"), SqlUtil.buildContainString(keyword))
-            );
+            return (root, query, criteriaBuilder) -> {
+                query.distinct(true);
+                Join<CustomerEntity, String> salesAccountsJoin = root.join("salesAccounts", JoinType.LEFT);
+                return criteriaBuilder.or(
+                        criteriaBuilder.like(root.get("id"), SqlUtil.buildContainString(keyword)),
+                        criteriaBuilder.like(root.get("customerName"), SqlUtil.buildContainString(keyword)),
+                        criteriaBuilder.like(root.get("companyName"), SqlUtil.buildContainString(keyword)),
+                        criteriaBuilder.like(root.get("taxId"), SqlUtil.buildContainString(keyword)),
+                        criteriaBuilder.like(root.get("salesAccount"), SqlUtil.buildContainString(keyword)),
+                        criteriaBuilder.like(salesAccountsJoin, SqlUtil.buildContainString(keyword))
+                );
+            };
         }
         return null;
     }

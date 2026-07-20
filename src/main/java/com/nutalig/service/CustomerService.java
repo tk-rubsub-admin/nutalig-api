@@ -117,6 +117,7 @@ public class CustomerService {
         entity.setStatus(Status.ACTIVE);
         entity.setCreatedBy(userId);
         entity.setUpdatedBy(userId);
+        applySalesAccounts(entity, request.getSalesAccounts(), request.getSalesAccount());
 
         // address
         if (request.getAddress() != null) {
@@ -358,7 +359,9 @@ public class CustomerService {
             ));
         }
         if (request.getSalesAccount() != null) {
-            entity.setSalesAccount(StringUtils.trimToNull(request.getSalesAccount()));
+            applySalesAccounts(entity, request.getSalesAccounts(), request.getSalesAccount());
+        } else if (request.getSalesAccounts() != null) {
+            applySalesAccounts(entity, request.getSalesAccounts(), null);
         }
         if (request.getCoSalesAccount() != null) {
             entity.setCoSalesAccount(StringUtils.trimToNull(request.getCoSalesAccount()));
@@ -597,8 +600,40 @@ public class CustomerService {
         detail.put("branchName", entity.getBranchName());
         detail.put("email", entity.getEmail());
         detail.put("salesAccount", entity.getSalesAccount());
+        detail.put("salesAccounts", getEffectiveSalesAccounts(entity));
         detail.put("coSalesAccount", entity.getCoSalesAccount());
         return detail;
+    }
+
+    private void applySalesAccounts(CustomerEntity entity, List<String> salesAccounts, String salesAccount) {
+        List<String> normalizedSalesAccounts = normalizeSalesAccounts(salesAccounts, salesAccount);
+        entity.setSalesAccounts(new ArrayList<>(normalizedSalesAccounts));
+        entity.setSalesAccount(normalizedSalesAccounts.isEmpty() ? null : normalizedSalesAccounts.get(0));
+    }
+
+    private List<String> normalizeSalesAccounts(List<String> salesAccounts, String salesAccount) {
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        if (CollectionUtils.isNotEmpty(salesAccounts)) {
+            salesAccounts.stream()
+                    .map(StringUtils::trimToNull)
+                    .filter(Objects::nonNull)
+                    .forEach(normalized::add);
+        }
+        String primarySalesAccount = StringUtils.trimToNull(salesAccount);
+        if (primarySalesAccount != null) {
+            normalized.add(primarySalesAccount);
+        }
+        return new ArrayList<>(normalized);
+    }
+
+    private List<String> getEffectiveSalesAccounts(CustomerEntity entity) {
+        if (CollectionUtils.isNotEmpty(entity.getSalesAccounts())) {
+            return new ArrayList<>(entity.getSalesAccounts());
+        }
+        if (StringUtils.isNotBlank(entity.getSalesAccount())) {
+            return List.of(entity.getSalesAccount());
+        }
+        return new ArrayList<>();
     }
 
     private List<CustomerDashboardBreakdownDto> buildBreakdown(

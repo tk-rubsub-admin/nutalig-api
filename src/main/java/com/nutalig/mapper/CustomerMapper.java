@@ -7,9 +7,15 @@ import com.nutalig.dto.CustomerDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
 import com.nutalig.entity.CustomerEntity;
+import org.apache.commons.lang3.StringUtils;
+import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
+import org.mapstruct.MappingTarget;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {SystemConfigMapper.class})
 public interface CustomerMapper {
@@ -72,6 +78,24 @@ public interface CustomerMapper {
                 sb.append(" ");
             }
             sb.append(value.trim());
+        }
+    }
+
+    @AfterMapping
+    default void normalizeSalesAccounts(CustomerEntity entity, @MappingTarget CustomerDto dto) {
+        List<String> salesAccounts = entity.getSalesAccounts();
+        if (salesAccounts == null || salesAccounts.isEmpty()) {
+            if (StringUtils.isNotBlank(entity.getSalesAccount())) {
+                dto.setSalesAccounts(List.of(entity.getSalesAccount()));
+            } else {
+                dto.setSalesAccounts(new ArrayList<>());
+            }
+        }
+
+        if (StringUtils.isBlank(dto.getSalesAccount())
+                && dto.getSalesAccounts() != null
+                && !dto.getSalesAccounts().isEmpty()) {
+            dto.setSalesAccount(dto.getSalesAccounts().get(0));
         }
     }
 }

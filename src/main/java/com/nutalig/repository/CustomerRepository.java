@@ -6,6 +6,7 @@ import com.nutalig.entity.CustomerEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,6 +32,17 @@ public interface CustomerRepository extends JpaRepository<CustomerEntity, String
 
     List<CustomerEntity> findAllByStatusOrderByCreatedDateDesc(Status status);
 
-    List<CustomerEntity> findAllByStatusAndSalesAccountOrderByCreatedDateDesc(Status status, String salesAccount);
+    @Query("""
+            SELECT DISTINCT c
+            FROM Customer c
+            LEFT JOIN c.salesAccounts sa
+            WHERE c.status = :status
+              AND (sa = :salesAccount OR c.salesAccount = :salesAccount)
+            ORDER BY c.createdDate DESC
+            """)
+    List<CustomerEntity> findAllByStatusAndSalesAccountOrderByCreatedDateDesc(
+            @Param("status") Status status,
+            @Param("salesAccount") String salesAccount
+    );
 
 }

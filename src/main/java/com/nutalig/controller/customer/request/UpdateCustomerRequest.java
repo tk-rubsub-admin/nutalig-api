@@ -2,6 +2,8 @@ package com.nutalig.controller.customer.request;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class UpdateCustomerRequest {
 
@@ -16,6 +18,7 @@ public class UpdateCustomerRequest {
     private String creditTerm;
     private String paymentTerm;
     private String salesAccount;
+    private List<String> salesAccounts;
     private String coSalesAccount;
 
 }

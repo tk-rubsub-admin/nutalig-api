@@ -2250,3 +2250,44 @@ databaseChangeLog:
             tableName: rfq_supplier_quote
             columnNames: rfq_header_id, supplier_id, revision_no
             constraintName: uk_rfq_supplier_quote_rfq_supplier_revision
+
+  - changeSet:
+      id: 20260720-001-add-customer-sales-account-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_sales_account
+      changes:
+        - createTable:
+            tableName: customer_sales_account
+            columns:
+              - column:
+                  name: customer_id
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: sort_order
+                  type: INT
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: sales_account
+                  type: VARCHAR(100)
+        - addForeignKeyConstraint:
+            baseTableName: customer_sales_account
+            baseColumnNames: customer_id
+            referencedTableName: customer
+            referencedColumnNames: id
+            constraintName: fk_customer_sales_account_customer
+        - sql:
+            sql: |
+              INSERT INTO customer_sales_account (customer_id, sort_order, sales_account)
+              SELECT id, 0, sales_account
+              FROM customer
+              WHERE sales_account IS NOT NULL
+                AND TRIM(sales_account) <> '';

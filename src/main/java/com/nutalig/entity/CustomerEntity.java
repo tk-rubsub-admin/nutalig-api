@@ -112,6 +112,15 @@ public class CustomerEntity extends AuditDateEntity {
     @ToString.Include
     private String salesAccount;
 
+    @ElementCollection
+    @CollectionTable(
+            name = "customer_sales_account",
+            joinColumns = @JoinColumn(name = "customer_id")
+    )
+    @OrderColumn(name = "sort_order")
+    @Column(name = "sales_account")
+    private List<String> salesAccounts = new ArrayList<>();
+
     @Column(name = "co_sales_account")
     @ToString.Include
     private String coSalesAccount;

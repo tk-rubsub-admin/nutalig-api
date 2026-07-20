@@ -20,5 +20,6 @@ public class CreateCustomerRequest {
     private CreateCustomerAddressRequest address;
     private List<CreateCustomerContactRequest> contacts;
     private String salesAccount;
+    private List<String> salesAccounts;
     private String coSalesAccount;
 }

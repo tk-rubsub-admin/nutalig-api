@@ -22,6 +22,7 @@ public class CustomerDto {
     private String branchName;
     private String email;
     private String salesAccount;
+    private List<String> salesAccounts;
     private String coSalesAccount;
     private String createdBy;
     private String updatedBy;
