@@ -3,9 +3,11 @@ package com.nutalig.service;
 import com.nutalig.constant.CalendarEventStyleRegistry;
 import com.nutalig.constant.CalendarEventType;
 import com.nutalig.controller.user.request.CreateMyCalendarEventRequest;
+import com.nutalig.controller.user.request.UpdateMyCalendarEventRequest;
 import com.nutalig.controller.request.DateTimeRangeModelRequest;
 import com.nutalig.dto.CalendarEventDto;
 import com.nutalig.entity.CalendarEventEntity;
+import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.CalendarEventRepository;
 import com.nutalig.utils.DateUtil;
@@ -27,12 +29,36 @@ public class CalendarEventService {
     public List<CalendarEventDto> getCalendarEvents(DateTimeRangeModelRequest request) {
         List<CalendarEventEntity> events;
         if (request != null && request.getStart() != null && request.getEnd() != null) {
-            events = calendarEventRepository.findAllByActiveTrueAndStartAtLessThanEqualAndEndAtGreaterThanEqualOrderByStartAtAsc(
+            events = calendarEventRepository.findAllByActiveTrueAndEventTypeNotAndStartAtLessThanEqualAndEndAtGreaterThanEqualOrderByStartAtAsc(
+                    CalendarEventType.PRIVATE,
                     request.getEnd(),
                     request.getStart()
             );
         } else {
-            events = calendarEventRepository.findAllByActiveTrueOrderByStartAtAsc();
+            events = calendarEventRepository.findAllByActiveTrueAndEventTypeNotOrderByStartAtAsc(
+                    CalendarEventType.PRIVATE
+            );
+        }
+
+        return events.stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarEventDto> getMyPrivateCalendarEvents(String userId, DateTimeRangeModelRequest request) {
+        List<CalendarEventEntity> events;
+        if (request != null && request.getStart() != null && request.getEnd() != null) {
+            events = calendarEventRepository
+                    .findAllByActiveTrueAndEventTypeAndCreatedByAndStartAtLessThanEqualAndEndAtGreaterThanEqualOrderByStartAtAsc(
+                            CalendarEventType.PRIVATE,
+                            userId,
+                            request.getEnd(),
+                            request.getStart()
+                    );
+        } else {
+            events = calendarEventRepository.findAllByActiveTrueAndEventTypeAndCreatedByOrderByStartAtAsc(
+                    CalendarEventType.PRIVATE,
+                    userId
+            );
         }
 
         return events.stream().map(this::toDto).toList();
@@ -73,6 +99,55 @@ public class CalendarEventService {
         entity.setUpdatedDate(now);
 
         return toDto(calendarEventRepository.save(entity));
+    }
+
+    @Transactional
+    public CalendarEventDto updateMyPrivateCalendarEvent(
+            String userId,
+            Long eventId,
+            UpdateMyCalendarEventRequest request
+    ) throws InvalidRequestException, DataNotFoundException {
+        if (request == null || StringUtils.isBlank(request.getTitle())) {
+            throw new InvalidRequestException("Event title is required.");
+        }
+        if (request.getStart() == null || request.getEnd() == null) {
+            throw new InvalidRequestException("Event start and end are required.");
+        }
+        if (request.getEnd().isBefore(request.getStart())) {
+            throw new InvalidRequestException("Event end must be after or equal to start.");
+        }
+
+        CalendarEventEntity entity = calendarEventRepository
+                .findByIdAndActiveTrueAndEventTypeAndCreatedBy(eventId, CalendarEventType.PRIVATE, userId)
+                .orElseThrow(() -> new DataNotFoundException("Calendar event not found"));
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        entity.setTitle(StringUtils.trimToNull(request.getTitle()));
+        entity.setDescription(StringUtils.trimToNull(request.getDescription()));
+        entity.setStartAt(request.getStart());
+        entity.setEndAt(request.getEnd());
+        entity.setAllDay(Boolean.TRUE.equals(request.getAllDay()));
+        entity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        entity.setUpdatedBy(userId);
+        entity.setUpdatedDate(now);
+
+        return toDto(calendarEventRepository.save(entity));
+    }
+
+    @Transactional
+    public void deleteMyPrivateCalendarEvent(String userId, Long eventId) throws DataNotFoundException {
+        CalendarEventEntity entity = calendarEventRepository
+                .findByIdAndActiveTrueAndEventTypeAndCreatedBy(eventId, CalendarEventType.PRIVATE, userId)
+                .orElseThrow(() -> new DataNotFoundException("Calendar event not found"));
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        entity.setActive(Boolean.FALSE);
+        entity.setUpdatedBy(userId);
+        entity.setUpdatedDate(now);
+
+        calendarEventRepository.save(entity);
     }
 
     private CalendarEventDto toDto(CalendarEventEntity entity) {

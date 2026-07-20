@@ -10,6 +10,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.CustomerDashboardBreakdownDto;
 import com.nutalig.dto.CustomerDashboardDto;
 import com.nutalig.dto.CustomerDto;
+import com.nutalig.dto.UserDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
 import com.nutalig.entity.CustomerEntity;
@@ -29,10 +30,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Function;
 
@@ -252,7 +255,11 @@ public class CustomerService {
     }
 
     @Transactional
-    public SearchCustomerResponse searchCustomer(SearchCustomerRequest searchCustomerRequest, PageableRequest pageableRequest) {
+    public SearchCustomerResponse searchCustomer(
+            SearchCustomerRequest searchCustomerRequest,
+            PageableRequest pageableRequest,
+            Authentication authentication
+    ) {
         log.info("Search customer by criteria(s) {}", searchCustomerRequest);
 
         pageableRequest.setSortBy("createdDate");
@@ -262,6 +269,7 @@ public class CustomerService {
         Page<CustomerEntity> customerEntityPage = customerRepository.findAll(buildSearchCriteria(searchCustomerRequest), pageable);
         Page<CustomerDto> customerDtoPage = customerEntityPage.map(customerMapper::toDto);
         List<CustomerDto> customerDtoList = customerDtoPage.getContent();
+        applySalesVisibleOrderTotals(customerDtoList, authentication);
 
         log.info("Search customer size : {}", customerDtoPage.getTotalElements());
 
@@ -583,6 +591,36 @@ public class CustomerService {
                 .and(saleAccountEqual(request.getSaleAccountEqual()))
                 .and(keywordContain(request.getKeyword()))
                 ;
+    }
+
+    private void applySalesVisibleOrderTotals(List<CustomerDto> customers, Authentication authentication) {
+        if (CollectionUtils.isEmpty(customers) || authentication == null || !(authentication.getPrincipal() instanceof UserDto userDto)) {
+            return;
+        }
+
+        String roleCode = userDto.getRole() != null ? userDto.getRole().getRoleCode() : null;
+        String salesId = StringUtils.trimToNull(userDto.getEmployeeId());
+        if (!StringUtils.equalsIgnoreCase(roleCode, "SALES") || salesId == null) {
+            return;
+        }
+
+        for (CustomerDto customer : customers) {
+            if (!isCustomerOwnedBySales(customer, salesId)) {
+                customer.setTotalSalesOrderAmount(BigDecimal.ZERO);
+            }
+        }
+    }
+
+    private boolean isCustomerOwnedBySales(CustomerDto customer, String salesId) {
+        if (customer == null || StringUtils.isBlank(salesId)) {
+            return false;
+        }
+
+        if (CollectionUtils.isNotEmpty(customer.getSalesAccounts()) && customer.getSalesAccounts().contains(salesId)) {
+            return true;
+        }
+
+        return StringUtils.equals(customer.getSalesAccount(), salesId);
     }
 
     private Map<String, Object> buildCustomerHistorySnapshot(CustomerEntity entity) {

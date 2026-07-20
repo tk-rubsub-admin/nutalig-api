@@ -49,7 +49,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         String path = normalizePath(request);
         boolean skip = WHITELIST.stream().anyMatch(path::startsWith);
 
-        log.info("[JWTFilter] path: {} skip: {}", path, skip );
+        log.debug("[JWTFilter] path: {} skip: {}", path, skip );
         return skip;
     }
 

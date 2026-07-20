@@ -11,6 +11,7 @@ import org.hibernate.annotations.JoinColumnOrFormula;
 import org.hibernate.annotations.JoinColumnsOrFormulas;
 import org.hibernate.annotations.JoinFormula;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -124,6 +125,9 @@ public class CustomerEntity extends AuditDateEntity {
     @Column(name = "co_sales_account")
     @ToString.Include
     private String coSalesAccount;
+
+    @Column(name = "total_sales_order_amount", precision = 18, scale = 2)
+    private BigDecimal totalSalesOrderAmount;
 
     @Column(name = "created_by")
     @ToString.Include

@@ -3,6 +3,7 @@ package com.nutalig.dto;
 import com.nutalig.constant.Status;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -24,6 +25,7 @@ public class CustomerDto {
     private String salesAccount;
     private List<String> salesAccounts;
     private String coSalesAccount;
+    private BigDecimal totalSalesOrderAmount;
     private String createdBy;
     private String updatedBy;
     private List<CustomerAddressDto> addresses;

@@ -2357,3 +2357,34 @@ databaseChangeLog:
             referencedTableName: user
             referencedColumnNames: id
             constraintName: fk_user_app_session_user
+
+  - changeSet:
+      id: 20260720-003-add-total-sales-order-amount-to-customer
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer
+                columnName: total_sales_order_amount
+      changes:
+        - addColumn:
+            tableName: customer
+            columns:
+              - column:
+                  name: total_sales_order_amount
+                  type: DECIMAL(18,2)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: |
+              UPDATE customer c
+              LEFT JOIN (
+                  SELECT customer_id, COALESCE(SUM(grand_total), 0) AS total_amount
+                  FROM sales_order
+                  WHERE customer_id IS NOT NULL
+                    AND status NOT IN ('REJECTED', 'CANCELLED')
+                  GROUP BY customer_id
+              ) so ON so.customer_id = c.id
+              SET c.total_sales_order_amount = COALESCE(so.total_amount, 0);

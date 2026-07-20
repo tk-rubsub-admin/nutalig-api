@@ -2,9 +2,11 @@ package com.nutalig.controller.user;
 
 import com.nutalig.constant.UserTodoStatus;
 import com.nutalig.constant.UserTodoType;
+import com.nutalig.controller.request.DateTimeRangeModelRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.user.request.CreateMyCalendarEventRequest;
 import com.nutalig.controller.user.request.CreateUserRequest;
+import com.nutalig.controller.user.request.UpdateMyCalendarEventRequest;
 import com.nutalig.controller.user.request.CreateUserTodoRequest;
 import com.nutalig.dto.CalendarEventDto;
 import com.nutalig.dto.RolePermissionDto;
@@ -190,6 +192,65 @@ public class UserController {
 
         log.info("=== End create my calendar event {} by user {} ===", response.getId(), userDto.getId());
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/me/calendar-event")
+    public GeneralResponse<List<CalendarEventDto>> getMyCalendarEvents(
+            Authentication authentication,
+            @ModelAttribute DateTimeRangeModelRequest request
+    ) throws DataNotFoundException {
+        log.info("=== Start get my private calendar events start {} end {} ===", request.getStart(), request.getEnd());
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        List<CalendarEventDto> response = calendarEventService.getMyPrivateCalendarEvents(userDto.getId(), request);
+
+        log.info("=== End get my private calendar events user {} size {} ===", userDto.getId(), response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/v1/me/calendar-event/{id}")
+    public GeneralResponse<CalendarEventDto> updateMyCalendarEvent(
+            Authentication authentication,
+            @PathVariable("id") Long eventId,
+            @RequestBody UpdateMyCalendarEventRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update my calendar event {} ===", eventId);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        CalendarEventDto response = calendarEventService.updateMyPrivateCalendarEvent(
+                userDto.getId(),
+                eventId,
+                request
+        );
+
+        log.info("=== End update my calendar event {} by user {} ===", eventId, userDto.getId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/v1/me/calendar-event/{id}")
+    public GeneralResponse<Boolean> deleteMyCalendarEvent(
+            Authentication authentication,
+            @PathVariable("id") Long eventId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete my calendar event {} ===", eventId);
+
+        if (authentication == null) {
+            throw new DataNotFoundException("User not found");
+        }
+        UserDto userDto = (UserDto) authentication.getPrincipal();
+
+        calendarEventService.deleteMyPrivateCalendarEvent(userDto.getId(), eventId);
+
+        log.info("=== End delete my calendar event {} by user {} ===", eventId, userDto.getId());
+        return new GeneralResponse<>(SUCCESS, true);
     }
 
 //    @PostMapping("/api/users/notification-token")

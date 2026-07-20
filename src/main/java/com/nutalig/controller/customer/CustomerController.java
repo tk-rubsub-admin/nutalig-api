@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -96,11 +97,12 @@ public class CustomerController {
     @GetMapping
     public GeneralResponse<SearchCustomerResponse> getCustomers(
             SearchCustomerRequest searchCustomerRequest,
-            @Valid PageableRequest pageableRequest
+            @Valid PageableRequest pageableRequest,
+            Authentication authentication
     ) {
         log.info("=== Start get customers page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
 
-        SearchCustomerResponse response = customerService.searchCustomer(searchCustomerRequest, pageableRequest);
+        SearchCustomerResponse response = customerService.searchCustomer(searchCustomerRequest, pageableRequest, authentication);
 
         log.info("=== End get customers page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);
@@ -109,11 +111,12 @@ public class CustomerController {
     @PostMapping("/search")
     public GeneralResponse<SearchCustomerResponse> searchCustomer(
             @RequestBody(required = false) SearchCustomerRequest searchCustomerRequest,
-            @Valid PageableRequest pageableRequest
+            @Valid PageableRequest pageableRequest,
+            Authentication authentication
     ) {
         log.info("=== Start search customer page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
 
-        SearchCustomerResponse response = customerService.searchCustomer(searchCustomerRequest, pageableRequest);
+        SearchCustomerResponse response = customerService.searchCustomer(searchCustomerRequest, pageableRequest, authentication);
 
         log.info("=== End search customer page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);

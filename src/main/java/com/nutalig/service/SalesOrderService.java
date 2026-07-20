@@ -54,6 +54,8 @@ import static com.nutalig.repository.specification.SalesOrderSpecification.*;
 @Service
 @RequiredArgsConstructor
 public class SalesOrderService {
+    private static final Set<SalesOrderStatus> EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES =
+            EnumSet.of(SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED);
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
@@ -137,6 +139,7 @@ public class SalesOrderService {
         entity.setGrandTotal(summary.grandTotal());
 
         salesOrderRepository.save(entity);
+        refreshCustomerOrderTotal(customer);
 
         if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
             linkRfq(request.getRfqId(), salesOrderNo, userId, now);
@@ -231,6 +234,7 @@ public class SalesOrderService {
         entity.setUpdatedBy(user);
 
         salesOrderRepository.save(entity);
+        refreshCustomerOrderTotal(entity.getCustomer());
         recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
 
         return mapToDto(entity);
@@ -441,6 +445,19 @@ public class SalesOrderService {
         append(sb, address.getPostcode());
 
         return sb.toString().trim();
+    }
+
+    private void refreshCustomerOrderTotal(CustomerEntity customer) {
+        if (customer == null || StringUtils.isBlank(customer.getId())) {
+            return;
+        }
+
+        BigDecimal total = salesOrderRepository.sumGrandTotalByCustomerIdAndStatusNotIn(
+                customer.getId(),
+                EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES
+        );
+        customer.setTotalSalesOrderAmount(defaultIfNull(total));
+        customerRepository.save(customer);
     }
 
     private void append(StringBuilder sb, String value) {
