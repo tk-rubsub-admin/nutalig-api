@@ -15,6 +15,8 @@ public class CreateCustomerRequest {
     private String branchName;
     private String creditTerm;
     private String paymentTerm;
+    private String billingCondition;
+    private String paymentCycle;
     private String customerSegment;
     private String customerTier;
     private CreateCustomerAddressRequest address;

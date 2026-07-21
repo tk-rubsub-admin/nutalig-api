@@ -89,6 +89,14 @@ public class CustomerEntity extends AuditDateEntity {
     @ToString.Include
     private SystemConfigEntity customerPaymentTerm;
 
+    @Column(name = "customer_billing_condition")
+    @ToString.Include
+    private String customerBillingCondition;
+
+    @Column(name = "customer_payment_cycle")
+    @ToString.Include
+    private String customerPaymentCycle;
+
     @Column(name = "tax_id")
     @ToString.Include
     private String taxId;

@@ -8,9 +8,14 @@ import java.util.List;
 @Data
 public class UpdateRequestPriceHeaderRequest {
 
+    private String contactName;
+    private String contactPhone;
+    private String salesId;
+    private String procurementId;
     private String referenceRfqId;
     private String rfqTypeCode;
     private String orderTypeCode;
+    private String shippingMethod;
     private String productFamily;
     private String productUsage;
     private String systemMechanic;

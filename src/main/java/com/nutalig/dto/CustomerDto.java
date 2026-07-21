@@ -15,6 +15,8 @@ public class CustomerDto {
     private SystemConfigDto customerType;
     private SystemConfigDto customerCreditTerm;
     private SystemConfigDto customerPaymentTerm;
+    private String customerBillingCondition;
+    private String customerPaymentCycle;
     private SystemConfigDto customerTier;
     private SystemConfigDto customerSegment;
     private String taxId;

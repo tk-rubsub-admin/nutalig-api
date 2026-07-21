@@ -2427,3 +2427,23 @@ databaseChangeLog:
               SET q.rfq_id = r.id,
                   q.reference_rfq_id = r.reference_rfq_id
               WHERE q.rfq_id IS NULL;
+
+  - changeSet:
+      id: 20260721-002-add-billing-condition-and-payment-cycle-to-customer
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer
+                columnName: customer_billing_condition
+      changes:
+        - addColumn:
+            tableName: customer
+            columns:
+              - column:
+                  name: customer_billing_condition
+                  type: VARCHAR(50)
+              - column:
+                  name: customer_payment_cycle
+                  type: VARCHAR(50)

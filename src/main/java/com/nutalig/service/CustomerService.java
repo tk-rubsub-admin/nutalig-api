@@ -85,6 +85,9 @@ public class CustomerService {
             entity.setCustomerPaymentTerm(customerPaymentTerm);
         }
 
+        entity.setCustomerBillingCondition(StringUtils.trimToNull(request.getBillingCondition()));
+        entity.setCustomerPaymentCycle(StringUtils.trimToNull(request.getPaymentCycle()));
+
         if (StringUtils.isNotBlank(request.getCustomerSegment())) {
             SystemConfigEntity customerSegment = systemConfigRepository
                     .findByIdGroupCodeAndIdCode(SystemConstant.CUSTOMER_SEGMENT, request.getCustomerSegment())
@@ -366,6 +369,12 @@ public class CustomerService {
                     "Customer payment term"
             ));
         }
+        if (request.getBillingCondition() != null) {
+            entity.setCustomerBillingCondition(StringUtils.trimToNull(request.getBillingCondition()));
+        }
+        if (request.getPaymentCycle() != null) {
+            entity.setCustomerPaymentCycle(StringUtils.trimToNull(request.getPaymentCycle()));
+        }
         if (request.getSalesAccount() != null) {
             applySalesAccounts(entity, request.getSalesAccounts(), request.getSalesAccount());
         } else if (request.getSalesAccounts() != null) {
@@ -633,6 +642,8 @@ public class CustomerService {
         detail.put("customerSegment", entity.getCustomerSegment() != null ? entity.getCustomerSegment().getId().getCode() : null);
         detail.put("creditTerm", entity.getCustomerCreditTerm() != null ? entity.getCustomerCreditTerm().getId().getCode() : null);
         detail.put("paymentTerm", entity.getCustomerPaymentTerm() != null ? entity.getCustomerPaymentTerm().getId().getCode() : null);
+        detail.put("billingCondition", entity.getCustomerBillingCondition());
+        detail.put("paymentCycle", entity.getCustomerPaymentCycle());
         detail.put("companyName", entity.getCompanyName());
         detail.put("branchNumber", entity.getBranchNumber());
         detail.put("branchName", entity.getBranchName());

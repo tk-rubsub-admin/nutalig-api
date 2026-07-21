@@ -953,6 +953,36 @@ public class RFQService {
 
         List<String> editFields = new ArrayList<>();
 
+        String requestContactName = normalizeRequestValue(request.getContactName());
+        if (!StringUtils.equals(requestContactName, normalizeRequestValue(entity.getContactName()))) {
+            entity.setContactName(requestContactName);
+            editFields.add("ชื่อผู้ติดต่อ");
+        }
+
+        String requestContactPhone = normalizeRequestValue(request.getContactPhone());
+        if (!StringUtils.equals(requestContactPhone, normalizeRequestValue(entity.getContactPhone()))) {
+            entity.setContactPhone(requestContactPhone);
+            editFields.add("เบอร์โทรผู้ติดต่อ");
+        }
+
+        String requestSalesId = normalizeRequestValue(request.getSalesId());
+        if (!StringUtils.equals(
+                requestSalesId,
+                entity.getSales() != null ? normalizeRequestValue(entity.getSales().getEmployeeId()) : null
+        )) {
+            entity.setSales(resolveSales(requestSalesId));
+            editFields.add("เซลล์");
+        }
+
+        String requestProcurementId = normalizeRequestValue(request.getProcurementId());
+        if (!StringUtils.equals(
+                requestProcurementId,
+                entity.getProcurement() != null ? normalizeRequestValue(entity.getProcurement().getEmployeeId()) : null
+        )) {
+            entity.setProcurement(resolveProcurement(requestProcurementId));
+            editFields.add("จัดซื้อที่ดูแล");
+        }
+
         if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus()) && Boolean.TRUE.equals(entity.getIsAccept())) {
             log.info("Update status from {} to {}", RfqStatus.REQUESTED_INFO, RfqStatus.IN_PROGRESS);
             entity.setStatus(RfqStatus.IN_PROGRESS);
@@ -966,6 +996,17 @@ public class RFQService {
             editFields.add("สถานะ");
         }
 
+        String requestRfqTypeCode = normalizeRequestValue(request.getRfqTypeCode());
+        if (!StringUtils.equals(
+                requestRfqTypeCode,
+                entity.getRfqType() != null && entity.getRfqType().getId() != null
+                        ? entity.getRfqType().getId().getCode()
+                        : null
+        )) {
+            entity.setRfqType(resolveRfqType(requestRfqTypeCode));
+            editFields.add("ประเภท RFQ");
+        }
+
         String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
         String requestReferenceRfqId = normalizeRequestValue(request.getReferenceRfqId());
         if (StringUtils.isNotEmpty(requestOrderTypeCode) && !StringUtils.equals(
@@ -974,13 +1015,19 @@ public class RFQService {
                         ? entity.getOrderType().getId().getCode()
                         : null
         )) {
-            entity.setRfqType(resolveRfqType(request.getRfqTypeCode()));
             entity.setOrderType(resolveOrderType(requestOrderTypeCode));
             editFields.add("ประเภทงาน");
         }
         if (!StringUtils.equals(requestReferenceRfqId, entity.getReferenceRfqId())) {
             applyReferenceRfq(entity, requestReferenceRfqId);
             editFields.add("RFQ ตัวหลัก");
+        }
+        String requestShippingMethod = normalizeRequestValue(request.getShippingMethod());
+        String normalizedCurrentShippingMethod = StringUtils.defaultIfBlank(entity.getShippingMethod(), "ALL");
+        String normalizedRequestShippingMethod = StringUtils.defaultIfBlank(requestShippingMethod, "ALL");
+        if (!StringUtils.equals(normalizedRequestShippingMethod, normalizedCurrentShippingMethod)) {
+            entity.setShippingMethod(normalizeRfqShippingMethod(normalizedRequestShippingMethod));
+            editFields.add("การขนส่ง");
         }
         String requestProductFamily = normalizeRequestValue(request.getProductFamily());
         if (StringUtils.isNotEmpty(requestProductFamily)
@@ -1077,8 +1124,14 @@ public class RFQService {
             return false;
         }
 
+        String requestContactName = normalizeRequestValue(request.getContactName());
+        String requestContactPhone = normalizeRequestValue(request.getContactPhone());
+        String requestSalesId = normalizeRequestValue(request.getSalesId());
+        String requestProcurementId = normalizeRequestValue(request.getProcurementId());
+        String requestRfqTypeCode = normalizeRequestValue(request.getRfqTypeCode());
         String requestOrderTypeCode = normalizeRequestValue(request.getOrderTypeCode());
         String requestReferenceRfqId = normalizeRequestValue(request.getReferenceRfqId());
+        String requestShippingMethod = normalizeRequestValue(request.getShippingMethod());
         String requestProductFamily = normalizeRequestValue(request.getProductFamily());
         String requestProductUsage = normalizeRequestValue(request.getProductUsage());
         String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
@@ -1089,12 +1142,32 @@ public class RFQService {
                 : request.getRequestedMoqs().stream().filter(Objects::nonNull).toList();
         String requestDescription = normalizeRequestValue(request.getDescription());
 
-        return !StringUtils.equals(
+        return !StringUtils.equals(requestContactName, normalizeRequestValue(entity.getContactName()))
+                || !StringUtils.equals(requestContactPhone, normalizeRequestValue(entity.getContactPhone()))
+                || !StringUtils.equals(
+                requestSalesId,
+                entity.getSales() != null ? normalizeRequestValue(entity.getSales().getEmployeeId()) : null
+        )
+                || !StringUtils.equals(
+                requestProcurementId,
+                entity.getProcurement() != null ? normalizeRequestValue(entity.getProcurement().getEmployeeId()) : null
+        )
+                || !StringUtils.equals(
+                requestRfqTypeCode,
+                entity.getRfqType() != null && entity.getRfqType().getId() != null
+                        ? entity.getRfqType().getId().getCode()
+                        : null
+        )
+                || !StringUtils.equals(
                 requestOrderTypeCode,
                 entity.getOrderType() != null && entity.getOrderType().getId() != null
                         ? entity.getOrderType().getId().getCode()
                         : null
         ) || !StringUtils.equals(requestReferenceRfqId, entity.getReferenceRfqId())
+                || !StringUtils.equals(
+                StringUtils.defaultIfBlank(requestShippingMethod, "ALL"),
+                StringUtils.defaultIfBlank(entity.getShippingMethod(), "ALL")
+        )
                 || !StringUtils.equals(requestProductFamily, entity.getProductFamily())
                 || !StringUtils.equals(
                 requestProductUsage,
