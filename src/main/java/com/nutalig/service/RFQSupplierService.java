@@ -873,6 +873,9 @@ public class RFQSupplierService {
     private String buildThaiInquiryMessage(RfqHeaderEntity rfq) throws DataNotFoundException {
         String template = promptService.getActivePrompt(RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE).getUserPromptTemplate();
         Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("customerName", safeValue(rfq.getContactName()));
+        variables.put("salesId", safeValue(rfq.getSales().getNickName()));
+        variables.put("procurementId", safeValue(rfq.getProcurement().getNickName()));
         variables.put("rfqId", safeValue(rfq.getId()));
         variables.put("productFamily", displayProductFamily(rfq));
         variables.put("productSubtype1", displayProductSubtype1(rfq));

@@ -20,6 +20,7 @@ import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
+import com.nutalig.mapper.RequestPriceHeaderMapper;
 import com.nutalig.repository.CustomerRepository;
 import com.nutalig.repository.EmployeeRepository;
 import com.nutalig.repository.QuotationRepository;
@@ -72,6 +73,7 @@ public class QuotationService {
     private final EmployeeRepository employeeRepository;
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
+    private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final ObjectMapper objectMapper;
     private final PromptTemplateEngine promptTemplateEngine;
     private final TemplateProperties templateProperties;
@@ -165,9 +167,18 @@ public class QuotationService {
         quotationEntity.setCustomerAddress(customerAddressEntity);
         quotationEntity.setCustomerContact(customerContactEntity);
         quotationEntity.setSales(saleEntity);
+        quotationEntity.setRfqId(StringUtils.trimToNull(requestDto.getRfqId()));
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
         quotationEntity.setRevNo(1);
+
+        if (StringUtils.isNotBlank(requestDto.getRfqId())) {
+            RfqHeaderEntity rfqEntity = requestPriceHeaderRepository.findById(requestDto.getRfqId().trim())
+                    .orElseThrow(() -> new DataNotFoundException("RFQ " + requestDto.getRfqId() + " not found."));
+            quotationEntity.setRfq(rfqEntity);
+            quotationEntity.setReferenceRfqId(StringUtils.trimToNull(rfqEntity.getReferenceRfqId()));
+            quotationEntity.setReferenceRfq(rfqEntity.getReferenceRfq());
+        }
 
         QuotationSummary summary = calculate(requestDto);
         quotationEntity.setDiscount(requestDto.getDiscount());
@@ -291,6 +302,7 @@ public class QuotationService {
         detail.put("customerId", quotationEntity.getCustomer() != null ? quotationEntity.getCustomer().getId() : null);
         detail.put("salesId", quotationEntity.getSales() != null ? quotationEntity.getSales().getEmployeeId() : null);
         detail.put("rfqId", requestDto.getRfqId());
+        detail.put("referenceRfqId", quotationEntity.getReferenceRfqId());
         detail.put("revNo", quotationEntity.getRevNo());
         detail.put("itemCount", quotationEntity.getItems() != null ? quotationEntity.getItems().size() : 0);
         detail.put("subTotal", quotationEntity.getSubTotal());
@@ -800,6 +812,9 @@ public class QuotationService {
         EmployeeDto salesDto = employeeMapper.toDto(entity.getSales());
 
         QuotationDto dto = new QuotationDto();
+        dto.setRfqId(entity.getRfqId());
+        dto.setReferenceRfqId(entity.getReferenceRfqId());
+        dto.setReferenceRfq(requestPriceHeaderMapper.toReferenceDto(entity.getReferenceRfq()));
         dto.setDocDate(entity.getDocDate().format(DateUtil.DD_MM_YY));
         dto.setEffectiveDate(entity.getExpireDate().format(DateUtil.DD_MM_YY));
         dto.setCustomer(customerDto);
@@ -823,6 +838,7 @@ public class QuotationService {
         for (QuotationDetailEntity detail : entity.getItems()) {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
             item.setId(detail.getId().toString());
+            item.setTierId(detail.getTierId());
             item.setName(detail.getName());
             item.setImagePreview(detail.getImageUrl());
             item.setSpec(detail.getSpec());
@@ -837,4 +853,5 @@ public class QuotationService {
         dto.setItems(items);
         return dto;
     }
+
 }

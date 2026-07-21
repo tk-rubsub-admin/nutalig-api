@@ -9,6 +9,9 @@ import java.util.List;
 @Data
 public class QuotationDto {
     private String quotationNo;
+    private String rfqId;
+    private String referenceRfqId;
+    private RfqReferenceDto referenceRfq;
     private String docDate;
     private String effectiveDate;
     private CustomerDto customer;

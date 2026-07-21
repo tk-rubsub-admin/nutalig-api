@@ -2388,3 +2388,42 @@ databaseChangeLog:
                   GROUP BY customer_id
               ) so ON so.customer_id = c.id
               SET c.total_sales_order_amount = COALESCE(so.total_amount, 0);
+
+  - changeSet:
+      id: 20260721-001-add-rfq-reference-to-quotation
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: rfq_id
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: rfq_id
+                  type: VARCHAR(50)
+              - column:
+                  name: reference_rfq_id
+                  type: VARCHAR(50)
+        - addForeignKeyConstraint:
+            baseTableName: quotations
+            baseColumnNames: rfq_id
+            referencedTableName: rfq_header
+            referencedColumnNames: id
+            constraintName: fk_quotations_rfq_id
+        - addForeignKeyConstraint:
+            baseTableName: quotations
+            baseColumnNames: reference_rfq_id
+            referencedTableName: rfq_header
+            referencedColumnNames: id
+            constraintName: fk_quotations_reference_rfq_id
+        - sql:
+            sql: |
+              UPDATE quotations q
+              JOIN rfq_header r ON r.quotation_no = q.quotation_no
+              SET q.rfq_id = r.id,
+                  q.reference_rfq_id = r.reference_rfq_id
+              WHERE q.rfq_id IS NULL;

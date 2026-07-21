@@ -59,6 +59,22 @@ public class QuotationEntity extends AuditDateEntity {
     @ToString.Exclude
     private EmployeeEntity sales;
 
+    @Column(name = "rfq_id", length = 50)
+    private String rfqId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rfq_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @ToString.Exclude
+    private RfqHeaderEntity rfq;
+
+    @Column(name = "reference_rfq_id", length = 50)
+    private String referenceRfqId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reference_rfq_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @ToString.Exclude
+    private RfqHeaderEntity referenceRfq;
+
     @Column(name = "co_sales_id", length = 20)
     private String coSalesId;
 
