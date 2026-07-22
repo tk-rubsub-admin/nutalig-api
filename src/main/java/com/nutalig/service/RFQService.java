@@ -13,10 +13,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.rfq.request.*;
 import com.nutalig.controller.rfq.response.UploadRfqErrorResponse;
 import com.nutalig.controller.rfq.response.UploadRfqResponse;
-import com.nutalig.dto.FinalRfqFromLineDto;
-import com.nutalig.dto.RfqHeaderDto;
-import com.nutalig.dto.SlaConfigDto;
-import com.nutalig.dto.SupplierDto;
+import com.nutalig.dto.*;
 import com.nutalig.entity.*;
 import com.nutalig.entity.id.ProductMaterialId;
 import com.nutalig.entity.id.RfqStatusTimelineId;
@@ -30,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -41,6 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -116,6 +115,94 @@ public class RFQService {
         response.setRecords(records);
         response.setPagination(Pagination.build(page));
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportRFQ(SearchRFQRequest searchRequest) {
+        List<RfqHeaderDto> records = requestPriceHeaderRepository.findAll(
+                        buildSearchCriteria(searchRequest),
+                        Sort.by(Sort.Direction.DESC, "requestedDate")
+                ).stream()
+                .map(requestPriceHeaderMapper::toDto)
+                .toList();
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("RFQ");
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            String[] headers = {
+                    "เลข RFQ",
+                    "วันที่ขอราคา",
+                    "สถานะ",
+                    "รับงานแล้ว",
+                    "รหัสลูกค้า",
+                    "ชื่อลูกค้า",
+                    "รหัสเซลล์",
+                    "ชื่อเซลล์",
+                    "รหัสจัดซื้อ",
+                    "ชื่อจัดซื้อ",
+                    "ประเภท RFQ",
+                    "ประเภทงาน",
+                    "Product Family",
+                    "Product Subtype 1",
+                    "Product Material",
+                    "Capacity",
+                    "ผู้ติดต่อ",
+                    "เบอร์ติดต่อ",
+                    "ช่องทางติดต่อ",
+                    "SLA Date",
+                    "Quotation No",
+                    "Sales Order No"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIndex = 1;
+            for (RfqHeaderDto record : records) {
+                Row row = sheet.createRow(rowIndex++);
+                int columnIndex = 0;
+
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getId()));
+                row.createCell(columnIndex++).setCellValue(formatExportDateTime(record.getRequestedDate()));
+                row.createCell(columnIndex++).setCellValue(displayRfqStatus(record.getStatus()));
+                row.createCell(columnIndex++).setCellValue(Boolean.TRUE.equals(record.getIsAccept()) ? "ใช่" : "ไม่");
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getCustomer() != null ? record.getCustomer().getId() : ""));
+                row.createCell(columnIndex++).setCellValue(resolveCustomerName(record));
+                row.createCell(columnIndex++).setCellValue(resolveEmployeeId(record.getSales()));
+                row.createCell(columnIndex++).setCellValue(resolveEmployeeName(record.getSales()));
+                row.createCell(columnIndex++).setCellValue(resolveEmployeeId(record.getProcurement()));
+                row.createCell(columnIndex++).setCellValue(resolveEmployeeName(record.getProcurement()));
+                row.createCell(columnIndex++).setCellValue(resolveSystemConfigName(record.getRfqType()));
+                row.createCell(columnIndex++).setCellValue(resolveSystemConfigName(record.getOrderType()));
+                row.createCell(columnIndex++).setCellValue(resolveProductFamilyName(record));
+                row.createCell(columnIndex++).setCellValue(resolveProductSubtype1Name(record));
+                row.createCell(columnIndex++).setCellValue(resolveProductMaterialName(record));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getCapacity()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactName()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactPhone()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactChannel()));
+                row.createCell(columnIndex++).setCellValue(formatExportDateTime(record.getSlaDate()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getQuotationNo()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getSaleOrderId()));
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception exception) {
+            throw new RuntimeException("Cannot export RFQ data", exception);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -2447,6 +2534,86 @@ public class RFQService {
             case COMPLETED -> "เสร็จสิ้น";
             case REJECTED -> "ปฏิเสธ";
         };
+    }
+
+    private String formatExportDateTime(ZonedDateTime value) {
+        if (value == null) {
+            return "";
+        }
+        return value.withZoneSameInstant(DateUtil.getTimeZone())
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+    }
+
+    private String resolveCustomerName(RfqHeaderDto record) {
+        if (record == null || record.getCustomer() == null) {
+            return "";
+        }
+        return StringUtils.defaultIfBlank(
+                record.getCustomer().getCustomerName(),
+                record.getCustomer().getCompanyName()
+        );
+    }
+
+    private String resolveEmployeeId(EmployeeDto employee) {
+        if (employee == null) {
+            return "";
+        }
+        return StringUtils.defaultString(employee.getEmployeeId());
+    }
+
+    private String resolveEmployeeName(EmployeeDto employee) {
+        if (employee == null) {
+            return "";
+        }
+        String fullName = StringUtils.trim(String.join(
+                " ",
+                StringUtils.defaultString(employee.getFirstNameTh()),
+                StringUtils.defaultString(employee.getLastNameTh())
+        ));
+        return StringUtils.firstNonBlank(employee.getNickName(), fullName, "");
+    }
+
+    private String resolveSystemConfigName(SystemConfigDto config) {
+        if (config == null) {
+            return "";
+        }
+        return StringUtils.firstNonBlank(config.getNameTh(), config.getNameEn(), config.getCode(), "");
+    }
+
+    private String resolveProductFamilyName(RfqHeaderDto record) {
+        if (record == null || record.getProductFamily() == null) {
+            return "";
+        }
+        return StringUtils.firstNonBlank(
+                record.getProductFamily().getNameTh(),
+                record.getProductFamily().getNameEn(),
+                record.getProductFamily().getCode(),
+                ""
+        );
+    }
+
+    private String resolveProductSubtype1Name(RfqHeaderDto record) {
+        if (record == null || record.getProductSubtype1() == null) {
+            return "";
+        }
+        return StringUtils.firstNonBlank(
+                record.getProductSubtype1().getNameTh(),
+                record.getProductSubtype1().getNameEn(),
+                record.getProductSubtype1().getCode(),
+                ""
+        );
+    }
+
+    private String resolveProductMaterialName(RfqHeaderDto record) {
+        if (record == null || record.getMaterial() == null) {
+            return "";
+        }
+        return StringUtils.firstNonBlank(
+                record.getMaterial().getNameTh(),
+                record.getMaterial().getNameEn(),
+                record.getMaterial().getCode(),
+                ""
+        );
     }
 
     private String formatRfqUpdatedDate(ZonedDateTime updatedDate) {

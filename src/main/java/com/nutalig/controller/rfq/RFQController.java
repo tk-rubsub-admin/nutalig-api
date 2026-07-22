@@ -16,7 +16,10 @@ import com.nutalig.service.RFQSupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -57,6 +60,27 @@ public class RFQController {
 
         log.info("=== End search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> exportRFQ(
+            @RequestBody(required = false) SearchRFQRequest searchRequest
+    ) {
+        log.info("=== Start export rfq ===");
+
+        byte[] content = rfqService.exportRFQ(searchRequest);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ));
+        headers.set(
+                HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"rfq-export.xlsx\""
+        );
+
+        log.info("=== End export rfq ===");
+        return new ResponseEntity<>(content, headers, HttpStatus.OK);
     }
 
     @PostMapping("/pending-acceptance/collect")
