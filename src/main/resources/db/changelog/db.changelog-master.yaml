@@ -2464,3 +2464,62 @@ databaseChangeLog:
               - column:
                   name: contact_channel
                   type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260722-001-fix-rfq-supplier-quote-revision-unique-constraint
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: rfq_supplier_quote
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              SET @has_pair_index := (
+                  SELECT COUNT(*)
+                  FROM information_schema.statistics
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'rfq_supplier_quote'
+                    AND index_name = 'idx_rfq_supplier_quote_rfq_supplier_pair'
+              );
+              SET @create_pair_index_sql := IF(
+                  @has_pair_index = 0,
+                  'CREATE INDEX idx_rfq_supplier_quote_rfq_supplier_pair ON rfq_supplier_quote (rfq_header_id, supplier_id)',
+                  'SELECT 1'
+              );
+              PREPARE stmt_create_pair_index FROM @create_pair_index_sql;
+              EXECUTE stmt_create_pair_index;
+              DEALLOCATE PREPARE stmt_create_pair_index;
+
+              SET @has_old_unique := (
+                  SELECT COUNT(*)
+                  FROM information_schema.statistics
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'rfq_supplier_quote'
+                    AND index_name = 'uk_rfq_supplier_quote_rfq_supplier'
+              );
+              SET @drop_old_unique_sql := IF(
+                  @has_old_unique > 0,
+                  'ALTER TABLE rfq_supplier_quote DROP INDEX uk_rfq_supplier_quote_rfq_supplier',
+                  'SELECT 1'
+              );
+              PREPARE stmt_drop_old_unique FROM @drop_old_unique_sql;
+              EXECUTE stmt_drop_old_unique;
+              DEALLOCATE PREPARE stmt_drop_old_unique;
+
+              SET @has_new_unique := (
+                  SELECT COUNT(*)
+                  FROM information_schema.statistics
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'rfq_supplier_quote'
+                    AND index_name = 'uk_rfq_supplier_quote_rfq_supplier_revision'
+              );
+              SET @create_new_unique_sql := IF(
+                  @has_new_unique = 0,
+                  'ALTER TABLE rfq_supplier_quote ADD CONSTRAINT uk_rfq_supplier_quote_rfq_supplier_revision UNIQUE (rfq_header_id, supplier_id, revision_no)',
+                  'SELECT 1'
+              );
+              PREPARE stmt_create_new_unique FROM @create_new_unique_sql;
+              EXECUTE stmt_create_new_unique;
+              DEALLOCATE PREPARE stmt_create_new_unique;

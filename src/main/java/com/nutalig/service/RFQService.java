@@ -2,6 +2,7 @@ package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.config.AppProperties;
 import com.nutalig.config.LineConfiguration;
 import com.nutalig.config.PromptTemplateEngine;
 import com.nutalig.config.TemplateProperties;
@@ -35,6 +36,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -114,6 +116,121 @@ public class RFQService {
         response.setRecords(records);
         response.setPagination(Pagination.build(page));
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RfqHeaderDto> getPendingAcceptanceRfqsInWindow(
+            ZonedDateTime requestedDateStart,
+            ZonedDateTime requestedDateEnd
+    ) {
+        if (requestedDateStart == null || requestedDateEnd == null) {
+            throw new IllegalArgumentException("requestedDateStart and requestedDateEnd are required.");
+        }
+        if (requestedDateEnd.isBefore(requestedDateStart)) {
+            throw new IllegalArgumentException("requestedDateEnd must be greater than or equal to requestedDateStart.");
+        }
+
+        List<RfqHeaderDto> records = requestPriceHeaderRepository.findAll(
+                        Specification.where(statusEqual(RfqStatus.NEW))
+                                .and((root, query, cb) -> cb.isFalse(root.get("isAccept")))
+                                .and(requestedDateTimeBetween(requestedDateStart, requestedDateEnd)),
+                        Sort.by(Sort.Direction.ASC, "requestedDate")
+                ).stream()
+                .map(requestPriceHeaderMapper::toDto)
+                .toList();
+
+        log.info(
+                "Found {} pending acceptance RFQs in window {} to {}",
+                records.size(),
+                requestedDateStart,
+                requestedDateEnd
+        );
+
+        return records;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RfqHeaderDto> getPendingAcceptanceRfqsByConfig(AppProperties.RfqPendingAcceptance config) {
+        if (config == null) {
+            throw new IllegalArgumentException("rfq pending acceptance config is required.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        ZonedDateTime requestedDateStart = now.toLocalDate()
+                .minusDays(config.getStartOffsetDays())
+                .atTime(config.getStartTime())
+                .atZone(DateUtil.getTimeZone());
+        ZonedDateTime requestedDateEnd = now.toLocalDate()
+                .minusDays(config.getEndOffsetDays())
+                .atTime(config.getEndTime())
+                .atZone(DateUtil.getTimeZone());
+
+        return getPendingAcceptanceRfqsInWindow(requestedDateStart, requestedDateEnd);
+    }
+
+    @Transactional(readOnly = true)
+    public void sendPendingAcceptanceSummaryNotifications(
+            List<RfqHeaderDto> rfqs,
+            ZonedDateTime requestedDateStart,
+            ZonedDateTime requestedDateEnd
+    ) {
+        if (CollectionUtils.isEmpty(rfqs)) {
+            log.info("Skip pending acceptance summary notifications because no RFQs were found.");
+            return;
+        }
+
+        Map<String, List<RfqHeaderDto>> rfqsByProcurementId = rfqs.stream()
+                .filter(Objects::nonNull)
+                .filter(rfq -> rfq.getProcurement() != null && StringUtils.isNotBlank(rfq.getProcurement().getEmployeeId()))
+                .collect(java.util.stream.Collectors.groupingBy(rfq -> rfq.getProcurement().getEmployeeId(), LinkedHashMap::new, java.util.stream.Collectors.toList()));
+
+        if (rfqsByProcurementId.isEmpty()) {
+            log.warn("Skip pending acceptance summary notifications because no procurement owners were found.");
+            return;
+        }
+
+        List<UserEntity> procurementUsers = userRepository.findByEmployeeEntity_EmployeeIdIn(new ArrayList<>(rfqsByProcurementId.keySet()));
+        Map<String, UserEntity> userByEmployeeId = procurementUsers.stream()
+                .filter(user -> user.getEmployeeEntity() != null && StringUtils.isNotBlank(user.getEmployeeEntity().getEmployeeId()))
+                .collect(java.util.stream.Collectors.toMap(
+                        user -> user.getEmployeeEntity().getEmployeeId(),
+                        user -> user,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+
+        rfqsByProcurementId.forEach((employeeId, procurementRfqs) -> {
+            UserEntity userEntity = userByEmployeeId.get(employeeId);
+            if (userEntity != null && StringUtils.isNotBlank(userEntity.getLineUserId()) && Status.ACTIVE.equals(userEntity.getStatus())) {
+                try {
+                    Map<String, String> placeholders = new HashMap<>();
+                    placeholders.put("altText", "มี RFQ รอรับงาน จำนวน " + procurementRfqs.size() + " คำขอ");
+                    placeholders.put("title", "RFQ รอรับงาน");
+                    placeholders.put(
+                            "detail",
+                            String.format(
+                                    "คุณมี RFQ รอรับงาน จำนวน %d คำขอ กรุณาทำการตรวจสอบและกดรับงาน",
+                                    procurementRfqs.size()
+                            )
+                    );
+                    placeholders.put(
+                            "detailUrl",
+                            buildRfqManagementUrl(employeeId, requestedDateStart, requestedDateEnd)
+                    );
+
+                    JsonNode message = renderNotificationTemplate(placeholders);
+                    lineMessageService.sendFlexMessage(userEntity.getLineUserId(), message);
+                } catch (Exception exception) {
+                    log.warn(
+                            "Cannot send pending acceptance summary notification to procurement user {}",
+                            userEntity.getId(),
+                            exception
+                    );
+                }
+            } else {
+                log.warn("No LINE-bound procurement user found for employeeId {}", employeeId);
+            }
+        });
     }
 
     @Transactional
@@ -316,8 +433,13 @@ public class RFQService {
         attachPictures(entity, request.getAttachments(), OTHER_FILE_TYPE, userId);
 
         if (entity.getCustomer() != null) {
-            entity.setContactName(entity.getCustomer().getContacts().getFirst().getContactName());
-            entity.setContactPhone(entity.getCustomer().getContacts().getFirst().getContactNumber());
+            if (!CollectionUtils.isEmpty(entity.getCustomer().getContacts()) && entity.getCustomer().getContacts().getFirst() != null) {
+                entity.setContactName(entity.getCustomer().getContacts().getFirst().getContactName());
+                entity.setContactPhone(entity.getCustomer().getContacts().getFirst().getContactNumber());
+            } else {
+                entity.setContactName("ลูกค้า");
+                entity.setContactPhone("");
+            }
         } else {
             entity.setContactName(request.getContactName());
             entity.setContactPhone(request.getContactPhone());
@@ -488,7 +610,8 @@ public class RFQService {
             addedDetails.add(addedDetail);
         }
 
-        if (entity.getStatus() == RfqStatus.SUPPLIER_QUOTED) {
+        boolean isFinalQuoted = entity.getStatus() == RfqStatus.SUPPLIER_QUOTED;
+        if (isFinalQuoted) {
             entity.setStatus(RfqStatus.QUOTED);
             entity.setQuotedDate(now);
         }
@@ -514,6 +637,10 @@ public class RFQService {
 
         if (entity.getStatus() == RfqStatus.QUOTED) {
             saveRfqStatusTimeline(entity, RfqStatus.QUOTED, now);
+        }
+
+        if (isFinalQuoted) {
+            sendFinalQuotedNotificationToSales(entity, updatedBy);
         }
 
         return mapToDto(entity);
@@ -959,6 +1086,8 @@ public class RFQService {
                 "รับงานคำขอราคาเลขที่ " + entity.getId(),
                 detail
         );
+
+        sendAcceptedByProcurementNotificationToSales(entity, actor);
 
         return mapToDto(entity);
     }
@@ -2285,6 +2414,7 @@ public class RFQService {
 
         return Specification.where(idEqual(request.getId()))
                 .and(statusIn(statuses))
+                .and(isAcceptEqual(request.getIsAccept()))
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(procurementIdEqual(request.getProcurementId()))
@@ -2447,10 +2577,131 @@ public class RFQService {
         }
     }
 
+    private void sendAcceptedByProcurementNotificationToSales(
+            RfqHeaderEntity entity,
+            String acceptedBy
+    ) {
+        try {
+            EmployeeEntity salesOwner = entity.getSales();
+
+            if (salesOwner == null || StringUtils.isBlank(salesOwner.getEmployeeId())) {
+                log.warn("No sales owner found for accepted rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(salesOwner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No LINE-bound sales owner found for accepted rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ " + entity.getId() + " ถูกจัดซื้อรับงานแล้ว");
+            placeholders.put("title", "RFQ ถูกจัดซื้อรับงานแล้ว");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s ถูกจัดซื้อรับงานแล้วโดย %s และอยู่ในสถานะกำลังดำเนินการ",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            StringUtils.defaultIfBlank(acceptedBy, "-")
+                    )
+            );
+            placeholders.put("detailUrl", buildSalesRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn(
+                        "Cannot send accepted-by-procurement notification to sales owner {} for rfq {}",
+                        userEntityOptional.get().getId(),
+                        entity.getId(),
+                        exception
+                );
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send accepted-by-procurement notification for rfq {}", entity.getId(), exception);
+        }
+    }
+
+    private void sendFinalQuotedNotificationToSales(
+            RfqHeaderEntity entity,
+            String finalQuotedBy
+    ) {
+        try {
+            EmployeeEntity salesOwner = entity.getSales();
+
+            if (salesOwner == null || StringUtils.isBlank(salesOwner.getEmployeeId())) {
+                log.warn("No sales owner found for final quoted rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(salesOwner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No LINE-bound sales owner found for final quoted rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ เลขที่ " + entity.getId() + " ได้ราคาแล้ว");
+            placeholders.put("title", "RFQ ได้ราคาแล้ว");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ เลขที่ %s ได้ราคาแล้ว กรุณาเข้าตรวจสอบรายละเอียด",
+                            StringUtils.defaultString(entity.getId(), "-")
+                    )
+            );
+            placeholders.put("detailUrl", buildSalesRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn(
+                        "Cannot send final quoted notification to sales owner {} for rfq {}",
+                        userEntityOptional.get().getId(),
+                        entity.getId(),
+                        exception
+                );
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send final quoted notification for rfq {}", entity.getId(), exception);
+        }
+    }
+
     private String buildRfqDetailUrl(String rfqId) throws InvalidRequestException {
         return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
                 .path("/price-inquiry/")
                 .path(StringUtils.defaultString(rfqId))
+                .build()
+                .toUriString();
+    }
+
+    private String buildRfqManagementUrl(
+            String procurementId,
+            ZonedDateTime requestedDateStart,
+            ZonedDateTime requestedDateEnd
+    ) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/rfq-management")
+                .queryParam("status", RfqStatus.NEW.name())
+                .queryParam("isAccept", Boolean.FALSE)
+                .queryParam("procurementId", StringUtils.defaultString(procurementId))
+                .queryParam(
+                        "requestedDateStart",
+                        requestedDateStart == null
+                                ? ""
+                                : requestedDateStart.withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate()
+                )
+                .queryParam(
+                        "requestedDateEnd",
+                        requestedDateEnd == null
+                                ? ""
+                                : requestedDateEnd.withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate()
+                )
                 .build()
                 .toUriString();
     }

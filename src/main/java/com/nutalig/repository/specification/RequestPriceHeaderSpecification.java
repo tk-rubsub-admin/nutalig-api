@@ -40,6 +40,14 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> root.get("status").in(statuses);
     }
 
+    public static Specification<RfqHeaderEntity> isAcceptEqual(Boolean isAccept) {
+        if (isAccept == null) {
+            return null;
+        }
+
+        return (root, query, cb) -> cb.equal(root.get("isAccept"), isAccept);
+    }
+
     public static Specification<RfqHeaderEntity> customerIdEqual(String customerId) {
         if (StringUtils.isBlank(customerId)) {
             return null;
@@ -145,6 +153,24 @@ public class RequestPriceHeaderSpecification {
             }
 
             return cb.lessThanOrEqualTo(root.get("requestedDate"), endDateTime);
+        };
+    }
+
+    public static Specification<RfqHeaderEntity> requestedDateTimeBetween(ZonedDateTime start, ZonedDateTime end) {
+        if (start == null && end == null) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            if (start != null && end != null) {
+                return cb.between(root.get("requestedDate"), start, end);
+            }
+
+            if (start != null) {
+                return cb.greaterThanOrEqualTo(root.get("requestedDate"), start);
+            }
+
+            return cb.lessThanOrEqualTo(root.get("requestedDate"), end);
         };
     }
 

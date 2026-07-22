@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.config.PromptTemplateEngine;
 import com.nutalig.constant.*;
 import com.nutalig.controller.rfq.request.UpdateRfqSupplierInquiryRequest;
@@ -19,10 +20,15 @@ import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -34,6 +40,7 @@ public class RFQSupplierService {
     private static final String RFQ_FINAL_QUOTE_INQUIRY_TH = "RFQ_FINAL_QUOTE_INQUIRY_TH";
     private static final String RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE = "RFQ_SUPPLIER_QUOTE_EXTRACTION";
     private static final String FINAL_RFQ_EXTRACTION = "FINAL_RFQ_EXTRACTION";
+    private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
@@ -42,12 +49,15 @@ public class RFQSupplierService {
     private final SupplierRepository supplierRepository;
     private final ActivityHistoryService activityHistoryService;
     private final UserProfileService userProfileService;
+    private final UserRepository userRepository;
+    private final LineMessageService lineMessageService;
     private final AiExecutionService aiExecutionService;
     private final OpenAiService openAiService;
     private final PromptService promptService;
     private final PromptTemplateEngine promptTemplateEngine;
     private final ObjectMapper objectMapper;
     private final SupplierMapper supplierMapper;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional(rollbackFor = Exception.class)
     public RfqSupplierInquiryDto generateInquiry(String rfqId, String userId) throws Exception {
@@ -207,6 +217,17 @@ public class RFQSupplierService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqSupplierQuoteDto sendSupplierQuoteSavedNotification(
+            String rfqId,
+            String quoteId
+    ) throws DataNotFoundException {
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+        RfqSupplierQuoteEntity quote = getSupplierQuoteEntity(rfqId, quoteId);
+        sendSupplierQuoteSavedNotifications(rfq, quote);
+        return toSupplierQuoteDto(quote);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqSupplierQuoteDto createSupplierQuote(
             String rfqId,
             UpsertRfqSupplierQuoteRequest request,
@@ -252,6 +273,8 @@ public class RFQSupplierService {
                 "จัดซื้อบันทึกราคาจากซัพพลายเออร์ของคำขอราคาเลขที่ " + quote.getRequestPriceHeader().getId(),
                 detail
         );
+
+        sendSupplierQuoteSavedNotifications(rfq, quote);
 
         return toSupplierQuoteDto(quote);
     }
@@ -605,6 +628,8 @@ public class RFQSupplierService {
                 "จัดซื้ออัพเดตราคาจากซัพพลายเออร์ของคำขอราคาเลขที่ " + quote.getRequestPriceHeader().getId(),
                 detail
         );
+
+        sendSupplierQuoteSavedNotifications(rfq, quote);
 
         return toSupplierQuoteDto(quote);
     }
@@ -1375,6 +1400,75 @@ public class RFQSupplierService {
             lines.add(line.trim());
         }
         return String.join("\n", lines);
+    }
+
+    private void sendSupplierQuoteSavedNotifications(RfqHeaderEntity rfq, RfqSupplierQuoteEntity quote) {
+        try {
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of(SUPER_ADMIN_ROLE_CODE)).stream()
+                    .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                    .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                    .toList();
+
+            if (adminUsers.isEmpty()) {
+                log.warn("No active SUPER_ADMIN users with LINE binding found for rfq {}", rfq.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "มีรายการขอราคา รอสรุปราคา " + rfq.getId());
+            placeholders.put("title", "รอสรุปราคา");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s มีการบันทึกราคาจากซัพ %s Rev.%s กรุณาเข้าตรวจสอบและสรุปราคา",
+                            StringUtils.defaultString(rfq.getId(), "-"),
+                            quote.getSupplier() != null ? StringUtils.defaultString(quote.getSupplier().getSupplierName(), "-") : "-",
+                            quote.getRevisionNo() == null ? "-" : quote.getRevisionNo()
+                    )
+            );
+            placeholders.put("detailUrl", buildPriceInquiryDetailUrl(rfq.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            for (UserEntity adminUser : adminUsers) {
+                try {
+                    lineMessageService.sendFlexMessage(adminUser.getLineUserId(), message);
+                } catch (Exception exception) {
+                    log.warn("Cannot send supplier quote saved notification to SUPER_ADMIN {}", adminUser.getId(), exception);
+                }
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send supplier quote saved notifications for rfq {}", rfq.getId(), exception);
+        }
+    }
+
+    private String buildPriceInquiryDetailUrl(String rfqId) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/price-inquiry/")
+                .path(StringUtils.defaultString(rfqId))
+                .build()
+                .toUriString();
+    }
+
+    private String buildFrontendBaseUrl() throws InvalidRequestException {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new InvalidRequestException("LINE frontend redirect URL is not configured");
+        }
+
+        URI uri = URI.create(loginSuccessUrl);
+        return uri.getScheme() + "://" + uri.getAuthority();
+    }
+
+    private JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
+        ClassPathResource resource = new ClassPathResource("line/notification.json");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            String rendered = template;
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                rendered = rendered.replace("${" + entry.getKey() + "}", StringUtils.defaultString(entry.getValue()));
+            }
+            return objectMapper.readTree(rendered);
+        }
     }
 
     private String safeValue(String value) {

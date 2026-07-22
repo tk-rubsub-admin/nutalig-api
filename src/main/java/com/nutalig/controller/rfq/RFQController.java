@@ -11,6 +11,7 @@ import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.RFQService;
+import com.nutalig.service.RfqPendingAcceptanceScheduler;
 import com.nutalig.service.RFQSupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class RFQController {
 
     private final RFQService rfqService;
     private final RFQSupplierService rfqSupplierService;
+    private final RfqPendingAcceptanceScheduler rfqPendingAcceptanceScheduler;
 
     @GetMapping
     public GeneralResponse<com.nutalig.controller.response.Pageable<RfqHeaderDto>> getAllRFQ(
@@ -54,6 +56,16 @@ public class RFQController {
                 rfqService.getAllRFQ(searchRequest, pageableRequest);
 
         log.info("=== End search rfq page {} size {} ===", pageableRequest.getPage(), pageableRequest.getSize());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/pending-acceptance/collect")
+    public GeneralResponse<java.util.List<RfqHeaderDto>> collectPendingAcceptanceRfqs() {
+        log.info("=== Start collect pending acceptance rfqs ===");
+
+        java.util.List<RfqHeaderDto> response = rfqPendingAcceptanceScheduler.runPendingAcceptanceCollection();
+
+        log.info("=== End collect pending acceptance rfqs size {} ===", response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
@@ -236,6 +248,19 @@ public class RFQController {
         RfqSupplierQuoteDto response = rfqSupplierService.updateSupplierQuote(id, quoteId, request, userId);
 
         log.info("=== End update supplier quote {} rfq {} ===", quoteId, id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/supplier-quotes/{quoteId}/send-notification")
+    public GeneralResponse<RfqSupplierQuoteDto> sendSupplierQuoteNotification(
+            @PathVariable("id") String id,
+            @PathVariable("quoteId") String quoteId
+    ) throws Exception {
+        log.info("=== Start send supplier quote notification {} rfq {} ===", quoteId, id);
+
+        RfqSupplierQuoteDto response = rfqSupplierService.sendSupplierQuoteSavedNotification(id, quoteId);
+
+        log.info("=== End send supplier quote notification {} rfq {} ===", quoteId, id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 
