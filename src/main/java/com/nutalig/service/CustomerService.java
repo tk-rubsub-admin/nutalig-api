@@ -265,7 +265,7 @@ public class CustomerService {
     ) {
         log.info("Search customer by criteria(s) {}", searchCustomerRequest);
 
-        pageableRequest.setSortBy("createdDate");
+        pageableRequest.setSortBy("id");
         pageableRequest.setSortDirection(Sort.Direction.DESC);
         Pageable pageable = pageableRequest.build();
 

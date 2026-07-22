@@ -50,6 +50,10 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "contact_phone")
     private String contactPhone;
 
+    @ToString.Include
+    @Column(name = "contact_channel")
+    private String contactChannel;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "sales_id", referencedColumnName = "employee_id")
     @EqualsAndHashCode.Exclude

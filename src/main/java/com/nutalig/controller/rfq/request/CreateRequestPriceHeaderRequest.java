@@ -11,6 +11,7 @@ public class CreateRequestPriceHeaderRequest {
 
     private String contactName;
     private String contactPhone;
+    private String contactChannel;
     private String salesId;
     private String customerId;
     private String procurementId;

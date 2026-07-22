@@ -18,6 +18,7 @@ public class RfqHeaderDto {
     private RfqReferenceDto referenceRfq;
     private String contactName;
     private String contactPhone;
+    private String contactChannel;
     private EmployeeDto sales;
     private CustomerDto customer;
     private SystemConfigDto rfqType;

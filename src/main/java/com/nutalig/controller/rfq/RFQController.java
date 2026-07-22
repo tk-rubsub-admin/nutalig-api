@@ -3,6 +3,7 @@ package com.nutalig.controller.rfq;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.rfq.request.*;
+import com.nutalig.controller.rfq.response.UploadRfqResponse;
 import com.nutalig.dto.RfqHeaderDto;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
@@ -14,6 +15,7 @@ import com.nutalig.service.RFQSupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -260,6 +262,19 @@ public class RFQController {
         RfqHeaderDto response = rfqService.createRFQ(request, userId);
 
         log.info("=== End create rfq {} ===", response.getId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public GeneralResponse<UploadRfqResponse> uploadRfqs(
+            @RequestPart("file") MultipartFile file,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start upload rfqs ===");
+
+        UploadRfqResponse response = rfqService.uploadRfqs(file, userId);
+
+        log.info("=== End upload rfqs ===");
         return new GeneralResponse<>(SUCCESS, response);
     }
 

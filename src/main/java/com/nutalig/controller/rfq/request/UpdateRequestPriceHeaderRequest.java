@@ -10,6 +10,7 @@ public class UpdateRequestPriceHeaderRequest {
 
     private String contactName;
     private String contactPhone;
+    private String contactChannel;
     private String salesId;
     private String procurementId;
     private String referenceRfqId;

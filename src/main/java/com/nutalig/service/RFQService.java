@@ -10,6 +10,8 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.rfq.request.*;
+import com.nutalig.controller.rfq.response.UploadRfqErrorResponse;
+import com.nutalig.controller.rfq.response.UploadRfqResponse;
 import com.nutalig.dto.FinalRfqFromLineDto;
 import com.nutalig.dto.RfqHeaderDto;
 import com.nutalig.dto.SlaConfigDto;
@@ -26,6 +28,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -39,8 +42,11 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_NOT_FOUND_TH;
@@ -59,6 +65,7 @@ public class RFQService {
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
     private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
+    private final EmployeeProcurementMappingRepository employeeProcurementMappingRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final ProductFamilyRepository productFamilyEntityRepository;
@@ -68,6 +75,7 @@ public class RFQService {
     private final QuotationRepository quotationRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
     private final ActivityHistoryService activityHistoryService;
@@ -368,6 +376,83 @@ public class RFQService {
         saveRfqStatusTimeline(entity, entity.getStatus(), entity.getRequestedDate());
 
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public UploadRfqResponse uploadRfqs(MultipartFile file, String userId) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new InvalidRequestException("RFQ file is required.");
+        }
+
+        log.info("Upload rfqs from file {} by {}", file.getOriginalFilename(), userId);
+
+        UploadRfqResponse response = new UploadRfqResponse();
+        List<UploadRfqErrorResponse> errors = new ArrayList<>();
+        int totalRows = 0;
+        int createdCount = 0;
+        int failedCount = 0;
+
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+            if (sheet == null) {
+                throw new InvalidRequestException("RFQ excel sheet not found.");
+            }
+
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                throw new InvalidRequestException("RFQ excel header row not found.");
+            }
+
+            Map<String, Integer> headerIndexMap = buildRfqUploadHeaderIndexMap(headerRow, evaluator);
+            validateRfqUploadHeaders(headerIndexMap);
+
+            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (row == null || isBlankRfqUploadRow(row, evaluator, headerIndexMap)) {
+                    continue;
+                }
+
+                totalRows++;
+
+                try {
+                    RfqHeaderEntity entity = buildRfqHeaderEntityFromUploadRow(row, headerIndexMap, evaluator, userId);
+                    entity = requestPriceHeaderRepository.save(entity);
+
+                    activityHistoryService.record(
+                            ActivityEntityType.RFQ,
+                            entity.getId(),
+                            userId,
+                            ActivityActorType.USER,
+                            ActivityAction.CREATE,
+                            ActivitySource.API,
+                            "อัปโหลดคำขอราคา " + entity.getId(),
+                            Map.of(
+                                    "source", "UPLOAD_RFQ_EXCEL",
+                                    "rowNumber", rowIndex + 1,
+                                    "rfq", buildActivityDetail(entity)
+                            )
+                    );
+                    createdCount++;
+                } catch (Exception ex) {
+                    failedCount++;
+                    errors.add(new UploadRfqErrorResponse(
+                            rowIndex + 1,
+                            StringUtils.defaultString(readRfqUploadCell(row, headerIndexMap, evaluator, "salesid"), "-"),
+                            StringUtils.defaultString(readRfqUploadCell(row, headerIndexMap, evaluator, "description"), "-"),
+                            ex.getMessage()
+                    ));
+                    log.warn("Skip rfq row {} because {}", rowIndex + 1, ex.getMessage());
+                }
+            }
+        }
+
+        response.setTotalRows(totalRows);
+        response.setCreatedCount(createdCount);
+        response.setFailedCount(failedCount);
+        response.setErrors(errors);
+        log.info("Upload rfqs completed created={} failed={}", createdCount, failedCount);
+        return response;
     }
 
     @Transactional
@@ -965,6 +1050,12 @@ public class RFQService {
             editFields.add("เบอร์โทรผู้ติดต่อ");
         }
 
+        String requestContactChannel = normalizeRequestValue(request.getContactChannel());
+        if (!StringUtils.equals(requestContactChannel, normalizeRequestValue(entity.getContactChannel()))) {
+            entity.setContactChannel(requestContactChannel);
+            editFields.add("ช่องทางติดต่อ");
+        }
+
         String requestSalesId = normalizeRequestValue(request.getSalesId());
         if (!StringUtils.equals(
                 requestSalesId,
@@ -1126,6 +1217,7 @@ public class RFQService {
 
         String requestContactName = normalizeRequestValue(request.getContactName());
         String requestContactPhone = normalizeRequestValue(request.getContactPhone());
+        String requestContactChannel = normalizeRequestValue(request.getContactChannel());
         String requestSalesId = normalizeRequestValue(request.getSalesId());
         String requestProcurementId = normalizeRequestValue(request.getProcurementId());
         String requestRfqTypeCode = normalizeRequestValue(request.getRfqTypeCode());
@@ -1144,6 +1236,7 @@ public class RFQService {
 
         return !StringUtils.equals(requestContactName, normalizeRequestValue(entity.getContactName()))
                 || !StringUtils.equals(requestContactPhone, normalizeRequestValue(entity.getContactPhone()))
+                || !StringUtils.equals(requestContactChannel, normalizeRequestValue(entity.getContactChannel()))
                 || !StringUtils.equals(
                 requestSalesId,
                 entity.getSales() != null ? normalizeRequestValue(entity.getSales().getEmployeeId()) : null
@@ -1391,6 +1484,7 @@ public class RFQService {
         detail.put("requestInformation", entity.getRequestInformation());
         detail.put("contactName", entity.getContactName());
         detail.put("contactPhone", entity.getContactPhone());
+        detail.put("contactChannel", entity.getContactChannel());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("referenceRfqId", entity.getReferenceRfqId());
@@ -1417,6 +1511,313 @@ public class RFQService {
         detail.put("description", entity.getDescription());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
         return detail;
+    }
+
+    private RfqHeaderEntity buildRfqHeaderEntityFromUploadRow(
+            Row row,
+            Map<String, Integer> headerIndexMap,
+            FormulaEvaluator evaluator,
+            String userId
+    ) throws Exception {
+        String actor = userProfileService.getNameFromId(userId);
+        String salesId = requiredRfqUploadValue(row, headerIndexMap, evaluator, "salesid");
+        String rfqTypeValue = requiredRfqUploadValue(row, headerIndexMap, evaluator, "rfqtype");
+        String requestedDateValue = requiredRfqUploadValue(row, headerIndexMap, evaluator, "requesteddate");
+        String orderTypeValue = requiredRfqUploadValue(row, headerIndexMap, evaluator, "ordertype");
+        String productFamilyValue = requiredRfqUploadValue(row, headerIndexMap, evaluator, "productfamily");
+        String productUsageValue = readRfqUploadCell(row, headerIndexMap, evaluator, "productusage");
+        String materialValue = readRfqUploadCell(row, headerIndexMap, evaluator, "material");
+
+        RfqHeaderEntity entity = new RfqHeaderEntity();
+        entity.setRequestedDate(parseRfqUploadRequestedDate(row, headerIndexMap, "requesteddate", requestedDateValue));
+        entity.setStatus(RfqStatus.NEW);
+        entity.setIsAccept(Boolean.FALSE);
+        entity.setShippingMethod("ALL");
+        entity.setContactName(StringUtils.trimToNull(readRfqUploadCell(row, headerIndexMap, evaluator, "contactname")));
+        entity.setContactPhone(null);
+        entity.setContactChannel(resolveSystemConfigCodeByImportValue(
+                SystemConstant.CONTACT_CHANNEL,
+                readRfqUploadCell(row, headerIndexMap, evaluator, "contactchannel"),
+                "Contact channel"
+        ));
+        entity.setCapacity(StringUtils.trimToNull(readRfqUploadCell(row, headerIndexMap, evaluator, "capacity")));
+        entity.setDescription(StringUtils.trimToNull(readRfqUploadCell(row, headerIndexMap, evaluator, "description")));
+        entity.setCreatedBy(actor);
+        entity.setUpdatedBy(actor);
+        entity.setUrgentRequest(Boolean.FALSE);
+
+        EmployeeEntity sales = resolveSales(salesId);
+        EmployeeEntity procurement = resolveDefaultProcurementForSales(sales);
+
+        entity.setSales(sales);
+        entity.setCustomer(null);
+        entity.setProcurement(procurement);
+        entity.setReferenceRfqId(null);
+        entity.setReferenceRfq(null);
+        entity.setRfqType(resolveSystemConfigByImportValue(SystemConstant.RFQ_TYPE, rfqTypeValue, "RFQ type"));
+        entity.setOrderType(resolveSystemConfigByImportValue(SystemConstant.ORDER_TYPE, orderTypeValue, "Order type"));
+
+        String productFamilyCode = resolveProductFamilyCodeByImportValue(productFamilyValue);
+        String productSubtype1Code = resolveProductSubtype1CodeByImportValue(productFamilyCode, productUsageValue);
+        String productSubtype2Code = resolveProductSubtype2CodeByImportValue(
+                productSubtype1Code,
+                readRfqUploadCell(row, headerIndexMap, evaluator, "systemmechanic")
+        );
+        String productMaterialCode = resolveProductMaterialCodeByImportValue(productFamilyCode, materialValue);
+        applyProductHierarchy(entity, productFamilyCode, productSubtype1Code, productSubtype2Code, productMaterialCode);
+
+        return entity;
+    }
+
+    private EmployeeEntity resolveDefaultProcurementForSales(EmployeeEntity sales) {
+        if (sales == null) {
+            return null;
+        }
+
+        List<EmployeeProcurementMappingEntity> mappings =
+                employeeProcurementMappingRepository.findBySalesEmployee_EmployeeId(sales.getEmployeeId());
+        if (mappings == null || mappings.isEmpty()) {
+            return null;
+        }
+
+        return mappings.stream()
+                .filter(mapping -> mapping.getProcurementEmployee() != null)
+                .sorted(Comparator
+                        .comparing((EmployeeProcurementMappingEntity mapping) -> !Boolean.TRUE.equals(mapping.getIsDefault()))
+                        .thenComparing(mapping -> StringUtils.defaultString(
+                                mapping.getProcurementEmployee() != null ? mapping.getProcurementEmployee().getEmployeeId() : null)))
+                .map(EmployeeProcurementMappingEntity::getProcurementEmployee)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Map<String, Integer> buildRfqUploadHeaderIndexMap(Row headerRow, FormulaEvaluator evaluator) {
+        Map<String, Integer> headerIndexMap = new LinkedHashMap<>();
+        DataFormatter formatter = new DataFormatter();
+        for (Cell cell : headerRow) {
+            String header = formatter.formatCellValue(cell, evaluator);
+            if (StringUtils.isBlank(header)) {
+                continue;
+            }
+            headerIndexMap.put(header.trim().toLowerCase(Locale.ROOT), cell.getColumnIndex());
+        }
+        return headerIndexMap;
+    }
+
+    private void validateRfqUploadHeaders(Map<String, Integer> headerIndexMap) throws InvalidRequestException {
+        List<String> requiredHeaders = List.of(
+                "rfqtype",
+                "requesteddate",
+                "salesid",
+                "contactname",
+                "contactchannel",
+                "ordertype",
+                "productfamily",
+                "systemmechanic",
+                "capacity",
+                "description"
+        );
+
+        List<String> missingHeaders = new ArrayList<>();
+        for (String header : requiredHeaders) {
+            if (!headerIndexMap.containsKey(header)) {
+                missingHeaders.add(header);
+            }
+        }
+
+        if (!missingHeaders.isEmpty()) {
+            throw new InvalidRequestException("RFQ excel headers missing: " + String.join(", ", missingHeaders));
+        }
+    }
+
+    private boolean isBlankRfqUploadRow(Row row, FormulaEvaluator evaluator, Map<String, Integer> headerIndexMap) {
+        for (String header : List.of("rfqtype", "salesid", "productfamily", "description")) {
+            if (StringUtils.isNotBlank(readRfqUploadCell(row, headerIndexMap, evaluator, header))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String readRfqUploadCell(Row row, Map<String, Integer> headerIndexMap, FormulaEvaluator evaluator, String headerName) {
+        Integer columnIndex = headerIndexMap.get(headerName.toLowerCase(Locale.ROOT));
+        if (columnIndex == null) {
+            return null;
+        }
+
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) {
+            return null;
+        }
+
+        DataFormatter formatter = new DataFormatter();
+        String value = formatter.formatCellValue(cell, evaluator);
+        return StringUtils.trimToNull(value);
+    }
+
+    private String requiredRfqUploadValue(Row row, Map<String, Integer> headerIndexMap, FormulaEvaluator evaluator, String headerName)
+            throws InvalidRequestException {
+        String value = readRfqUploadCell(row, headerIndexMap, evaluator, headerName);
+        if (StringUtils.isBlank(value)) {
+            throw new InvalidRequestException(headerName + " is required.");
+        }
+        return value;
+    }
+
+    private ZonedDateTime parseRfqUploadRequestedDate(
+            Row row,
+            Map<String, Integer> headerIndexMap,
+            String headerName,
+            String rawValue
+    ) throws InvalidRequestException {
+        Integer columnIndex = headerIndexMap.get(headerName.toLowerCase(Locale.ROOT));
+        if (columnIndex == null) {
+            throw new InvalidRequestException(headerName + " is required.");
+        }
+
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell != null && cell.getCellType() == CellType.NUMERIC) {
+            LocalDate localDate = org.apache.poi.ss.usermodel.DateUtil.getLocalDateTime(cell.getNumericCellValue()).toLocalDate();
+            return localDate.atTime(LocalTime.MIN).atZone(DateUtil.getTimeZone());
+        }
+
+        String normalized = normalizeImportValue(rawValue);
+        if (normalized == null) {
+            throw new InvalidRequestException(headerName + " is required.");
+        }
+
+        if (StringUtils.isNumeric(normalized)) {
+            LocalDate localDate = org.apache.poi.ss.usermodel.DateUtil.getLocalDateTime(Double.parseDouble(normalized)).toLocalDate();
+            return localDate.atTime(LocalTime.MIN).atZone(DateUtil.getTimeZone());
+        }
+
+        List<DateTimeFormatter> formatters = List.of(
+                DateUtil.DD_MM_YY,
+                DateUtil.DD_MM_YY_2,
+                DateUtil.DD_M_YY,
+                DateTimeFormatter.ISO_LOCAL_DATE
+        );
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                LocalDate localDate = LocalDate.parse(normalized, formatter);
+                return localDate.atTime(LocalTime.MIN).atZone(DateUtil.getTimeZone());
+            } catch (DateTimeParseException ignored) {
+                // try next format
+            }
+        }
+
+        throw new InvalidRequestException("requestedDate is invalid: " + normalized);
+    }
+
+    private SystemConfigEntity resolveSystemConfigByImportValue(SystemConstant groupCode, String value, String fieldLabel)
+            throws DataNotFoundException {
+        String normalized = normalizeImportValue(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        return systemConfigRepository.findByIdGroupCodeOrderBySortAsc(groupCode).stream()
+                .filter(config -> matchesImportValue(
+                        normalized,
+                        config.getId() != null ? config.getId().getCode() : null,
+                        config.getNameTh(),
+                        config.getNameEn()
+                ))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(fieldLabel + " " + value + " not found."));
+    }
+
+    private String resolveSystemConfigCodeByImportValue(SystemConstant groupCode, String value, String fieldLabel)
+            throws DataNotFoundException {
+        SystemConfigEntity config = resolveSystemConfigByImportValue(groupCode, value, fieldLabel);
+        return config != null && config.getId() != null ? config.getId().getCode() : null;
+    }
+
+    private String resolveProductFamilyCodeByImportValue(String value) throws DataNotFoundException {
+        String normalized = normalizeImportValue(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        return productFamilyEntityRepository.findAllByIsActiveTrueOrderByCodeAsc().stream()
+                .filter(entity -> matchesImportValue(normalized, entity.getCode(), entity.getNameTh(), entity.getNameEn()))
+                .map(ProductFamilyEntity::getCode)
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Product family " + value + " not found."));
+    }
+
+    private String resolveProductSubtype1CodeByImportValue(String productFamilyCode, String value)
+            throws DataNotFoundException {
+        String normalized = normalizeImportValue(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        List<ProductSubtype1Entity> candidates = StringUtils.isBlank(productFamilyCode)
+                ? productSubtype1Repository.findAllByOrderByProductFamilyCodeAscCodeAsc()
+                : productSubtype1Repository.findAllByProductFamilyCodeOrderByCodeAsc(productFamilyCode);
+        return candidates.stream()
+                .filter(entity -> matchesImportValue(normalized, entity.getCode(), entity.getNameTh(), entity.getNameEn()))
+                .map(ProductSubtype1Entity::getCode)
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Product subtype1 " + value + " not found."));
+    }
+
+    private String resolveProductSubtype2CodeByImportValue(String productSubtype1Code, String value)
+            throws DataNotFoundException {
+        String normalized = normalizeImportValue(value);
+        if (normalized == null || StringUtils.equalsIgnoreCase(normalized, "Optional (ตัวเลือก - ไม่บังคับใช้)")) {
+            return null;
+        }
+
+        List<ProductSubtype2Entity> candidates = StringUtils.isBlank(productSubtype1Code)
+                ? productSubtype2Repository.findAllByOrderByProductSubtype1CodeAscCodeAsc()
+                : productSubtype2Repository.findAllByProductSubtype1CodeOrderByCodeAsc(productSubtype1Code);
+        return candidates.stream()
+                .filter(entity -> matchesImportValue(normalized, entity.getCode(), entity.getNameTh(), entity.getNameEn()))
+                .map(ProductSubtype2Entity::getCode)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String resolveProductMaterialCodeByImportValue(String productFamilyCode, String value)
+            throws DataNotFoundException {
+        String normalized = normalizeImportValue(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        return productMaterialRepository.findAllByProductFamilyCodeOrderByCodeAsc(productFamilyCode).stream()
+                .filter(entity -> matchesImportValue(normalized, entity.getCode(), entity.getNameTh(), entity.getNameEn()))
+                .map(ProductMaterialEntity::getCode)
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Product material " + value + " not found."));
+    }
+
+    private boolean matchesImportValue(String importValue, String code, String nameTh, String nameEn) {
+        return StringUtils.equalsIgnoreCase(importValue, normalizeImportValue(code))
+                || StringUtils.equalsIgnoreCase(importValue, normalizeImportValue(nameTh))
+                || StringUtils.equalsIgnoreCase(importValue, normalizeImportValue(nameEn))
+                || StringUtils.equalsIgnoreCase(importValue, normalizeImportValue(buildDisplayName(nameEn, nameTh)));
+    }
+
+    private String buildDisplayName(String nameEn, String nameTh) {
+        String en = StringUtils.trimToNull(nameEn);
+        String th = StringUtils.trimToNull(nameTh);
+        if (en == null) {
+            return th;
+        }
+        if (th == null) {
+            return en;
+        }
+        return en + " (" + th + ")";
+    }
+
+    private String normalizeImportValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        return StringUtils.normalizeSpace(StringUtils.trimToNull(value));
     }
 
     private String appendRequestInformation(

@@ -2447,3 +2447,20 @@ databaseChangeLog:
               - column:
                   name: customer_payment_cycle
                   type: VARCHAR(50)
+
+  - changeSet:
+      id: 20260721-003-add-contact-channel-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: contact_channel
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: contact_channel
+                  type: VARCHAR(255)
