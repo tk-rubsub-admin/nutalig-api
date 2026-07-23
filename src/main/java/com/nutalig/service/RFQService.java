@@ -523,7 +523,7 @@ public class RFQService {
 
         if (entity.getCustomer() != null) {
             if (!CollectionUtils.isEmpty(entity.getCustomer().getContacts()) && entity.getCustomer().getContacts().getFirst() != null) {
-                entity.setContactName(entity.getCustomer().getContacts().getFirst().getContactName());
+                entity.setContactName(entity.getCustomer().getCustomerName());
                 entity.setContactPhone(entity.getCustomer().getContacts().getFirst().getContactNumber());
             } else {
                 entity.setContactName("ลูกค้า");
