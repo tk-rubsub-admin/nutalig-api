@@ -923,7 +923,7 @@ public class RFQSupplierService {
         variables.put("supplier", supplierQuote.getSupplier() == null ? "-" : safeValue(supplierQuote.getSupplier().getSupplierName()));
         variables.put("sales", rfq.getSales().getNickName());
         variables.put("procurement", rfq.getProcurement().getNickName());
-        variables.put("customer", rfq.getContactName());
+        variables.put("customer", safeValue(rfq.getContactName()));
         variables.put("productFamily", displayProductFamily(rfq));
         variables.put("productSubtype1", displayProductSubtype1(rfq));
         variables.put("productSubtype2", displayProductSubtype2(rfq));
