@@ -1,5 +1,48 @@
 databaseChangeLog:
   - changeSet:
+      id: 20260723-004-create-rfq-supplier-quote-package-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_supplier_quote_package
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE rfq_supplier_quote_package (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  supplier_quote_id VARCHAR(255) NOT NULL,
+                  package_name VARCHAR(255) DEFAULT NULL,
+                  package_dimension TEXT DEFAULT NULL,
+                  package_weight TEXT DEFAULT NULL,
+                  package_capacity TEXT DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_package_quote (supplier_quote_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260723-005-add-fk-rfq-supplier-quote-package-quote
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_package_quote
+                foreignKeyTableName: rfq_supplier_quote_package
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_package
+            baseColumnNames: supplier_quote_id
+            referencedTableName: rfq_supplier_quote
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_package_quote
+
+  - changeSet:
       id: 20260723-001-create-rfq-supplier-quote-lead-time-table
       author: codex
       preConditions:

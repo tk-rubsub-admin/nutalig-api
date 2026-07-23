@@ -17,6 +17,7 @@ public class UpsertRfqSupplierQuoteRequest {
     private String recommend;
     private List<DetailRequest> details;
     private List<AdditionalCostRequest> additionalCosts;
+    private List<PackageRequest> packages;
     private List<LeadTimeRequest> leadTimes;
 
     @Data

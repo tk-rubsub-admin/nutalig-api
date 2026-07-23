@@ -72,6 +72,9 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     private List<RfqSupplierQuoteAdditionalCostEntity> additionalCosts = new ArrayList<>();
 
     @OneToMany(mappedBy = "supplierQuote", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RfqSupplierQuotePackageEntity> packages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "supplierQuote", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqSupplierQuoteLeadTimeEntity> leadTimes = new ArrayList<>();
 
     public void addDetail(RfqSupplierQuoteDetailEntity detail) {
@@ -82,6 +85,11 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     public void addAdditionalCost(RfqSupplierQuoteAdditionalCostEntity additionalCost) {
         additionalCosts.add(additionalCost);
         additionalCost.setSupplierQuote(this);
+    }
+
+    public void addPackage(RfqSupplierQuotePackageEntity packageEntity) {
+        packages.add(packageEntity);
+        packageEntity.setSupplierQuote(this);
     }
 
     public void addLeadTime(RfqSupplierQuoteLeadTimeEntity leadTime) {
