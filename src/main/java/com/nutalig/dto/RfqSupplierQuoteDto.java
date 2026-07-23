@@ -18,6 +18,7 @@ public class RfqSupplierQuoteDto {
     private String remark;
     private List<RfqSupplierQuoteDetailDto> details;
     private List<RfqSupplierQuoteAdditionalCostDto> additionalCosts;
+    private List<RfqSupplierQuoteLeadTimeDto> leadTimes;
     private String createdBy;
     private String updatedBy;
     private ZonedDateTime createdDate;

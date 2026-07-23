@@ -45,6 +45,7 @@ public class RFQSupplierService {
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
     private final RfqSupplierQuoteRepository rfqSupplierQuoteRepository;
+    private final LeadTimeConfigRepository leadTimeConfigRepository;
     private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
     private final SupplierRepository supplierRepository;
     private final ActivityHistoryService activityHistoryService;
@@ -580,6 +581,24 @@ public class RFQSupplierService {
         }
         normalized.setAdditionalCosts(normalizedAdditionalCosts);
 
+        List<UpsertRfqSupplierQuoteRequest.LeadTimeRequest> normalizedLeadTimes = new ArrayList<>();
+        List<UpsertRfqSupplierQuoteRequest.LeadTimeRequest> leadTimeRequests =
+                Optional.ofNullable(normalized.getLeadTimes()).orElse(List.of());
+        for (UpsertRfqSupplierQuoteRequest.LeadTimeRequest leadTimeRequest : leadTimeRequests) {
+            if (leadTimeRequest == null
+                    || StringUtils.isBlank(leadTimeRequest.getLeadTimeCode())
+                    || leadTimeRequest.getLeadTimeDayMin() == null
+                    || leadTimeRequest.getLeadTimeDayMax() == null) {
+                continue;
+            }
+
+            leadTimeRequest.setLeadTimeCode(leadTimeRequest.getLeadTimeCode().trim());
+            leadTimeRequest.setRemark(StringUtils.trimToNull(leadTimeRequest.getRemark()));
+            leadTimeRequest.setSortOrder(normalizedLeadTimes.size() + 1);
+            normalizedLeadTimes.add(leadTimeRequest);
+        }
+        normalized.setLeadTimes(normalizedLeadTimes);
+
         return normalized;
     }
 
@@ -609,6 +628,7 @@ public class RFQSupplierService {
 
         quote.getDetails().clear();
         quote.getAdditionalCosts().clear();
+        quote.getLeadTimes().clear();
         applySupplierQuoteRequest(rfq, quote, request, userId);
 
         quote = rfqSupplierQuoteRepository.save(quote);
@@ -690,6 +710,11 @@ public class RFQSupplierService {
                 .sorted(Comparator.comparing(RfqSupplierQuoteAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteAdditionalCostEntity::getId, Comparator.nullsLast(Long::compareTo)))
                 .map(this::toSupplierQuoteAdditionalCostDto)
+                .toList());
+        dto.setLeadTimes(entity.getLeadTimes().stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteLeadTimeEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteLeadTimeEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(this::toSupplierQuoteLeadTimeDto)
                 .toList());
         dto.setCreatedBy(entity.getCreatedBy());
         dto.setUpdatedBy(entity.getUpdatedBy());
@@ -807,6 +832,32 @@ public class RFQSupplierService {
         return dto;
     }
 
+    private RfqSupplierQuoteLeadTimeDto toSupplierQuoteLeadTimeDto(RfqSupplierQuoteLeadTimeEntity entity) {
+        RfqSupplierQuoteLeadTimeDto dto = new RfqSupplierQuoteLeadTimeDto();
+        dto.setId(entity.getId());
+        dto.setLeadTimeCode(entity.getLeadTimeConfig() == null ? null : entity.getLeadTimeConfig().getCode());
+        dto.setLeadTimeConfig(toLeadTimeConfigDto(entity.getLeadTimeConfig()));
+        dto.setLeadTimeDayMin(entity.getLeadTimeDayMin());
+        dto.setLeadTimeDayMax(entity.getLeadTimeDayMax());
+        dto.setRemark(entity.getRemark());
+        dto.setSortOrder(entity.getSortOrder());
+        dto.setCreatedDate(entity.getCreatedDate());
+        dto.setUpdatedDate(entity.getUpdatedDate());
+        return dto;
+    }
+
+    private LeadTimeConfigDto toLeadTimeConfigDto(LeadTimeConfigEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        LeadTimeConfigDto dto = new LeadTimeConfigDto();
+        dto.setCode(entity.getCode());
+        dto.setType(entity.getType());
+        dto.setNameTh(entity.getNameTh());
+        dto.setNameEn(entity.getNameEn());
+        return dto;
+    }
+
     private Map<String, Object> buildSupplierQuoteActivityDetail(RfqSupplierQuoteEntity entity) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("id", entity.getId());
@@ -824,6 +875,11 @@ public class RFQSupplierService {
                 .sorted(Comparator.comparing(RfqSupplierQuoteAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteAdditionalCostEntity::getId, Comparator.nullsLast(Long::compareTo)))
                 .map(this::buildSupplierQuoteAdditionalCostActivityDetail)
+                .toList());
+        detail.put("leadTimes", entity.getLeadTimes().stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteLeadTimeEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteLeadTimeEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(this::buildSupplierQuoteLeadTimeActivityDetail)
                 .toList());
         return detail;
     }
@@ -895,6 +951,17 @@ public class RFQSupplierService {
         return detail;
     }
 
+    private Map<String, Object> buildSupplierQuoteLeadTimeActivityDetail(RfqSupplierQuoteLeadTimeEntity entity) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("id", entity.getId());
+        detail.put("leadTimeCode", entity.getLeadTimeConfig() == null ? null : entity.getLeadTimeConfig().getCode());
+        detail.put("leadTimeDayMin", entity.getLeadTimeDayMin());
+        detail.put("leadTimeDayMax", entity.getLeadTimeDayMax());
+        detail.put("remark", entity.getRemark());
+        detail.put("sortOrder", entity.getSortOrder());
+        return detail;
+    }
+
     private String buildThaiInquiryMessage(RfqHeaderEntity rfq) throws DataNotFoundException {
         String template = promptService.getActivePrompt(RFQ_SUPPLIER_INQUIRY_TEMPLATE_CODE).getUserPromptTemplate();
         Map<String, String> variables = new LinkedHashMap<>();
@@ -923,7 +990,7 @@ public class RFQSupplierService {
         variables.put("supplier", supplierQuote.getSupplier() == null ? "-" : safeValue(supplierQuote.getSupplier().getSupplierName()));
         variables.put("sales", rfq.getSales().getNickName());
         variables.put("procurement", rfq.getProcurement().getNickName());
-        variables.put("customer", safeValue(rfq.getContactName()));
+        variables.put("customer", buildFinalQuoteInquiryCustomerLabel(rfq));
         variables.put("productFamily", displayProductFamily(rfq));
         variables.put("productSubtype1", displayProductSubtype1(rfq));
         variables.put("productSubtype2", displayProductSubtype2(rfq));
@@ -934,6 +1001,23 @@ public class RFQSupplierService {
         variables.put("detailSection", buildFinalQuoteInquiryDetailSection(supplierQuote));
         variables.put("additionalCostSection", buildFinalQuoteInquiryAdditionalCostSection(supplierQuote));
         return promptTemplateEngine.render(template, variables).trim();
+    }
+
+    private String buildFinalQuoteInquiryCustomerLabel(RfqHeaderEntity rfq) {
+        if (rfq == null) {
+            return "";
+        }
+
+        if (rfq.getCustomer() == null) {
+            return safeValue(rfq.getContactName());
+        }
+
+        String customerName = StringUtils.firstNonBlank(
+                rfq.getCustomer().getCustomerName(),
+                rfq.getCustomer().getCompanyName(),
+                "-"
+        );
+        return String.format("%s (%s)", customerName, safeValue(rfq.getCustomer().getId()));
     }
 
     private String displayShippingType(RfqHeaderEntity rfq) {
@@ -1030,6 +1114,16 @@ public class RFQSupplierService {
                     additionalCostRequest.getSortOrder() == null ? additionalCostSortOrder : additionalCostRequest.getSortOrder()
             ));
             additionalCostSortOrder++;
+        }
+
+        int leadTimeSortOrder = 1;
+        for (UpsertRfqSupplierQuoteRequest.LeadTimeRequest leadTimeRequest :
+                Optional.ofNullable(request.getLeadTimes()).orElse(List.of())) {
+            quote.addLeadTime(buildSupplierQuoteLeadTimeEntity(
+                    leadTimeRequest,
+                    leadTimeRequest.getSortOrder() == null ? leadTimeSortOrder : leadTimeRequest.getSortOrder()
+            ));
+            leadTimeSortOrder++;
         }
     }
 
@@ -1152,6 +1246,44 @@ public class RFQSupplierService {
         entity.setDescription(request.getDescription().trim());
         entity.setUnit(StringUtils.trimToNull(request.getUnit()));
         entity.setValue(StringUtils.trimToNull(request.getValue()));
+        entity.setSortOrder(sortOrder);
+        return entity;
+    }
+
+    private RfqSupplierQuoteLeadTimeEntity buildSupplierQuoteLeadTimeEntity(
+            UpsertRfqSupplierQuoteRequest.LeadTimeRequest request,
+            Integer sortOrder
+    ) throws InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("Supplier quote lead time is required.");
+        }
+        if (StringUtils.isBlank(request.getLeadTimeCode())) {
+            throw new InvalidRequestException("Supplier quote lead time code is required.");
+        }
+        if (request.getLeadTimeDayMin() == null) {
+            throw new InvalidRequestException("Supplier quote lead time min day is required.");
+        }
+        if (request.getLeadTimeDayMax() == null) {
+            throw new InvalidRequestException("Supplier quote lead time max day is required.");
+        }
+        if (request.getLeadTimeDayMin() < 0) {
+            throw new InvalidRequestException("Supplier quote lead time min day must be greater than or equal to 0.");
+        }
+        if (request.getLeadTimeDayMax() < request.getLeadTimeDayMin()) {
+            throw new InvalidRequestException("Supplier quote lead time max day must be greater than or equal to min day.");
+        }
+
+        LeadTimeConfigEntity leadTimeConfig = leadTimeConfigRepository
+                .findByCodeAndIsActiveTrue(request.getLeadTimeCode().trim())
+                .orElseThrow(() -> new InvalidRequestException(
+                        "Lead time config " + request.getLeadTimeCode().trim() + " is invalid or inactive."
+                ));
+
+        RfqSupplierQuoteLeadTimeEntity entity = new RfqSupplierQuoteLeadTimeEntity();
+        entity.setLeadTimeConfig(leadTimeConfig);
+        entity.setLeadTimeDayMin(request.getLeadTimeDayMin());
+        entity.setLeadTimeDayMax(request.getLeadTimeDayMax());
+        entity.setRemark(StringUtils.trimToNull(request.getRemark()));
         entity.setSortOrder(sortOrder);
         return entity;
     }

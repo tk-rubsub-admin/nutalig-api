@@ -1,5 +1,66 @@
 databaseChangeLog:
   - changeSet:
+      id: 20260723-001-create-rfq-supplier-quote-lead-time-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_supplier_quote_lead_time
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE rfq_supplier_quote_lead_time (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  supplier_quote_id VARCHAR(255) NOT NULL,
+                  lead_time_code VARCHAR(100) NOT NULL,
+                  lead_time_day_min INT NOT NULL,
+                  lead_time_day_max INT NOT NULL,
+                  remark TEXT DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_supplier_quote_lead_time_quote (supplier_quote_id),
+                  KEY idx_rfq_supplier_quote_lead_time_code (lead_time_code)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260723-002-add-fk-rfq-supplier-quote-lead-time-quote
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_lead_time_quote
+                foreignKeyTableName: rfq_supplier_quote_lead_time
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_lead_time
+            baseColumnNames: supplier_quote_id
+            referencedTableName: rfq_supplier_quote
+            referencedColumnNames: id
+            constraintName: fk_rfq_supplier_quote_lead_time_quote
+
+  - changeSet:
+      id: 20260723-003-add-fk-rfq-supplier-quote-lead-time-config
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_supplier_quote_lead_time_config
+                foreignKeyTableName: rfq_supplier_quote_lead_time
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_supplier_quote_lead_time
+            baseColumnNames: lead_time_code
+            referencedTableName: lead_time_config
+            referencedColumnNames: code
+            constraintName: fk_rfq_supplier_quote_lead_time_config
+
+  - changeSet:
       id: 20260711-001-add-is-active-to-product-family
       author: codex
       preConditions:
@@ -2523,3 +2584,48 @@ databaseChangeLog:
               PREPARE stmt_create_new_unique FROM @create_new_unique_sql;
               EXECUTE stmt_create_new_unique;
               DEALLOCATE PREPARE stmt_create_new_unique;
+
+  - changeSet:
+      id: 20260723-001-create-lead-time-config-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: lead_time_config
+      changes:
+        - createTable:
+            tableName: lead_time_config
+            columns:
+              - column:
+                  name: code
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_lead_time_config
+                    nullable: false
+              - column:
+                  name: type
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name_th
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name_en
+                  type: VARCHAR(255)
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: lead_time_config
+            indexName: idx_lead_time_config_type
+            columns:
+              - column:
+                  name: type

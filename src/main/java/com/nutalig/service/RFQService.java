@@ -146,13 +146,14 @@ public class RFQService {
                     "ชื่อจัดซื้อ",
                     "ประเภท RFQ",
                     "ประเภทงาน",
+                    "ผู้ติดต่อ",
+                    "เบอร์ติดต่อ",
+                    "ช่องทางติดต่อ",
                     "Product Family",
                     "Product Subtype 1",
                     "Product Material",
                     "Capacity",
-                    "ผู้ติดต่อ",
-                    "เบอร์ติดต่อ",
-                    "ช่องทางติดต่อ",
+                    "Description",
                     "SLA Date",
                     "Quotation No",
                     "Sales Order No"
@@ -182,13 +183,14 @@ public class RFQService {
                 row.createCell(columnIndex++).setCellValue(resolveEmployeeName(record.getProcurement()));
                 row.createCell(columnIndex++).setCellValue(resolveSystemConfigName(record.getRfqType()));
                 row.createCell(columnIndex++).setCellValue(resolveSystemConfigName(record.getOrderType()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactName()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactPhone()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactChannel()));
                 row.createCell(columnIndex++).setCellValue(resolveProductFamilyName(record));
                 row.createCell(columnIndex++).setCellValue(resolveProductSubtype1Name(record));
                 row.createCell(columnIndex++).setCellValue(resolveProductMaterialName(record));
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getCapacity()));
-                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactName()));
-                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactPhone()));
-                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getContactChannel()));
+                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getDescription()));
                 row.createCell(columnIndex++).setCellValue(formatExportDateTime(record.getSlaDate()));
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getQuotationNo()));
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getSaleOrderId()));
@@ -1245,6 +1247,7 @@ public class RFQService {
     public RfqHeaderDto updateRFQ(String id, UpdateRequestPriceHeaderRequest request, String userId) throws Exception {
         RfqHeaderEntity entity = getEntityById(id);
         java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
+        String updatedBy = userProfileService.getNameFromId(userId);
 
         if (!hasRFQUpdateChanges(entity, request) && !RfqStatus.REQUESTED_INFO.equals(entity.getStatus())) {
             return mapToDto(entity);
@@ -1253,6 +1256,7 @@ public class RFQService {
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
 
         List<String> editFields = new ArrayList<>();
+        boolean shouldNotifyProcurementSalesUpdatedInfo = false;
 
         String requestContactName = normalizeRequestValue(request.getContactName());
         if (!StringUtils.equals(requestContactName, normalizeRequestValue(entity.getContactName()))) {
@@ -1293,6 +1297,7 @@ public class RFQService {
         if (RfqStatus.REQUESTED_INFO.equals(entity.getStatus()) && Boolean.TRUE.equals(entity.getIsAccept())) {
             log.info("Update status from {} to {}", RfqStatus.REQUESTED_INFO, RfqStatus.IN_PROGRESS);
             entity.setStatus(RfqStatus.IN_PROGRESS);
+            shouldNotifyProcurementSalesUpdatedInfo = true;
 
             SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
             entity.setSlaDate(slaConfigService.calculateSlaDate(sla, now));
@@ -1394,7 +1399,7 @@ public class RFQService {
                 requestMaterial
         );
 
-        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedBy(updatedBy);
         entity.setUpdatedDate(now);
 
         entity = requestPriceHeaderRepository.save(entity);
@@ -1422,6 +1427,10 @@ public class RFQService {
                 summary,
                 detail
         );
+
+        if (shouldNotifyProcurementSalesUpdatedInfo) {
+            sendSalesUpdatedInformationNotificationToProcurement(entity, updatedBy);
+        }
 
         return mapToDto(entity);
     }
@@ -2789,6 +2798,54 @@ public class RFQService {
             }
         } catch (Exception exception) {
             log.warn("Cannot send accepted-by-procurement notification for rfq {}", entity.getId(), exception);
+        }
+    }
+
+    private void sendSalesUpdatedInformationNotificationToProcurement(
+            RfqHeaderEntity entity,
+            String updatedBy
+    ) {
+        try {
+            EmployeeEntity procurementOwner = entity.getProcurement();
+
+            if (procurementOwner == null || StringUtils.isBlank(procurementOwner.getEmployeeId())) {
+                log.warn("No procurement owner found for rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(procurementOwner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No LINE-bound procurement owner found for rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ " + entity.getId() + " ถูกอัปเดตข้อมูลโดยเซลล์");
+            placeholders.put("title", "RFQ ถูกอัปเดตข้อมูล");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "เซลล์ได้อัปเดตข้อมูล RFQ %s แล้วโดย %s กรุณาเข้าตรวจสอบรายละเอียด",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            StringUtils.defaultIfBlank(updatedBy, "-")
+                    )
+            );
+            placeholders.put("detailUrl", buildRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn(
+                        "Cannot send sales-updated-information notification to procurement owner {} for rfq {}",
+                        userEntityOptional.get().getId(),
+                        entity.getId(),
+                        exception
+                );
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send sales-updated-information notification for rfq {}", entity.getId(), exception);
         }
     }
 

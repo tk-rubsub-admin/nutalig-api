@@ -17,6 +17,7 @@ public class UpsertRfqSupplierQuoteRequest {
     private String recommend;
     private List<DetailRequest> details;
     private List<AdditionalCostRequest> additionalCosts;
+    private List<LeadTimeRequest> leadTimes;
 
     @Data
     public static class DetailRequest {
@@ -62,6 +63,15 @@ public class UpsertRfqSupplierQuoteRequest {
         private String description;
         private String unit;
         private String value;
+        private Integer sortOrder;
+    }
+
+    @Data
+    public static class LeadTimeRequest {
+        private String leadTimeCode;
+        private Integer leadTimeDayMin;
+        private Integer leadTimeDayMax;
+        private String remark;
         private Integer sortOrder;
     }
 }

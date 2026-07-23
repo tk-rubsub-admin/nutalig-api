@@ -37,6 +37,7 @@ public class SupplierService {
     private final SupplierRepository supplierRepository;
     private final SupplierCapabilityRepository supplierCapabilityRepository;
     private final SupplierShippingRepository supplierShippingRepository;
+    private final LeadTimeConfigRepository leadTimeConfigRepository;
     private final ProductFamilyRepository productFamilyRepository;
     private final ProductMaterialRepository productMaterialRepository;
     private final ProductFamilyMapper productFamilyMapper;
@@ -144,6 +145,13 @@ public class SupplierService {
     public List<SupplierShippingDto> getSupplierShippings() {
         return supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc().stream()
                 .map(this::buildSupplierShippingDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LeadTimeConfigDto> getLeadTimeConfigs() {
+        return leadTimeConfigRepository.findAllByIsActiveTrueOrderByTypeAscNameThAsc().stream()
+                .map(this::buildLeadTimeConfigDto)
                 .toList();
     }
 
@@ -450,6 +458,15 @@ public class SupplierService {
                     return destinationDto;
                 })
                 .toList());
+        return dto;
+    }
+
+    private LeadTimeConfigDto buildLeadTimeConfigDto(LeadTimeConfigEntity entity) {
+        LeadTimeConfigDto dto = new LeadTimeConfigDto();
+        dto.setCode(entity.getCode());
+        dto.setType(entity.getType());
+        dto.setNameTh(entity.getNameTh());
+        dto.setNameEn(entity.getNameEn());
         return dto;
     }
 

@@ -5,6 +5,7 @@ import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.supplier.request.*;
 import com.nutalig.controller.supplier.response.SearchSupplierResponse;
 import com.nutalig.dto.SupplierCapabilityDto;
+import com.nutalig.dto.LeadTimeConfigDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.dto.SupplierShippingDto;
 import com.nutalig.exception.DataNotFoundException;
@@ -60,6 +61,12 @@ public class SupplierController {
     @GetMapping("/v1/supplier-shippings")
     public GeneralResponse<java.util.List<SupplierShippingDto>> getSupplierShippings() {
         java.util.List<SupplierShippingDto> response = supplierService.getSupplierShippings();
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/lead-time-configs")
+    public GeneralResponse<java.util.List<LeadTimeConfigDto>> getLeadTimeConfigs() {
+        java.util.List<LeadTimeConfigDto> response = supplierService.getLeadTimeConfigs();
         return new GeneralResponse<>(SUCCESS, response);
     }
 

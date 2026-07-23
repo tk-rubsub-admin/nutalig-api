@@ -71,6 +71,9 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "supplierQuote", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqSupplierQuoteAdditionalCostEntity> additionalCosts = new ArrayList<>();
 
+    @OneToMany(mappedBy = "supplierQuote", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RfqSupplierQuoteLeadTimeEntity> leadTimes = new ArrayList<>();
+
     public void addDetail(RfqSupplierQuoteDetailEntity detail) {
         details.add(detail);
         detail.setSupplierQuote(this);
@@ -79,5 +82,10 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     public void addAdditionalCost(RfqSupplierQuoteAdditionalCostEntity additionalCost) {
         additionalCosts.add(additionalCost);
         additionalCost.setSupplierQuote(this);
+    }
+
+    public void addLeadTime(RfqSupplierQuoteLeadTimeEntity leadTime) {
+        leadTimes.add(leadTime);
+        leadTime.setSupplierQuote(this);
     }
 }
