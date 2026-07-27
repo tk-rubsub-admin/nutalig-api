@@ -222,6 +222,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "request_information", columnDefinition = "TEXT")
     private String requestInformation;
 
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 

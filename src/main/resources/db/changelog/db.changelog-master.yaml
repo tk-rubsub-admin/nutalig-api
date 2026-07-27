@@ -2672,3 +2672,20 @@ databaseChangeLog:
             columns:
               - column:
                   name: type
+
+  - changeSet:
+      id: 20260727-001-add-rfq-header-note
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: note
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: note
+                  type: TEXT

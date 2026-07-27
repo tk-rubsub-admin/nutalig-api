@@ -2,6 +2,7 @@ package com.nutalig.controller.rfq;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.controller.rfq.request.AddRfqNoteRequest;
 import com.nutalig.controller.rfq.request.CloseRfqRequest;
 import com.nutalig.controller.rfq.request.RejectUrgentRfqRequest;
 import com.nutalig.controller.rfq.request.RequestRfqInformationRequest;
@@ -33,6 +34,20 @@ public class RFQActionController {
         RfqHeaderDto response = rfqService.requestInformation(request, userId);
 
         log.info("=== End request information rfq {} ===", response.getId());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/note")
+    public GeneralResponse<RfqHeaderDto> addNote(
+            @PathVariable("id") String id,
+            @RequestBody AddRfqNoteRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start add note rfq {} by {} ===", id, userId);
+
+        RfqHeaderDto response = rfqService.addNote(id, request, userId);
+
+        log.info("=== End add note rfq {} ===", response.getId());
         return new GeneralResponse<>(SUCCESS, response);
     }
 

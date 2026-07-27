@@ -137,7 +137,6 @@ public class RFQService {
                     "เลข RFQ",
                     "วันที่ขอราคา",
                     "สถานะ",
-                    "รับงานแล้ว",
                     "รหัสลูกค้า",
                     "ชื่อลูกค้า",
                     "รหัสเซลล์",
@@ -154,9 +153,6 @@ public class RFQService {
                     "Product Material",
                     "Capacity",
                     "Description",
-                    "SLA Date",
-                    "Quotation No",
-                    "Sales Order No"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -174,7 +170,6 @@ public class RFQService {
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getId()));
                 row.createCell(columnIndex++).setCellValue(formatExportDateTime(record.getRequestedDate()));
                 row.createCell(columnIndex++).setCellValue(displayRfqStatus(record.getStatus()));
-                row.createCell(columnIndex++).setCellValue(Boolean.TRUE.equals(record.getIsAccept()) ? "ใช่" : "ไม่");
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getCustomer() != null ? record.getCustomer().getId() : ""));
                 row.createCell(columnIndex++).setCellValue(resolveCustomerName(record));
                 row.createCell(columnIndex++).setCellValue(resolveEmployeeId(record.getSales()));
@@ -191,9 +186,6 @@ public class RFQService {
                 row.createCell(columnIndex++).setCellValue(resolveProductMaterialName(record));
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getCapacity()));
                 row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getDescription()));
-                row.createCell(columnIndex++).setCellValue(formatExportDateTime(record.getSlaDate()));
-                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getQuotationNo()));
-                row.createCell(columnIndex++).setCellValue(StringUtils.defaultString(record.getSaleOrderId()));
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -427,6 +419,63 @@ public class RFQService {
                 entity,
                 StringUtils.trimToEmpty(request.getRequestInformation()),
                 updatedBy
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto addNote(String rfqId, AddRfqNoteRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (StringUtils.isBlank(rfqId)) {
+            throw new InvalidRequestException("rfqId is required.");
+        }
+        if (request == null || StringUtils.isBlank(request.getNote())) {
+            throw new InvalidRequestException("note is required.");
+        }
+
+        RfqHeaderEntity entity = getEntityById(rfqId.trim());
+        Map<String, Object> beforeDetail = buildActivityDetail(entity);
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String updatedBy = userProfileService.getNameFromId(userId);
+        entity.setNote(appendRfqNote(
+                entity.getNote(),
+                StringUtils.trimToNull(request.getNote()),
+                updatedBy,
+                now
+        ));
+        entity.setUpdatedBy(updatedBy);
+        entity.setUpdatedDate(now);
+        entity = requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> afterDetail = buildActivityDetail(entity);
+        Map<String, Object> changedBeforeDetail = new LinkedHashMap<>();
+        Map<String, Object> changedAfterDetail = new LinkedHashMap<>();
+        extractChangedDetails(beforeDetail, afterDetail, changedBeforeDetail, changedAfterDetail);
+        changedBeforeDetail.remove("note");
+        changedAfterDetail.remove("note");
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", changedBeforeDetail);
+        detail.put("after", changedAfterDetail);
+        detail.put("note", parseRfqNotes(entity.getNote()));
+        detail.put("noteText", StringUtils.trimToNull(request.getNote()));
+
+        String summary = "เพิ่มโน้ตของคำขอราคาเลขที่ " + entity.getId();
+        if (StringUtils.isNotBlank(request.getNote())) {
+            summary += " : " + StringUtils.abbreviate(request.getNote().trim(), 120);
+        }
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                summary,
+                detail
         );
 
         return mapToDto(entity);
@@ -1189,33 +1238,27 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public RfqHeaderDto requestSpecialPrice(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+    public RfqHeaderDto requestSpecialPrice(String id, RequestSpecialPriceRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity entity = getEntityById(id);
         String actor = userProfileService.getNameFromId(userId);
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        if (request == null || request.getTargetPrice() == null) {
+            throw new InvalidRequestException("targetPrice is required.");
+        }
 
         if (!RfqStatus.QUOTED.equals(entity.getStatus())) {
             throw new InvalidRequestException("Only RFQ with QUOTED status can request special price review.");
         }
 
-        String currentRfqTypeCode = entity.getRfqType() != null && entity.getRfqType().getId() != null
-                ? entity.getRfqType().getId().getCode()
-                : null;
-        if (StringUtils.equals(currentRfqTypeCode, "SPECIAL_PRICE_REVIEW")) {
-            return mapToDto(entity);
-        }
-
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("beforeRfqTypeCode", currentRfqTypeCode);
-
-        entity.setRfqType(resolveRfqType("SPECIAL_PRICE_REVIEW"));
+        entity.setTargetPrice(request.getTargetPrice());
+        entity.setStatus(RfqStatus.SPECIAL_PRICE_REVIEW);
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         entity = requestPriceHeaderRepository.save(entity);
 
-        detail.put("afterRfqTypeCode", entity.getRfqType() != null && entity.getRfqType().getId() != null
-                ? entity.getRfqType().getId().getCode()
-                : null);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("targetPrice", request.getTargetPrice());
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -1227,6 +1270,8 @@ public class RFQService {
                 "ขอทบทวนราคาพิเศษสำหรับคำขอราคาเลขที่ " + entity.getId(),
                 detail
         );
+
+        sendRequestSpecialPriceReviewNotificationToProcurement(entity, actor);
 
         return mapToDto(entity);
     }
@@ -1707,6 +1752,7 @@ public class RFQService {
         detail.put("requestedDate", entity.getRequestedDate());
         detail.put("status", entity.getStatus());
         detail.put("requestInformation", entity.getRequestInformation());
+        detail.put("note", entity.getNote());
         detail.put("contactName", entity.getContactName());
         detail.put("contactPhone", entity.getContactPhone());
         detail.put("contactChannel", entity.getContactChannel());
@@ -2072,6 +2118,36 @@ public class RFQService {
             return new ArrayList<>(Arrays.asList(entries));
         } catch (Exception exception) {
             log.warn("Cannot parse request information json", exception);
+            return new ArrayList<>();
+        }
+    }
+
+    private String appendRfqNote(
+            String existingNote,
+            String note,
+            String notedBy,
+            ZonedDateTime notedDate
+    ) throws InvalidRequestException {
+        List<RfqNoteEntry> entries = parseRfqNotes(existingNote);
+        entries.add(new RfqNoteEntry(note, notedBy, notedDate));
+
+        try {
+            return objectMapper.writeValueAsString(entries);
+        } catch (Exception exception) {
+            throw new InvalidRequestException("Cannot serialize rfq note.");
+        }
+    }
+
+    private List<RfqNoteEntry> parseRfqNotes(String noteJson) {
+        if (StringUtils.isBlank(noteJson)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            RfqNoteEntry[] entries = objectMapper.readValue(noteJson, RfqNoteEntry[].class);
+            return new ArrayList<>(Arrays.asList(entries));
+        } catch (Exception exception) {
+            log.warn("Cannot parse rfq note json", exception);
             return new ArrayList<>();
         }
     }
@@ -2538,6 +2614,7 @@ public class RFQService {
             case SUPPLIER_QUOTED -> "ซัพพลายเออร์ตอบแล้ว";
             case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case QUOTED -> "เสนอราคาแล้ว";
+            case SPECIAL_PRICE_REVIEW -> "รอทบทวนราคาพิเศษ";
             case CANCELED -> "ยกเลิก";
             case CLOSED -> "ปิดงาน";
             case COMPLETED -> "เสร็จสิ้น";
@@ -2658,6 +2735,13 @@ public class RFQService {
             String requestInformation,
             String requestedBy,
             ZonedDateTime requestedDate
+    ) {
+    }
+
+    private record RfqNoteEntry(
+            String note,
+            String notedBy,
+            ZonedDateTime notedDate
     ) {
     }
 
@@ -2896,7 +2980,64 @@ public class RFQService {
         }
     }
 
+    private void sendRequestSpecialPriceReviewNotificationToProcurement(
+            RfqHeaderEntity entity,
+            String requestedBy
+    ) {
+        try {
+            EmployeeEntity procurementOwner = entity.getProcurement();
+
+            if (procurementOwner == null || StringUtils.isBlank(procurementOwner.getEmployeeId())) {
+                log.warn("No procurement owner found for special price review rfq {}", entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(procurementOwner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || !Status.ACTIVE.equals(userEntityOptional.get().getStatus())
+                    || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No active LINE-bound procurement owner found for special price review rfq {}", entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ " + entity.getId() + " รอทบทวนราคาพิเศษ");
+            placeholders.put("title", "รอทบทวนราคาพิเศษ");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s ถูกขอทบทวนราคาพิเศษโดย %s กรุณาเข้าตรวจสอบรายละเอียด",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            StringUtils.defaultIfBlank(requestedBy, "-")
+                    )
+            );
+            placeholders.put("detailUrl", buildPriceInquiryDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            try {
+                lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+            } catch (Exception exception) {
+                log.warn(
+                        "Cannot send special price review notification to procurement owner {} for rfq {}",
+                        userEntityOptional.get().getId(),
+                        entity.getId(),
+                        exception
+                );
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send special price review notification to procurement for rfq {}", entity.getId(), exception);
+        }
+    }
+
     private String buildRfqDetailUrl(String rfqId) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/price-inquiry/")
+                .path(StringUtils.defaultString(rfqId))
+                .build()
+                .toUriString();
+    }
+
+    private String buildPriceInquiryDetailUrl(String rfqId) throws InvalidRequestException {
         return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
                 .path("/price-inquiry/")
                 .path(StringUtils.defaultString(rfqId))

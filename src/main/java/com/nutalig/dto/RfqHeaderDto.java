@@ -57,6 +57,7 @@ public class RfqHeaderDto {
     private Boolean isCreatedPurchaseOrder;
     private String shippingMethod;
     private String requestInformation;
+    private String note;
     private String remark;
     private List<RfqStatusTimelineDto> rfqStatusTimeline;
     private Long confirmedDetailId;

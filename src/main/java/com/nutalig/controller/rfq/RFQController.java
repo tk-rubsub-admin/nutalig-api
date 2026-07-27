@@ -458,11 +458,12 @@ public class RFQController {
     @PatchMapping("/{id}/request-special-price")
     public GeneralResponse<RfqHeaderDto> requestSpecialPrice(
             @PathVariable("id") String id,
+            @RequestBody RequestSpecialPriceRequest request,
             @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start request special price review rfq {} by {} ===", id, userId);
 
-        RfqHeaderDto response = rfqService.requestSpecialPrice(id, userId);
+        RfqHeaderDto response = rfqService.requestSpecialPrice(id, request, userId);
 
         log.info("=== End request special price review rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);

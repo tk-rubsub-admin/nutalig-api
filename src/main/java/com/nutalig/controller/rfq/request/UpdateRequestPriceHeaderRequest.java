@@ -26,4 +26,5 @@ public class UpdateRequestPriceHeaderRequest {
     private List<BigDecimal> requestedMoqs;
     private String description;
     private String requestInformation;
+    private String note;
 }

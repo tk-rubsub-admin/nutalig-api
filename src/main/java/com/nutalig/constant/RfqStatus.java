@@ -5,6 +5,7 @@ public enum RfqStatus {
     IN_PROGRESS,
     SUPPLIER_QUOTED,
     REQUESTED_INFO,
+    SPECIAL_PRICE_REVIEW,
     QUOTED,
     CANCELED,
     REJECTED,

@@ -29,6 +29,7 @@ public class CreateRequestPriceHeaderRequest {
     private Boolean urgentRequest;
     private String urgentRequestReason;
     private String description;
+    private String note;
     private List<MultipartFile> pictures;
     private List<MultipartFile> attachments;
 }
