@@ -24,6 +24,7 @@ public class UpdateRequestPriceHeaderRequest {
     private String capacity;
     private BigDecimal targetPrice;
     private List<BigDecimal> requestedMoqs;
+    private Boolean requestSample;
     private String description;
     private String requestInformation;
     private String note;

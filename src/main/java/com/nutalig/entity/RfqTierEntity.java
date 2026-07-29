@@ -48,7 +48,7 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "product_price", precision = 18, scale = 4, nullable = false)
     private BigDecimal productPrice;
 
-    @Column(name = "commission", precision = 18, scale = 2)
+    @Column(name = "commission", precision = 18, scale = 4)
     private BigDecimal commission;
 
     @Enumerated(EnumType.STRING)

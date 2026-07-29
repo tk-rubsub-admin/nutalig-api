@@ -32,6 +32,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.*;
 
+import static com.nutalig.utils.ObjectUtil.safeValue;
+import static com.nutalig.utils.RfqUtil.*;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class RFQSupplierService {
     private static final String RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE = "RFQ_SUPPLIER_QUOTE_EXTRACTION";
     private static final String FINAL_RFQ_EXTRACTION = "FINAL_RFQ_EXTRACTION";
     private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
+    private static final int MONEY_SCALE = 4;
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RfqSupplierInquiryRepository rfqSupplierInquiryRepository;
@@ -542,7 +546,9 @@ public class RFQSupplierService {
                     continue;
                 }
 
-                tierRequest.setShippingCost(tierRequest.getShippingCost() == null ? BigDecimal.ZERO : tierRequest.getShippingCost());
+                tierRequest.setShippingCost(scaleMoney(
+                        tierRequest.getShippingCost() == null ? BigDecimal.ZERO : tierRequest.getShippingCost()
+                ));
                 com.nutalig.constant.Currency defaultCurrency = contextRequest.getDefaultCurrency() == null
                         ? com.nutalig.constant.Currency.CNY
                         : contextRequest.getDefaultCurrency();
@@ -685,9 +691,43 @@ public class RFQSupplierService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void deleteSupplierQuote(String rfqId, String quoteId) throws DataNotFoundException {
+    public void deleteSupplierQuote(String rfqId, String quoteId, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity rfq = getEntityById(rfqId);
         RfqSupplierQuoteEntity quote = getSupplierQuoteEntity(rfqId, quoteId);
+        ensureCanDeleteSupplierQuote(rfq, userId);
+
+        Map<String, Object> detail = buildSupplierQuoteActivityDetail(quote);
+        detail.put("deletedBy", userId);
+
         rfqSupplierQuoteRepository.delete(quote);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                rfq.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.DELETE,
+                ActivitySource.API,
+                "ลบ supplier quote ของคำขอราคาเลขที่ " + rfq.getId() + " quote " + quote.getId(),
+                detail
+        );
+    }
+
+    private void ensureCanDeleteSupplierQuote(RfqHeaderEntity rfq, String userId) throws InvalidRequestException {
+        String roleCode = userProfileService.getRoleCodeFromId(userId);
+        if (StringUtils.equals(roleCode, SUPER_ADMIN_ROLE_CODE)) {
+            return;
+        }
+
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidRequestException("User " + userId + " not found."));
+        String userEmployeeId = user.getEmployeeEntity() == null ? null : user.getEmployeeEntity().getEmployeeId();
+        String procurementEmployeeId = rfq.getProcurement() == null ? null : rfq.getProcurement().getEmployeeId();
+
+        if (!StringUtils.equals(userEmployeeId, procurementEmployeeId)) {
+            throw new InvalidRequestException("Only assigned procurement or SUPER_ADMIN can delete supplier quote.");
+        }
     }
 
     private RfqSupplierInquiryDto toInquiryDto(RfqSupplierInquiryEntity entity) {
@@ -1263,8 +1303,8 @@ public class RFQSupplierService {
 
         RfqSupplierQuoteTierEntity entity = new RfqSupplierQuoteTierEntity();
         entity.setQuantity(request.getQuantity());
-        entity.setProductPrice(request.getProductPrice());
-        entity.setShippingCost(defaultZero(request.getShippingCost()));
+        entity.setProductPrice(scaleMoney(request.getProductPrice()));
+        entity.setShippingCost(scaleMoney(defaultZero(request.getShippingCost())));
         entity.setProductPriceCurrency(request.getProductPriceCurrency() == null
                 ? request.getCurrency()
                 : request.getProductPriceCurrency());
@@ -1454,6 +1494,10 @@ public class RFQSupplierService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private BigDecimal scaleMoney(BigDecimal value) {
+        return value == null ? null : value.setScale(MONEY_SCALE, java.math.RoundingMode.HALF_UP);
+    }
+
     private RfqSupplierInquiryStatus determineInquiryStatus(String chineseMessage, RfqSupplierInquiryStatus currentStatus) {
         if (currentStatus == RfqSupplierInquiryStatus.FINAL) {
             return RfqSupplierInquiryStatus.FINAL;
@@ -1467,38 +1511,6 @@ public class RFQSupplierService {
             throw new InvalidRequestException(fieldName + " is required.");
         }
         return trimmedMessage;
-    }
-
-    private String displayProductFamily(RfqHeaderEntity rfq) {
-        if (rfq.getProductFamilyEntity() != null) {
-            return safeValue(rfq.getProductFamilyEntity().getNameTh() != null ? rfq.getProductFamilyEntity().getNameTh() : rfq.getProductFamilyEntity().getNameTh())
-                    + " (" + safeValue(rfq.getProductFamilyEntity().getCode()) + ")";
-        }
-        return safeValue(rfq.getProductFamily());
-    }
-
-    private String displayProductSubtype1(RfqHeaderEntity rfq) {
-        if (rfq.getProductUsage() != null) {
-            return safeValue(rfq.getProductUsage().getNameTh() != null ? rfq.getProductUsage().getNameTh() : rfq.getProductUsage().getNameTh())
-                    + " (" + safeValue(rfq.getProductUsage().getCode()) + ")";
-        }
-        return "-";
-    }
-
-    private String displayProductSubtype2(RfqHeaderEntity rfq) {
-        if (rfq.getSystemMechanic() != null) {
-            return safeValue(rfq.getSystemMechanic().getNameTh() != null ? rfq.getSystemMechanic().getNameTh() : rfq.getSystemMechanic().getNameTh())
-                    + " (" + safeValue(rfq.getSystemMechanic().getCode()) + ")";
-        }
-        return "-";
-    }
-
-    private String displayProductMaterial(RfqHeaderEntity rfq) {
-        if (rfq.getMaterial() != null) {
-            return safeValue(rfq.getMaterial().getNameTh() != null ? rfq.getMaterial().getNameTh() : rfq.getMaterial().getNameTh())
-                    + " (" + safeValue(rfq.getMaterial().getCode()) + ")";
-        }
-        return safeValue(rfq.getMaterialCode());
     }
 
     private String buildInquiryDetailSection(RfqHeaderEntity rfq) {
@@ -1702,11 +1714,6 @@ public class RFQSupplierService {
             }
             return objectMapper.readTree(rendered);
         }
-    }
-
-    private String safeValue(String value) {
-        String trimmedValue = StringUtils.trimToNull(value);
-        return trimmedValue == null ? "-" : trimmedValue;
     }
 
     private RfqDetailEntity getDetailFromHeader(RfqHeaderEntity entity, Long detailId) throws DataNotFoundException {

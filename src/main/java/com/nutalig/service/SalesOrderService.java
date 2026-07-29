@@ -971,7 +971,7 @@ public class SalesOrderService {
 
             itemDocuments.add(item);
         }
-        while (itemDocuments.size() < 7) {
+        while (itemDocuments.size() < 5) {
             itemDocuments.add(new SalesOrderItemDocumentDto());
         }
 

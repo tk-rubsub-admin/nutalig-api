@@ -26,9 +26,12 @@ public class CustomerSpecification {
     }
 
     public static Specification<CustomerEntity> customerNameContain(String nameContain) {
-        if (StringUtils.isNotEmpty(nameContain)) {
-            return (root, query, criteriaBuilder) -> criteriaBuilder.like(root.get("customerName"),
-                    SqlUtil.buildContainString(nameContain));
+        if (StringUtils.isNotBlank(nameContain)) {
+            String pattern = SqlUtil.buildContainString(nameContain.trim()).toLowerCase();
+            return (root, query, criteriaBuilder) -> criteriaBuilder.like(
+                    criteriaBuilder.lower(root.get("customerName")),
+                    pattern
+            );
         }
         return null;
     }
@@ -84,17 +87,18 @@ public class CustomerSpecification {
     }
 
     public static Specification<CustomerEntity> keywordContain(String keyword) {
-        if (StringUtils.isNotEmpty(keyword)) {
+        if (StringUtils.isNotBlank(keyword)) {
+            String containKeyword = SqlUtil.buildContainString(keyword.trim()).toLowerCase();
             return (root, query, criteriaBuilder) -> {
                 query.distinct(true);
                 Join<CustomerEntity, String> salesAccountsJoin = root.join("salesAccounts", JoinType.LEFT);
                 return criteriaBuilder.or(
-                        criteriaBuilder.like(root.get("id"), SqlUtil.buildContainString(keyword)),
-                        criteriaBuilder.like(root.get("customerName"), SqlUtil.buildContainString(keyword)),
-                        criteriaBuilder.like(root.get("companyName"), SqlUtil.buildContainString(keyword)),
-                        criteriaBuilder.like(root.get("taxId"), SqlUtil.buildContainString(keyword)),
-                        criteriaBuilder.like(root.get("salesAccount"), SqlUtil.buildContainString(keyword)),
-                        criteriaBuilder.like(salesAccountsJoin, SqlUtil.buildContainString(keyword))
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("id")), containKeyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("customerName")), containKeyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("companyName")), containKeyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("taxId")), containKeyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("salesAccount")), containKeyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(salesAccountsJoin), containKeyword)
                 );
             };
         }

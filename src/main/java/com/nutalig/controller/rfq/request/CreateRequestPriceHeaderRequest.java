@@ -26,6 +26,7 @@ public class CreateRequestPriceHeaderRequest {
     private String capacity;
     private BigDecimal targetPrice;
     private List<BigDecimal> requestedMoqs;
+    private Boolean requestSample;
     private Boolean urgentRequest;
     private String urgentRequestReason;
     private String description;

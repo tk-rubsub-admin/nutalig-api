@@ -1908,6 +1908,23 @@ databaseChangeLog:
                   name: urgent_reject_reason
                   type: TEXT
   - changeSet:
+      id: 20260729-001-add-request-sample-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: is_request_sample
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: is_request_sample
+                  type: BIT(1)
+                  defaultValueBoolean: false
+  - changeSet:
       id: 20260710-004-create-approval-request-tables
       author: codex
       changes:
@@ -2689,3 +2706,21 @@ databaseChangeLog:
               - column:
                   name: note
                   type: TEXT
+
+  - changeSet:
+      id: 20260728-001-update-rfq-commission-scale-to-4
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_detail
+            columnName: commission
+      changes:
+        - modifyDataType:
+            tableName: rfq_detail
+            columnName: commission
+            newDataType: DECIMAL(18,4)
+        - modifyDataType:
+            tableName: rfq_tier
+            columnName: commission
+            newDataType: DECIMAL(18,4)

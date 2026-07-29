@@ -44,7 +44,7 @@ public class RfqDetailEntity extends AuditDateEntity {
     @Column(name = "recommend", columnDefinition = "TEXT")
     private String recommend;
 
-    @Column(name = "commission", precision = 18, scale = 2)
+    @Column(name = "commission", precision = 18, scale = 4)
     private BigDecimal commission;
 
     @Column(name = "package_dimension", columnDefinition = "TEXT")

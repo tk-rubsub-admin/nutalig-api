@@ -3,6 +3,7 @@ package com.nutalig.utils;
 import com.nutalig.entity.SystemConfigEntity;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.function.Supplier;
 
@@ -41,6 +42,11 @@ public class ObjectUtil {
             return s.substring(start, end + 1);
         }
         return s; // fallback
+    }
+
+    public static String safeValue(String value) {
+        String trimmedValue = StringUtils.trimToNull(value);
+        return trimmedValue == null ? "-" : trimmedValue;
     }
 
 }

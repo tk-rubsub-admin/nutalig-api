@@ -114,4 +114,17 @@ public class RFQActionController {
         log.info("=== End reject urgent rfq {} ===", response.getId());
         return new GeneralResponse<>(SUCCESS, response);
     }
+
+    @GetMapping("/{id}/customer-quoted")
+    public GeneralResponse<String> getCustomerQuoted(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start get customer quoted for rfq {} by {} ===", id, userId);
+
+        String response = rfqService.getCustomerQuoted(id, userId);
+
+        log.info("=== End get customer quoted for rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
 }

@@ -291,11 +291,12 @@ public class RFQController {
     @DeleteMapping("/{id}/supplier-quotes/{quoteId}")
     public GeneralResponse<Void> deleteSupplierQuote(
             @PathVariable("id") String id,
-            @PathVariable("quoteId") String quoteId
-    ) throws DataNotFoundException {
-        log.info("=== Start delete supplier quote {} rfq {} ===", quoteId, id);
+            @PathVariable("quoteId") String quoteId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start delete supplier quote {} rfq {} by {} ===", quoteId, id, userId);
 
-        rfqSupplierService.deleteSupplierQuote(id, quoteId);
+        rfqSupplierService.deleteSupplierQuote(id, quoteId, userId);
 
         log.info("=== End delete supplier quote {} rfq {} ===", quoteId, id);
         return new GeneralResponse<>(SUCCESS);

@@ -151,6 +151,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "requested_moq", columnDefinition = "TEXT")
     private String requestedMoq;
 
+    @Column(name = "is_request_sample")
+    private Boolean requestSample;
+
     @Column(name = "is_urgent_request")
     private Boolean urgentRequest;
 

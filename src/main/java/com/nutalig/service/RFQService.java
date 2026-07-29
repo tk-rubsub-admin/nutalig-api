@@ -53,6 +53,8 @@ import java.util.*;
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_NOT_FOUND_TH;
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_TRACKING_STATUS_TH;
 import static com.nutalig.repository.specification.RequestPriceHeaderSpecification.*;
+import static com.nutalig.utils.RfqUtil.*;
+import static com.nutalig.utils.ObjectUtil.safeValue;
 
 @Slf4j
 @Service
@@ -63,6 +65,8 @@ public class RFQService {
     private final static String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
     private final static String PICTURE_FILE_TYPE = "PICTURE";
     private final static String OTHER_FILE_TYPE = "OTHER";
+    private final static String RFQ_CUSTOMER_QUOTED_TH = "RFQ_CUSTOMER_QUOTED_TH";
+    private static final int MONEY_SCALE = 4;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
     private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
@@ -76,6 +80,7 @@ public class RFQService {
     private final QuotationRepository quotationRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
+    private final RfqSupplierQuoteRepository rfqSupplierQuoteRepository;
     private final SystemConfigRepository systemConfigRepository;
     private final SystemConfigService systemConfigService;
     private final FileStorageService fileStorageService;
@@ -87,6 +92,7 @@ public class RFQService {
     private final UserTodoService userTodoService;
     private final LineMessageService lineMessageService;
     private final ApprovalService approvalService;
+    private final PromptService promptService;
     private final ObjectMapper objectMapper;
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final PromptTemplateEngine promptTemplateEngine;
@@ -584,17 +590,20 @@ public class RFQService {
         }
 
         entity = requestPriceHeaderRepository.save(entity);
+        int copiedSupplierQuoteCount = copyReferenceSupplierQuotesIfNeeded(entity, request, userId, actor);
 
         java.util.Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("status", entity.getStatus());
         detail.put("urgentRequest", entity.getUrgentRequest());
         detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
         detail.put("urgentRequestReason", entity.getUrgentRequestReason());
+        detail.put("requestSample", entity.getRequestSample());
         detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
         detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
         detail.put("referenceRfqId", entity.getReferenceRfqId());
         detail.put("shippingMethod", entity.getShippingMethod());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
+        detail.put("copiedSupplierQuoteCount", copiedSupplierQuoteCount);
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -874,7 +883,7 @@ public class RFQService {
         entity.setConfirmedDetailId(primarySelection.getDetail().getId());
         entity.setConfirmedTierId(primarySelection.getTier().getId());
         entity.setConfirmedShippingMethod(primarySelection.getShippingMethod());
-        entity.setConfirmedPrice(primarySelection.getConfirmedPrice());
+        entity.setConfirmedPrice(scaleMoney(primarySelection.getConfirmedPrice()));
         entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         entity.setStatus(RfqStatus.COMPLETED);
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
@@ -1001,7 +1010,7 @@ public class RFQService {
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
         detailEntity.setRemark(updatedDetail.getRemark());
         detailEntity.setRecommend(updatedDetail.getRecommend());
-        detailEntity.setCommission(updatedDetail.getCommission());
+        detailEntity.setCommission(scaleMoney(updatedDetail.getCommission()));
         detailEntity.setPackageDimension(updatedDetail.getPackageDimension());
         detailEntity.setPackageWeight(updatedDetail.getPackageWeight());
         detailEntity.setPackageCapacity(updatedDetail.getPackageCapacity());
@@ -1251,7 +1260,7 @@ public class RFQService {
             throw new InvalidRequestException("Only RFQ with QUOTED status can request special price review.");
         }
 
-        entity.setTargetPrice(request.getTargetPrice());
+        entity.setTargetPrice(scaleMoney(request.getTargetPrice()));
         entity.setStatus(RfqStatus.SPECIAL_PRICE_REVIEW);
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
@@ -1417,7 +1426,7 @@ public class RFQService {
             entity.setCapacity(request.getCapacity());
             editFields.add("ความจุ");
         }
-        BigDecimal requestTargetPrice = request.getTargetPrice();
+        BigDecimal requestTargetPrice = scaleMoney(request.getTargetPrice());
         if (!Objects.equals(requestTargetPrice, entity.getTargetPrice())) {
             entity.setTargetPrice(requestTargetPrice);
             editFields.add("Target Price");
@@ -1479,6 +1488,55 @@ public class RFQService {
 
         return mapToDto(entity);
     }
+
+
+    @Transactional(rollbackFor = Exception.class)
+    public String getCustomerQuoted(String rfqId, String userId) throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+
+        if (!List.of(RfqStatus.QUOTED, RfqStatus.COMPLETED).contains(rfq.getStatus())) {
+            throw new InvalidRequestException("Cannot get customer quoted for rfq isn't QUOTED.");
+        }
+        return buildThaiCustomerQuoteMessage(rfq);
+    }
+
+    public String buildThaiCustomerQuoteMessage(RfqHeaderEntity rfq) throws DataNotFoundException {
+        String template = promptService.getActivePrompt(RFQ_CUSTOMER_QUOTED_TH).getUserPromptTemplate();
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("requestDate", buildCustomerQuotedRequestedDate(rfq));
+        variables.put("rfqId", safeValue(rfq.getId()));
+        variables.put("sales", rfq.getSales().getNickName());
+        variables.put("procurement", rfq.getProcurement().getNickName());
+        variables.put("customer", buildFinalQuoteInquiryCustomerLabel(rfq));
+        variables.put("productFamily", displayProductFamily(rfq));
+        variables.put("productSubtype1", displayProductSubtype1(rfq));
+        variables.put("productSubtype2", displayProductSubtype2(rfq));
+        variables.put("material", displayProductMaterial(rfq));
+        variables.put("capacity", safeValue(rfq.getCapacity()));
+        variables.put("spec", rfq.getDetails().getFirst().getSpec());
+        variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
+        variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
+        variables.put("recommend", rfq.getDetails().getFirst().getRecommend());
+        return promptTemplateEngine.render(template, variables).trim();
+    }
+
+    private String buildFinalQuoteInquiryCustomerLabel(RfqHeaderEntity rfq) {
+        if (rfq == null) {
+            return "";
+        }
+
+        if (rfq.getCustomer() == null) {
+            return safeValue(rfq.getContactName());
+        }
+
+        String customerName = StringUtils.firstNonBlank(
+                rfq.getCustomer().getCustomerName(),
+                rfq.getCustomer().getCompanyName(),
+                "-"
+        );
+        return String.format("%s (%s)", customerName, safeValue(rfq.getCustomer().getId()));
+    }
+
 
     private boolean hasRFQUpdateChanges(RfqHeaderEntity entity, UpdateRequestPriceHeaderRequest request) {
         if (entity == null || request == null) {
@@ -1549,6 +1607,10 @@ public class RFQService {
         return StringUtils.trimToNull(value);
     }
 
+    private BigDecimal scaleMoney(BigDecimal value) {
+        return value == null ? null : value.setScale(MONEY_SCALE, java.math.RoundingMode.HALF_UP);
+    }
+
     private void applyProductHierarchyIfChanged(
             RfqHeaderEntity entity,
             String productFamily,
@@ -1586,6 +1648,267 @@ public class RFQService {
         String normalizedReferenceRfqId = normalizeRequestValue(referenceRfqId);
         entity.setReferenceRfqId(normalizedReferenceRfqId);
         entity.setReferenceRfq(resolveReferenceRfq(normalizedReferenceRfqId));
+    }
+
+    private int copyReferenceSupplierQuotesIfNeeded(
+            RfqHeaderEntity targetRfq,
+            CreateRequestPriceHeaderRequest request,
+            String userId,
+            String actor
+    ) throws DataNotFoundException {
+        if (targetRfq == null || request == null) {
+            return 0;
+        }
+
+        if (!StringUtils.equalsAny(
+                normalizeRequestValue(request.getRfqTypeCode()),
+                "REPEAT_PRICE",
+                "REORDER"
+        )) {
+            return 0;
+        }
+
+        String referenceRfqId = normalizeRequestValue(request.getReferenceRfqId());
+        if (StringUtils.isBlank(referenceRfqId)) {
+            return 0;
+        }
+
+        List<RfqSupplierQuoteEntity> sourceQuotes = rfqSupplierQuoteRepository
+                .findAllByRequestPriceHeader_IdOrderByUpdatedDateDesc(referenceRfqId);
+        if (CollectionUtils.isEmpty(sourceQuotes)) {
+            return 0;
+        }
+
+        List<RfqSupplierQuoteEntity> copiedQuotes = new ArrayList<>();
+        for (RfqSupplierQuoteEntity sourceQuote : sourceQuotes) {
+            if (sourceQuote == null || sourceQuote.getStatus() == RfqSupplierQuoteStatus.CANCELLED) {
+                continue;
+            }
+
+            copiedQuotes.add(cloneSupplierQuoteForReferenceRfq(targetRfq, sourceQuote, actor));
+        }
+
+        if (copiedQuotes.isEmpty()) {
+            return 0;
+        }
+
+        rfqSupplierQuoteRepository.saveAll(copiedQuotes);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                targetRfq.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.CREATE,
+                ActivitySource.API,
+                "คัดลอกข้อมูล supplier quote จากคำขอราคาเลขที่ " + referenceRfqId + " ไปยัง " + targetRfq.getId(),
+                Map.of(
+                        "referenceRfqId", referenceRfqId,
+                        "copiedSupplierQuoteCount", copiedQuotes.size()
+                )
+        );
+
+        return copiedQuotes.size();
+    }
+
+    private RfqSupplierQuoteEntity cloneSupplierQuoteForReferenceRfq(
+            RfqHeaderEntity targetRfq,
+            RfqSupplierQuoteEntity sourceQuote,
+            String actor
+    ) {
+        RfqSupplierQuoteEntity quote = new RfqSupplierQuoteEntity();
+        quote.setRequestPriceHeader(targetRfq);
+        quote.setSupplier(sourceQuote.getSupplier());
+        quote.setInquiry(null);
+        quote.setRevisionNo(sourceQuote.getRevisionNo());
+        quote.setStatus(sourceQuote.getStatus() == null ? RfqSupplierQuoteStatus.RESPONDED : sourceQuote.getStatus());
+        quote.setRemark(sourceQuote.getRemark());
+        quote.setCreatedBy(actor);
+        quote.setUpdatedBy(actor);
+
+        for (RfqSupplierQuoteDetailEntity sourceDetail : Optional.ofNullable(sourceQuote.getDetails()).orElse(List.of())
+                .stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteDetailEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList()) {
+            quote.addDetail(cloneSupplierQuoteDetailForReferenceRfq(sourceDetail));
+        }
+
+        for (RfqSupplierQuoteAdditionalCostEntity sourceAdditionalCost :
+                Optional.ofNullable(sourceQuote.getAdditionalCosts()).orElse(List.of()).stream()
+                        .sorted(Comparator.comparing(RfqSupplierQuoteAdditionalCostEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(RfqSupplierQuoteAdditionalCostEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                        .toList()) {
+            quote.addAdditionalCost(cloneSupplierQuoteAdditionalCost(sourceAdditionalCost));
+        }
+
+        for (RfqSupplierQuotePackageEntity sourcePackage :
+                resolveSupplierQuotePackagesForCopy(sourceQuote).stream()
+                        .sorted(Comparator.comparing(RfqSupplierQuotePackageEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(RfqSupplierQuotePackageEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                        .toList()) {
+            quote.addPackage(cloneSupplierQuotePackage(sourcePackage));
+        }
+
+        for (RfqSupplierQuoteLeadTimeEntity sourceLeadTime :
+                Optional.ofNullable(sourceQuote.getLeadTimes()).orElse(List.of()).stream()
+                        .sorted(Comparator.comparing(RfqSupplierQuoteLeadTimeEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(RfqSupplierQuoteLeadTimeEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                        .toList()) {
+            quote.addLeadTime(cloneSupplierQuoteLeadTime(sourceLeadTime));
+        }
+
+        return quote;
+    }
+
+    private RfqSupplierQuoteDetailEntity cloneSupplierQuoteDetailForReferenceRfq(RfqSupplierQuoteDetailEntity sourceDetail) {
+        RfqSupplierQuoteDetailEntity detail = new RfqSupplierQuoteDetailEntity();
+        detail.setRequestPriceDetail(null);
+        detail.setOptionName(sourceDetail.getOptionName());
+        detail.setSpec(sourceDetail.getSpec());
+        detail.setSortOrder(sourceDetail.getSortOrder());
+        detail.setRemark(sourceDetail.getRemark());
+        detail.setPackageDimension(sourceDetail.getPackageDimension());
+        detail.setPackageWeight(sourceDetail.getPackageWeight());
+        detail.setPackageCapacity(sourceDetail.getPackageCapacity());
+
+        for (RfqSupplierQuoteDetailPackageEntity sourcePackage :
+                resolveSupplierQuoteDetailPackagesForCopy(sourceDetail).stream()
+                        .sorted(Comparator.comparing(RfqSupplierQuoteDetailPackageEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(RfqSupplierQuoteDetailPackageEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                        .toList()) {
+            detail.addPackage(cloneSupplierQuoteDetailPackage(sourcePackage));
+        }
+
+        for (RfqSupplierQuoteTierEntity sourceTier : Optional.ofNullable(sourceDetail.getTiers()).orElse(List.of())
+                .stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteTierEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteTierEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList()) {
+            detail.addTier(cloneSupplierQuoteTier(sourceTier));
+        }
+
+        return detail;
+    }
+
+    private List<RfqSupplierQuoteDetailPackageEntity> resolveSupplierQuoteDetailPackagesForCopy(
+            RfqSupplierQuoteDetailEntity entity
+    ) {
+        if (entity == null) {
+            return List.of();
+        }
+
+        if (!CollectionUtils.isEmpty(entity.getPackages())) {
+            return entity.getPackages().stream()
+                    .sorted(Comparator.comparing(RfqSupplierQuoteDetailPackageEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                            .thenComparing(RfqSupplierQuoteDetailPackageEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                    .toList();
+        }
+
+        if (StringUtils.isAllBlank(
+                entity.getPackageDimension(),
+                entity.getPackageWeight(),
+                entity.getPackageCapacity()
+        )) {
+            return List.of();
+        }
+
+        RfqSupplierQuoteDetailPackageEntity packageEntity = new RfqSupplierQuoteDetailPackageEntity();
+        packageEntity.setPackageName(null);
+        packageEntity.setPackageDimension(entity.getPackageDimension());
+        packageEntity.setPackageWeight(entity.getPackageWeight());
+        packageEntity.setPackageCapacity(entity.getPackageCapacity());
+        packageEntity.setSortOrder(1);
+        return List.of(packageEntity);
+    }
+
+    private List<RfqSupplierQuotePackageEntity> resolveSupplierQuotePackagesForCopy(
+            RfqSupplierQuoteEntity entity
+    ) {
+        if (entity == null) {
+            return List.of();
+        }
+
+        if (!CollectionUtils.isEmpty(entity.getPackages())) {
+            return entity.getPackages().stream()
+                    .sorted(Comparator.comparing(RfqSupplierQuotePackageEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                            .thenComparing(RfqSupplierQuotePackageEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                    .toList();
+        }
+
+        List<RfqSupplierQuotePackageEntity> fallbackPackages = new ArrayList<>();
+        int sortOrder = 1;
+        for (RfqSupplierQuoteDetailEntity detail : Optional.ofNullable(entity.getDetails()).orElse(List.of()).stream()
+                .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(RfqSupplierQuoteDetailEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList()) {
+            for (RfqSupplierQuoteDetailPackageEntity detailPackage : resolveSupplierQuoteDetailPackagesForCopy(detail)) {
+                RfqSupplierQuotePackageEntity packageEntity = new RfqSupplierQuotePackageEntity();
+                packageEntity.setPackageName(detailPackage.getPackageName());
+                packageEntity.setPackageDimension(detailPackage.getPackageDimension());
+                packageEntity.setPackageWeight(detailPackage.getPackageWeight());
+                packageEntity.setPackageCapacity(detailPackage.getPackageCapacity());
+                packageEntity.setSortOrder(sortOrder++);
+                fallbackPackages.add(packageEntity);
+            }
+        }
+
+        return fallbackPackages;
+    }
+
+    private RfqSupplierQuoteTierEntity cloneSupplierQuoteTier(RfqSupplierQuoteTierEntity sourceTier) {
+        RfqSupplierQuoteTierEntity tier = new RfqSupplierQuoteTierEntity();
+        tier.setQuantity(sourceTier.getQuantity());
+        tier.setProductPrice(scaleMoney(sourceTier.getProductPrice()));
+        tier.setShippingCost(scaleMoney(sourceTier.getShippingCost()));
+        tier.setProductPriceCurrency(sourceTier.getProductPriceCurrency());
+        tier.setShippingCostCurrency(sourceTier.getShippingCostCurrency());
+        tier.setCurrency(sourceTier.getCurrency());
+        tier.setSortOrder(sourceTier.getSortOrder());
+        return tier;
+    }
+
+    private RfqSupplierQuoteAdditionalCostEntity cloneSupplierQuoteAdditionalCost(
+            RfqSupplierQuoteAdditionalCostEntity sourceAdditionalCost
+    ) {
+        RfqSupplierQuoteAdditionalCostEntity additionalCost = new RfqSupplierQuoteAdditionalCostEntity();
+        additionalCost.setDescription(sourceAdditionalCost.getDescription());
+        additionalCost.setUnit(sourceAdditionalCost.getUnit());
+        additionalCost.setValue(sourceAdditionalCost.getValue());
+        additionalCost.setSortOrder(sourceAdditionalCost.getSortOrder());
+        return additionalCost;
+    }
+
+    private RfqSupplierQuotePackageEntity cloneSupplierQuotePackage(RfqSupplierQuotePackageEntity sourcePackage) {
+        RfqSupplierQuotePackageEntity packageEntity = new RfqSupplierQuotePackageEntity();
+        packageEntity.setPackageName(sourcePackage.getPackageName());
+        packageEntity.setPackageDimension(sourcePackage.getPackageDimension());
+        packageEntity.setPackageWeight(sourcePackage.getPackageWeight());
+        packageEntity.setPackageCapacity(sourcePackage.getPackageCapacity());
+        packageEntity.setSortOrder(sourcePackage.getSortOrder());
+        return packageEntity;
+    }
+
+    private RfqSupplierQuoteDetailPackageEntity cloneSupplierQuoteDetailPackage(
+            RfqSupplierQuoteDetailPackageEntity sourcePackage
+    ) {
+        RfqSupplierQuoteDetailPackageEntity packageEntity = new RfqSupplierQuoteDetailPackageEntity();
+        packageEntity.setPackageName(sourcePackage.getPackageName());
+        packageEntity.setPackageDimension(sourcePackage.getPackageDimension());
+        packageEntity.setPackageWeight(sourcePackage.getPackageWeight());
+        packageEntity.setPackageCapacity(sourcePackage.getPackageCapacity());
+        packageEntity.setSortOrder(sourcePackage.getSortOrder());
+        return packageEntity;
+    }
+
+    private RfqSupplierQuoteLeadTimeEntity cloneSupplierQuoteLeadTime(RfqSupplierQuoteLeadTimeEntity sourceLeadTime) {
+        RfqSupplierQuoteLeadTimeEntity leadTime = new RfqSupplierQuoteLeadTimeEntity();
+        leadTime.setLeadTimeConfig(sourceLeadTime.getLeadTimeConfig());
+        leadTime.setLeadTimeDayMin(sourceLeadTime.getLeadTimeDayMin());
+        leadTime.setLeadTimeDayMax(sourceLeadTime.getLeadTimeDayMax());
+        leadTime.setRemark(sourceLeadTime.getRemark());
+        leadTime.setSortOrder(sourceLeadTime.getSortOrder());
+        return leadTime;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -1769,6 +2092,7 @@ public class RFQService {
         detail.put("capacity", entity.getCapacity());
         detail.put("targetPrice", entity.getTargetPrice());
         detail.put("requestedMoqs", parseRequestedMoq(entity.getRequestedMoq()));
+        detail.put("requestSample", entity.getRequestSample());
         detail.put("urgentRequest", entity.getUrgentRequest());
         detail.put("urgentRequestReason", entity.getUrgentRequestReason());
         detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
@@ -2235,7 +2559,7 @@ public class RFQService {
         detailEntity.setSortOrder(request.getSortOrder());
         detailEntity.setRemark(StringUtils.trimToNull(request.getRemark()));
         detailEntity.setRecommend(StringUtils.trimToNull(request.getRecommend()));
-        detailEntity.setCommission(request.getCommission());
+        detailEntity.setCommission(scaleMoney(request.getCommission()));
         detailEntity.setPackageDimension(StringUtils.trimToNull(request.getPackageDimension()));
         detailEntity.setPackageWeight(StringUtils.trimToNull(request.getPackageWeight()));
         detailEntity.setPackageCapacity(StringUtils.trimToNull(request.getPackageCapacity()));
@@ -2258,14 +2582,14 @@ public class RFQService {
             RfqTierEntity tierEntity = new RfqTierEntity();
             tierEntity.setSupplier(supplier);
             tierEntity.setQuantity(tierRequest.getQuantity());
-            tierEntity.setProductPrice(tierRequest.getProductPrice());
-            tierEntity.setCommission(tierRequest.getCommission());
+            tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
+            tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
             tierEntity.setCurrency(tierRequest.getCurrency());
-            tierEntity.setLandFreightCost(tierRequest.getLandFreightCost());
-            tierEntity.setSeaFreightCost(tierRequest.getSeaFreightCost());
+            tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
+            tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
             tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()));
-            tierEntity.setLandTotalPrice(tierRequest.getLandTotalPrice());
-            tierEntity.setSeaTotalPrice(tierRequest.getSeaTotalPrice());
+            tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
+            tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
             tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
             tierEntity.setSortOrder(
                     tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder++
