@@ -84,6 +84,12 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqAdditionalCostEntity> additionalCosts = new ArrayList<>();
 
+    @OneToMany(mappedBy = "rfq")
+    @jakarta.persistence.OrderBy("createdDate DESC")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<QuotationEntity> quotations = new ArrayList<>();
+
     @OneToMany(mappedBy = "rfqHeader", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

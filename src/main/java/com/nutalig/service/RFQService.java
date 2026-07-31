@@ -22,6 +22,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
+import com.nutalig.utils.DocumentStatusResolver;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1172,18 +1173,14 @@ public class RFQService {
                 null
         );
 
-        if (RfqStatus.REJECTED.equals(status) && StringUtils.isNotEmpty(entity.getQuotationNo())) {
-            log.info("Update Quotation {} with status {}", entity.getQuotationNo(), status);
+        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(entity.getId());
+        if (RfqStatus.REJECTED.equals(status) && !quotationEntities.isEmpty()) {
+            log.info("Update Quotation(s) for RFQ {} with status {}", entity.getId(), status);
 
-            QuotationEntity quotationEntity = quotationRepository.findById(entity.getQuotationNo())
-                    .orElse(null);
-
-            if (quotationEntity != null) {
+            for (QuotationEntity quotationEntity : quotationEntities) {
                 quotationEntity.setStatus(QuotationStatus.REJECTED);
                 quotationEntity.setUpdatedDate(now);
                 quotationEntity.setUpdatedBy(actor);
-
-                quotationRepository.save(quotationEntity);
 
                 activityHistoryService.record(
                         ActivityEntityType.QUOTATION,
@@ -1196,6 +1193,7 @@ public class RFQService {
                         null
                 );
             }
+            quotationRepository.saveAll(quotationEntities);
         }
     }
 
@@ -2064,7 +2062,25 @@ public class RFQService {
     }
 
     public RfqHeaderDto mapToDto(RfqHeaderEntity entity) throws DataNotFoundException {
-        return requestPriceHeaderMapper.toDto(entity);
+        RfqHeaderDto dto = requestPriceHeaderMapper.toDto(entity);
+        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(entity.getId());
+        dto.setQuotations(quotationEntities.stream()
+                .map(quotationEntity -> {
+                    RfqQuotationDto quotationDto = new RfqQuotationDto();
+                    quotationDto.setQuotationNo(quotationEntity.getQuotationNo());
+                    quotationDto.setRfqId(quotationEntity.getRfqId());
+                    quotationDto.setCreatedDate(quotationEntity.getCreatedDate());
+                    quotationDto.setUpdatedDate(quotationEntity.getUpdatedDate());
+                    quotationDto.setStatus(quotationEntity.getStatus());
+                    quotationDto.setStatusProfile(DocumentStatusResolver.resolveQuotation(quotationEntity.getStatus()));
+                    quotationDto.setRevNo(quotationEntity.getRevNo());
+                    quotationDto.setGrandTotal(quotationEntity.getGrandTotal());
+                    quotationDto.setDocDate(quotationEntity.getDocDate() != null ? quotationEntity.getDocDate().toString() : null);
+                    return quotationDto;
+                })
+                .toList());
+        dto.setQuotationNo(quotationEntities.isEmpty() ? null : quotationEntities.get(0).getQuotationNo());
+        return dto;
 //        dto.setServiceLevelAgreement(slaConfigService.getSlaConfigById(SLA));
 //        dto.getServiceLevelAgreement().setDayLeft(slaConfigService.calculateDayLeft(dto.getServiceLevelAgreement(), dto.getRequestedDate().toLocalDate()));
 //        return dto;

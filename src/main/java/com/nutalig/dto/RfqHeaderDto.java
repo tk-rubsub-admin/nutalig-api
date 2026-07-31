@@ -53,6 +53,7 @@ public class RfqHeaderDto {
     private ZonedDateTime slaDate;
     private ZonedDateTime quotedDate;
     private String quotationNo;
+    private List<RfqQuotationDto> quotations;
     private String saleOrderId;
     private Boolean isAccept;
     private Boolean isCreatedPurchaseOrder;

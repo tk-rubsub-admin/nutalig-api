@@ -11,5 +11,7 @@ public class SearchQuotationRequest {
     private LocalDate docDateStart;
     private LocalDate docDateEnd;
     private String customerIdEqual;
+    private String salesId;
     private QuotationStatus statusEqual;
+    private String keyword;
 }

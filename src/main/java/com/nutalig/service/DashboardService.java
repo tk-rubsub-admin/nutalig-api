@@ -4,6 +4,8 @@ import com.nutalig.constant.RfqStatus;
 import com.nutalig.dto.*;
 import com.nutalig.entity.EmployeeEntity;
 import com.nutalig.entity.RfqHeaderEntity;
+import com.nutalig.entity.QuotationEntity;
+import com.nutalig.repository.QuotationRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +59,7 @@ public class DashboardService {
     private static final String RFQ_CREATE_PATH = "/rfq-create";
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final QuotationRepository quotationRepository;
 
     @Transactional(readOnly = true)
     public DashboardDataDto getDashboard(
@@ -107,6 +110,12 @@ public class DashboardService {
                 specification,
                 Sort.by(Sort.Direction.DESC, "requestedDate")
         );
+        Set<String> rfqIdsWithQuotation = quotationRepository.findAllByRfqIdIn(
+                rfqs.stream().map(RfqHeaderEntity::getId).toList()
+        ).stream()
+                .map(QuotationEntity::getRfqId)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
 
         DashboardDataDto dashboard = new DashboardDataDto();
         dashboard.setRange("CUSTOM");
@@ -117,7 +126,7 @@ public class DashboardService {
         dashboard.setMetrics(buildMetrics(rfqs, startDate, endDate, selectedFilters));
         dashboard.setTrendCharts(buildTrendCharts(rfqs, startDate, endDate, roleCode));
         dashboard.setDistributionCharts(buildDistributionCharts(rfqs, roleCode));
-        dashboard.setWorkQueues(buildWorkQueues(rfqs, startDate, endDate, selectedFilters));
+        dashboard.setWorkQueues(buildWorkQueues(rfqs, startDate, endDate, selectedFilters, rfqIdsWithQuotation));
         dashboard.setQuickLinks(buildQuickLinks(roleCode, startDate, endDate, selectedFilters));
         return dashboard;
     }
@@ -312,7 +321,8 @@ public class DashboardService {
             List<RfqHeaderEntity> rfqs,
             LocalDate startDate,
             LocalDate endDate,
-            Map<String, String> selectedFilters
+            Map<String, String> selectedFilters,
+            Set<String> rfqIdsWithQuotation
     ) {
         return List.of(
                 queue(
@@ -370,7 +380,7 @@ public class DashboardService {
                         buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.QUOTED.name())),
                         rfqs.stream()
                                 .filter(rfq -> rfq.getStatus() == RfqStatus.QUOTED)
-                                .filter(rfq -> StringUtils.isBlank(rfq.getQuotationNo()))
+                                .filter(rfq -> !rfqIdsWithQuotation.contains(rfq.getId()))
                                 .toList(),
                         "รอออกใบเสนอราคา",
                         false,

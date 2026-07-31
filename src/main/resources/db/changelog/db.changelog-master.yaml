@@ -2550,6 +2550,26 @@ databaseChangeLog:
               WHERE q.rfq_id IS NULL;
 
   - changeSet:
+      id: 20260731-001-add-quotation-rfq-index
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: quotations
+            columnName: rfq_id
+        - not:
+            - indexExists:
+                tableName: quotations
+                indexName: idx_quotations_rfq_id
+      changes:
+        - createIndex:
+            tableName: quotations
+            indexName: idx_quotations_rfq_id
+            columns:
+              - column:
+                  name: rfq_id
+
+  - changeSet:
       id: 20260721-002-add-billing-condition-and-payment-cycle-to-customer
       author: codex
       preConditions:

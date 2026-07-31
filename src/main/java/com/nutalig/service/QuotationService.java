@@ -801,8 +801,10 @@ public class QuotationService {
         return specification
                 .and(docNoEqual(searchQuotationRequest.getDocNoEqual()))
                 .and(customerIdEqual(searchQuotationRequest.getCustomerIdEqual()))
+                .and(salesIdEqual(searchQuotationRequest.getSalesId()))
                 .and(statusEqual(searchQuotationRequest.getStatusEqual()))
-                .and(docDateBetween(searchQuotationRequest.getDocDateStart(), searchQuotationRequest.getDocDateEnd()));
+                .and(docDateBetween(searchQuotationRequest.getDocDateStart(), searchQuotationRequest.getDocDateEnd()))
+                .and(keywordContains(searchQuotationRequest.getKeyword()));
     }
 
     private QuotationDto mapToDto(QuotationEntity entity) {

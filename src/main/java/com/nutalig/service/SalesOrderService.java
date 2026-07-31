@@ -26,6 +26,7 @@ import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
+import com.nutalig.utils.RfqAttachmentUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -951,7 +952,7 @@ public class SalesOrderService {
     }
 
     @NotNull
-    private static List<SalesOrderItemDocumentDto> getItemDocumentDtos(SalesOrderEntity salesOrderEntity) {
+    private List<SalesOrderItemDocumentDto> getItemDocumentDtos(SalesOrderEntity salesOrderEntity) {
         List<SalesOrderItemDocumentDto> itemDocuments = new ArrayList<>();
         for (SalesOrderDetailEntity detail : salesOrderEntity.getItems()) {
             SalesOrderItemDocumentDto item = new SalesOrderItemDocumentDto();
@@ -978,8 +979,16 @@ public class SalesOrderService {
         return itemDocuments;
     }
 
-    private static InputStream loadImageAsInputStream(String imageUrl) {
+    private InputStream loadImageAsInputStream(String imageUrl) {
         try {
+            String fileName = RfqAttachmentUtil.extractFileName(imageUrl);
+            if (StringUtils.isNotBlank(fileName)) {
+                InputStream localFile = fileStorageService.openUploadedFile(fileName);
+                if (localFile != null) {
+                    return localFile;
+                }
+            }
+
             return new URL(imageUrl).openStream();
         } catch (Exception e) {
             log.warn("Cannot load image from url: {}", imageUrl, e);
