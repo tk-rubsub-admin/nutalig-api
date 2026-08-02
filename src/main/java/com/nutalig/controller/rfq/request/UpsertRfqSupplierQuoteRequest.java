@@ -49,7 +49,7 @@ public class UpsertRfqSupplierQuoteRequest {
         private BigDecimal quantity;
         private BigDecimal productPrice;
         private BigDecimal shippingCost;
-        private BigDecimal commission;
+        private BigDecimal commission = BigDecimal.valueOf(100);
         private BigDecimal landTotalPrice;
         private BigDecimal seaTotalPrice;
         private Boolean isFcl;

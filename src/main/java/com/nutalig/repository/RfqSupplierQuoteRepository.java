@@ -20,6 +20,8 @@ public interface RfqSupplierQuoteRepository extends JpaRepository<RfqSupplierQuo
             String supplierId
     );
 
+    long countByRequestPriceHeader_Id(String rfqId);
+
     @Query("""
             select coalesce(max(q.revisionNo), 0)
             from RfqSupplierQuote q

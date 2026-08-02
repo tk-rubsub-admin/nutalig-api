@@ -21,6 +21,12 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEventEnti
             ZonedDateTime rangeStart
     );
 
+    List<CalendarEventEntity> findAllByActiveTrueAndEventTypeAndStartAtLessThanEqualAndEndAtGreaterThanEqualOrderByStartAtAsc(
+            CalendarEventType eventType,
+            ZonedDateTime rangeEnd,
+            ZonedDateTime rangeStart
+    );
+
     List<CalendarEventEntity> findAllByActiveTrueAndEventTypeAndCreatedByOrderByStartAtAsc(
             CalendarEventType eventType,
             String createdBy

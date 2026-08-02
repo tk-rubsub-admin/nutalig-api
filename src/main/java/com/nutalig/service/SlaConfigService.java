@@ -2,11 +2,14 @@ package com.nutalig.service;
 
 import com.nutalig.controller.sla.request.CreateSlaConfigRequest;
 import com.nutalig.controller.sla.request.UpdateSlaConfigRequest;
+import com.nutalig.constant.CalendarEventType;
 import com.nutalig.dto.SlaConfigDto;
+import com.nutalig.entity.CalendarEventEntity;
 import com.nutalig.entity.SlaConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.SlaConfigMapper;
+import com.nutalig.repository.CalendarEventRepository;
 import com.nutalig.repository.SlaConfigRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -31,6 +37,7 @@ public class SlaConfigService {
 
     private final UserProfileService userProfileService;
     private final SlaConfigRepository slaConfigRepository;
+    private final CalendarEventRepository calendarEventRepository;
     private final SlaConfigMapper slaConfigMapper;
 
     @Transactional(readOnly = true)
@@ -117,29 +124,6 @@ public class SlaConfigService {
         return slaConfigMapper.toDto(entity);
     }
 
-    public Integer calculateDayLeft(SlaConfigDto dto, LocalDate referenceDate) {
-        if (dto == null || dto.getTargetDays() == null || referenceDate == null) {
-            return null;
-        }
-
-        if (dto.getTargetDays() <= 0) {
-            return 0;
-        }
-
-        LocalDate today = LocalDate.now(DateUtil.getTimeZone());
-        LocalDate remainingFrom = today.isAfter(referenceDate) ? today : referenceDate;
-        LocalDate dueDate = calculateDueDate(dto, referenceDate);
-
-        if (remainingFrom.isAfter(dueDate)) {
-            return 0;
-        }
-
-        if (dto.getDayType() == null || dto.getDayType() == com.nutalig.constant.SlaDayType.CALENDAR_DAY) {
-            return Math.toIntExact(ChronoUnit.DAYS.between(remainingFrom, dueDate) + 1);
-        }
-        return countBusinessDays(remainingFrom, dueDate);
-    }
-
     public ZonedDateTime calculateSlaDate(SlaConfigDto dto, ZonedDateTime referenceDateTime) {
         if (dto == null || referenceDateTime == null || dto.getTargetDays() == null || dto.getTargetDays() <= 0) {
             return null;
@@ -151,24 +135,80 @@ public class SlaConfigService {
 
     private LocalDate calculateDueDate(SlaConfigDto dto, LocalDate referenceDate) {
         if (dto.getDayType() == null || dto.getDayType() == com.nutalig.constant.SlaDayType.CALENDAR_DAY) {
-            return referenceDate.plusDays(dto.getTargetDays() - 1L);
+            return addEligibleDays(referenceDate, dto.getTargetDays(), false);
         }
-        return addBusinessDays(referenceDate, dto.getTargetDays());
+        return addEligibleDays(referenceDate, dto.getTargetDays(), true);
     }
 
-    private LocalDate addBusinessDays(LocalDate startDate, int businessDays) {
+    private LocalDate addEligibleDays(LocalDate startDate, int targetDays, boolean businessDayOnly) {
         LocalDate currentDate = startDate;
         int countedDays = 0;
+        Set<LocalDate> holidays = resolveHolidayDates(
+                startDate,
+                startDate.plusDays(Math.max(0, targetDays * 3L))
+        );
 
         while (true) {
-            if (isBusinessDay(currentDate)) {
+            if (isEligibleSlaDay(currentDate, businessDayOnly, holidays)) {
                 countedDays++;
-                if (countedDays == businessDays) {
+                if (countedDays == targetDays) {
                     return currentDate;
                 }
             }
             currentDate = currentDate.plusDays(1);
         }
+    }
+
+    private Set<LocalDate> resolveHolidayDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            return Set.of();
+        }
+
+        ZonedDateTime rangeStart = startDate.atStartOfDay(DateUtil.getTimeZone());
+        ZonedDateTime rangeEnd = endDate.atTime(DateUtil.MAX_TIME).atZone(DateUtil.getTimeZone());
+
+        return calendarEventRepository
+                .findAllByActiveTrueAndEventTypeAndStartAtLessThanEqualAndEndAtGreaterThanEqualOrderByStartAtAsc(
+                        CalendarEventType.HOLIDAY,
+                        rangeEnd,
+                        rangeStart
+                )
+                .stream()
+                .flatMap(event -> extractHolidayDates(event, startDate, endDate).stream())
+                .collect(Collectors.toSet());
+    }
+
+    private List<LocalDate> extractHolidayDates(CalendarEventEntity event, LocalDate startDate, LocalDate endDate) {
+        if (event == null || event.getStartAt() == null || event.getEndAt() == null) {
+            return List.of();
+        }
+
+        LocalDate eventStart = event.getStartAt().withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate();
+        LocalDate eventEnd = event.getEndAt().withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate();
+        LocalDate from = eventStart.isAfter(startDate) ? eventStart : startDate;
+        LocalDate to = eventEnd.isBefore(endDate) ? eventEnd : endDate;
+
+        if (to.isBefore(from)) {
+            return List.of();
+        }
+
+        return from.datesUntil(to.plusDays(1)).toList();
+    }
+
+    private boolean isEligibleSlaDay(LocalDate date, boolean businessDayOnly, Set<LocalDate> holidays) {
+        if (!isBusinessDay(date, businessDayOnly)) {
+            return false;
+        }
+
+        return holidays == null || !holidays.contains(date);
+    }
+
+    private boolean isBusinessDay(LocalDate date, boolean businessDayOnly) {
+        if (!businessDayOnly) {
+            return true;
+        }
+
+        return date.getDayOfWeek() != DayOfWeek.SATURDAY && date.getDayOfWeek() != DayOfWeek.SUNDAY;
     }
 
     private int countBusinessDays(LocalDate startDate, LocalDate endDate) {

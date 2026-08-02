@@ -696,11 +696,39 @@ public class RFQSupplierService {
         RfqHeaderEntity rfq = getEntityById(rfqId);
         RfqSupplierQuoteEntity quote = getSupplierQuoteEntity(rfqId, quoteId);
         ensureCanDeleteSupplierQuote(rfq, userId);
+        String actor = userProfileService.getNameFromId(userId);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
 
         Map<String, Object> detail = buildSupplierQuoteActivityDetail(quote);
         detail.put("deletedBy", userId);
 
         rfqSupplierQuoteRepository.delete(quote);
+        rfqSupplierQuoteRepository.flush();
+
+        if (rfqSupplierQuoteRepository.countByRequestPriceHeader_Id(rfqId) == 0
+                && rfq.getStatus() != RfqStatus.IN_PROGRESS) {
+            RfqStatus beforeStatus = rfq.getStatus();
+            rfq.setStatus(RfqStatus.IN_PROGRESS);
+            rfq.setUpdatedBy(actor);
+            rfq.setUpdatedDate(now);
+            rfq = requestPriceHeaderRepository.save(rfq);
+            saveRfqStatusTimeline(rfq, RfqStatus.IN_PROGRESS, now);
+
+            Map<String, Object> statusDetail = new LinkedHashMap<>();
+            statusDetail.put("beforeStatus", beforeStatus);
+            statusDetail.put("afterStatus", RfqStatus.IN_PROGRESS);
+
+            activityHistoryService.record(
+                    ActivityEntityType.RFQ,
+                    rfq.getId(),
+                    userId,
+                    ActivityActorType.USER,
+                    ActivityAction.STATUS_CHANGE,
+                    ActivitySource.API,
+                    "ปรับสถานะคำขอราคาเลขที่ " + rfq.getId() + " กลับเป็นกำลังดำเนินการหลังลบ supplier quote สุดท้าย",
+                    statusDetail
+            );
+        }
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,

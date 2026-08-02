@@ -1045,6 +1045,84 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto updateRFQDetailTier(
+            String rfqId,
+            Long detailId,
+            Long tierId,
+            UpdateRequestPriceTierRequest request,
+            String userId
+    ) throws Exception {
+        if (request == null) {
+            throw new InvalidRequestException("request is required");
+        }
+
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        RfqDetailEntity detailEntity = getDetailFromHeader(entity, detailId);
+        RfqTierEntity tierEntity = getTierFromDetail(detailEntity, tierId);
+
+        if (request.getQuantity() == null) {
+            throw new InvalidRequestException("quantity is required");
+        }
+        if (request.getProductPrice() == null) {
+            throw new InvalidRequestException("productPrice is required");
+        }
+
+        boolean quantityExists = detailEntity.getTiers().stream()
+                .filter(item -> !Objects.equals(item.getId(), tierEntity.getId()))
+                .anyMatch(item -> item.getQuantity() != null && item.getQuantity().compareTo(request.getQuantity()) == 0);
+        if (quantityExists) {
+            throw new InvalidRequestException(
+                    "quantity " + request.getQuantity() + " already exists in detail " + detailId
+            );
+        }
+
+        SupplierEntity supplier = tierEntity.getSupplier();
+        if (StringUtils.isNotBlank(request.getSupplierId())) {
+            supplier = getSupplierEntity(request.getSupplierId().trim());
+        } else if (detailEntity.getSupplier() != null) {
+            supplier = detailEntity.getSupplier();
+        }
+
+        String actor = userProfileService.getNameFromId(userId);
+        tierEntity.setSupplier(supplier);
+        tierEntity.setQuantity(request.getQuantity());
+        tierEntity.setProductPrice(scaleMoney(request.getProductPrice()));
+        tierEntity.setCommission(scaleMoney(request.getCommission()));
+        tierEntity.setCurrency(request.getCurrency());
+        tierEntity.setLandFreightCost(scaleMoney(request.getLandFreightCost()));
+        tierEntity.setSeaFreightCost(scaleMoney(request.getSeaFreightCost()));
+        tierEntity.setIsFcl(Boolean.TRUE.equals(request.getIsFcl()));
+        tierEntity.setLandTotalPrice(scaleMoney(request.getLandTotalPrice()));
+        tierEntity.setSeaTotalPrice(scaleMoney(request.getSeaTotalPrice()));
+        tierEntity.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
+        tierEntity.setSortOrder(request.getSortOrder());
+
+        detailEntity.setUpdatedBy(actor);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("detailId", detailId);
+        detail.put("tierId", tierId);
+        detail.put("quantity", tierEntity.getQuantity());
+        detail.put("productPrice", tierEntity.getProductPrice());
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "แก้ไข tier ของรายละเอียดคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateRFQAdditionalCost(
             String rfqId,
             Long additionalCostId,
@@ -2891,6 +2969,15 @@ public class RFQService {
                 .filter(detail -> Objects.equals(detail.getId(), detailId))
                 .findFirst()
                 .orElseThrow(() -> new DataNotFoundException("Detail " + detailId + " not found in RFQ " + entity.getId()));
+    }
+
+    private RfqTierEntity getTierFromDetail(RfqDetailEntity detail, Long tierId) throws DataNotFoundException {
+        return detail.getTiers().stream()
+                .filter(tier -> Objects.equals(tier.getId(), tierId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Tier " + tierId + " not found in detail " + detail.getId()
+                ));
     }
 
     private RfqAdditionalCostEntity getAdditionalCostFromHeader(RfqHeaderEntity entity, Long additionalCostId)
