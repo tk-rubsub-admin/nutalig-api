@@ -18,6 +18,7 @@ public class RfqTierDto {
     private BigDecimal landFreightCost;
     private BigDecimal seaFreightCost;
     private Boolean isFcl;
+    private Boolean isShareFCL;
     private BigDecimal landTotalPrice;
     private BigDecimal seaTotalPrice;
     private Long supplierQuoteTierId;

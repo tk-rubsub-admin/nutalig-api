@@ -53,9 +53,9 @@ public class UpsertRfqSupplierQuoteRequest {
         private BigDecimal landTotalPrice;
         private BigDecimal seaTotalPrice;
         private Boolean isFcl;
-        private Currency productPriceCurrency;
-        private Currency shippingCostCurrency;
-        private Currency currency;
+        private Currency productPriceCurrency = Currency.CNY;
+        private Currency shippingCostCurrency = Currency.CNY;
+        private Currency currency = Currency.CNY;
         private Integer sortOrder;
     }
 

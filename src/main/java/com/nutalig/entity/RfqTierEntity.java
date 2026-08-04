@@ -64,6 +64,9 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "is_fcl")
     private Boolean isFcl;
 
+    @Column(name = "is_share_fcl")
+    private Boolean isShareFCL;
+
     @Column(name = "land_total_price", precision = 18, scale = 4)
     private BigDecimal landTotalPrice;
 

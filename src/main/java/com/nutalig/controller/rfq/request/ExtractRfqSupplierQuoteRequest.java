@@ -8,6 +8,6 @@ public class ExtractRfqSupplierQuoteRequest {
 
     private String supplierId;
     private String inquiryId;
-    private Currency defaultCurrency;
+    private Currency defaultCurrency = Currency.CNY;
     private String supplierMessage;
 }

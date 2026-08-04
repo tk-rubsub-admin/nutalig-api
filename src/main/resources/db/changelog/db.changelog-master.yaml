@@ -2169,6 +2169,24 @@ databaseChangeLog:
                   defaultValueBoolean: false
 
   - changeSet:
+      id: 20260717-0041-add-is-share-fcl-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: is_share_fcl
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: is_share_fcl
+                  type: BIT(1)
+                  defaultValueBoolean: false
+
+  - changeSet:
       id: 20260717-005-create-freelance-sale-table
       author: codex
       preConditions:

@@ -1091,7 +1091,9 @@ public class RFQService {
         tierEntity.setCurrency(request.getCurrency());
         tierEntity.setLandFreightCost(scaleMoney(request.getLandFreightCost()));
         tierEntity.setSeaFreightCost(scaleMoney(request.getSeaFreightCost()));
-        tierEntity.setIsFcl(Boolean.TRUE.equals(request.getIsFcl()));
+        boolean isShareFcl = Boolean.TRUE.equals(request.getIsShareFCL());
+        tierEntity.setIsShareFCL(isShareFcl);
+        tierEntity.setIsFcl(Boolean.TRUE.equals(request.getIsFcl()) || isShareFcl);
         tierEntity.setLandTotalPrice(scaleMoney(request.getLandTotalPrice()));
         tierEntity.setSeaTotalPrice(scaleMoney(request.getSeaTotalPrice()));
         tierEntity.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
@@ -2681,7 +2683,9 @@ public class RFQService {
             tierEntity.setCurrency(tierRequest.getCurrency());
             tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
             tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
-            tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()));
+            boolean isShareFcl = Boolean.TRUE.equals(tierRequest.getIsShareFCL());
+            tierEntity.setIsShareFCL(isShareFcl);
+            tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()) || isShareFcl);
             tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
             tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
             tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
