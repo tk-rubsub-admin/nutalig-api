@@ -21,6 +21,7 @@ public class RfqDetailDto {
     private String packageCapacity;
     private SupplierDto supplier;
     private List<RfqTierDto> tiers;
+    private List<RfqTierSplitDto> tierSplits;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;
     private String createdBy;

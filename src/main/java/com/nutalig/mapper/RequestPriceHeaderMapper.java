@@ -103,6 +103,10 @@ public interface RequestPriceHeaderMapper {
 
     List<RfqTierDto> toTierDtoList(List<RfqTierEntity> entities);
 
+    RfqTierSplitDto toTierSplitDto(RfqTierSplitEntity entity);
+
+    List<RfqTierSplitDto> toTierSplitDtoList(List<RfqTierSplitEntity> entities);
+
     RfqAdditionalCostDto toAdditionalCostDto(RfqAdditionalCostEntity entity);
 
     List<RfqAdditionalCostDto> toAdditionalCostDtoList(List<RfqAdditionalCostEntity> entities);

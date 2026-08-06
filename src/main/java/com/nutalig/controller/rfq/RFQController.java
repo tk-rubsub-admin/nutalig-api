@@ -237,11 +237,12 @@ public class RFQController {
     @PostMapping("/{id}/supplier-quotes/extract")
     public GeneralResponse<UpsertRfqSupplierQuoteRequest> extractSupplierQuote(
             @PathVariable("id") String id,
-            @RequestBody ExtractRfqSupplierQuoteRequest request
+            @RequestBody ExtractRfqSupplierQuoteRequest request,
+            @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start extract supplier quote rfq {} supplier {} ===", id, request == null ? null : request.getSupplierId());
 
-        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.extractSupplierQuoteRequest(id, request);
+        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.extractSupplierQuoteRequest(id, request, userId);
 
         log.info("=== End extract supplier quote rfq {} supplier {} ===", id, response == null ? null : response.getSupplierId());
         return new GeneralResponse<>(SUCCESS, response);
@@ -250,11 +251,12 @@ public class RFQController {
     @PostMapping("/{id}/supplier-quotes/final-extract")
     public GeneralResponse<UpsertRfqSupplierQuoteRequest> finalExtractSupplierQuote(
             @PathVariable("id") String id,
-            @RequestBody ExtractRfqSupplierQuoteRequest request
+            @RequestBody ExtractRfqSupplierQuoteRequest request,
+            @RequestHeader("userId") String userId
     ) throws Exception {
         log.info("=== Start final extract supplier quote rfq {} supplier {} ===", id, request == null ? null : request.getSupplierId());
 
-        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.finalExtractSupplierQuoteRequest(id, request);
+        UpsertRfqSupplierQuoteRequest response = rfqSupplierService.finalExtractSupplierQuoteRequest(id, request, userId);
 
         log.info("=== End final extract supplier quote rfq {} supplier {} ===", id, response == null ? null : response.getSupplierId());
         return new GeneralResponse<>(SUCCESS, response);

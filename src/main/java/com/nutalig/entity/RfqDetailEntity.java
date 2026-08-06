@@ -73,6 +73,9 @@ public class RfqDetailEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "requestPriceDetail", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RfqTierEntity> tiers = new ArrayList<>();
 
+    @OneToMany(mappedBy = "requestPriceDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RfqTierSplitEntity> tierSplits = new ArrayList<>();
+
     public void addTier(RfqTierEntity tier) {
         tiers.add(tier);
         tier.setRequestPriceDetail(this);
@@ -81,5 +84,15 @@ public class RfqDetailEntity extends AuditDateEntity {
     public void removeTier(RfqTierEntity tier) {
         tiers.remove(tier);
         tier.setRequestPriceDetail(null);
+    }
+
+    public void addTierSplit(RfqTierSplitEntity tierSplit) {
+        tierSplits.add(tierSplit);
+        tierSplit.setRequestPriceDetail(this);
+    }
+
+    public void removeTierSplit(RfqTierSplitEntity tierSplit) {
+        tierSplits.remove(tierSplit);
+        tierSplit.setRequestPriceDetail(null);
     }
 }

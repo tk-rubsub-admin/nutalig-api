@@ -146,6 +146,33 @@ CREATE TABLE IF NOT EXISTS rfq_tier (
         UNIQUE (rfq_detail_id, quantity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS rfq_tier_split (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    rfq_detail_id BIGINT NOT NULL,
+    supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci DEFAULT NULL,
+    quantity DECIMAL(18,0) NOT NULL,
+    sell_price DECIMAL(18,4) NOT NULL,
+    commission DECIMAL(18,4) DEFAULT NULL,
+    currency VARCHAR(10) DEFAULT NULL,
+    land_freight_cost DECIMAL(18,4) DEFAULT NULL,
+    land_freight_qty DECIMAL(18,4) DEFAULT NULL,
+    sea_freight_qty DECIMAL(18,4) DEFAULT NULL,
+    sea_freight_cost DECIMAL(18,4) DEFAULT NULL,
+    is_fcl BIT(1) DEFAULT NULL,
+    is_share_fcl BIT(1) DEFAULT NULL,
+    created_date DATETIME(6) DEFAULT NULL,
+    updated_date DATETIME(6) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_rfq_tier_split_detail_id (rfq_detail_id),
+    KEY idx_rfq_tier_split_supplier_id (supplier_id),
+    CONSTRAINT fk_rfq_tier_split_detail
+        FOREIGN KEY (rfq_detail_id) REFERENCES rfq_detail (id),
+    CONSTRAINT fk_rfq_tier_split_supplier
+        FOREIGN KEY (supplier_id) REFERENCES supplier (id),
+    CONSTRAINT uk_rfq_tier_split_detail_qty
+        UNIQUE (rfq_detail_id, quantity)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS rfq_additional_cost (
     id BIGINT NOT NULL AUTO_INCREMENT,
     rfq_header_id VARCHAR(255) NOT NULL,

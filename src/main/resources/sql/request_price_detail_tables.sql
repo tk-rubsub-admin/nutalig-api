@@ -33,6 +33,31 @@ CREATE TABLE rfq_tier (
         UNIQUE (rfq_detail_id, quantity)
 );
 
+CREATE TABLE rfq_tier_split (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    rfq_detail_id BIGINT NOT NULL,
+    supplier_id VARCHAR(255) NULL,
+    quantity DECIMAL(18,0) NOT NULL,
+    sell_price DECIMAL(18,4) NOT NULL,
+    commission DECIMAL(18,4) NULL,
+    currency VARCHAR(10) NULL,
+    land_freight_cost DECIMAL(18,4) NULL,
+    land_freight_qty DECIMAL(18,4) NULL,
+    sea_freight_qty DECIMAL(18,4) NULL,
+    sea_freight_cost DECIMAL(18,4) NULL,
+    is_fcl BIT(1) NULL,
+    is_share_fcl BIT(1) NULL,
+    created_date DATETIME(6) NULL,
+    updated_date DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_rfq_tier_split_detail
+        FOREIGN KEY (rfq_detail_id) REFERENCES rfq_detail (id),
+    CONSTRAINT fk_rfq_tier_split_supplier
+        FOREIGN KEY (supplier_id) REFERENCES supplier (id),
+    CONSTRAINT uk_rfq_tier_split_detail_qty
+        UNIQUE (rfq_detail_id, quantity)
+);
+
 CREATE TABLE rfq_additional_cost (
     id BIGINT NOT NULL AUTO_INCREMENT,
     rfq_header_id VARCHAR(255) NOT NULL,

@@ -20,6 +20,7 @@ public class CreateRequestPriceDetailRequest {
     private String packageCapacity;
     private String supplierId;
     private List<CreateRequestPriceTierRequest> tiers;
+    private List<CreateRequestPriceTierSplitRequest> tierSplits;
 
     @Data
     public static class CreateRequestPriceTierRequest {
@@ -35,6 +36,21 @@ public class CreateRequestPriceDetailRequest {
         private BigDecimal seaTotalPrice;
         private Long supplierQuoteTierId;
         private Integer sortOrder;
+    }
+
+    @Data
+    public static class CreateRequestPriceTierSplitRequest {
+        private String supplierId;
+        private BigDecimal quantity;
+        private BigDecimal sellPrice;
+        private BigDecimal commission;
+        private Currency currency;
+        private BigDecimal landFreightCost;
+        private BigDecimal landFreightQty;
+        private BigDecimal seaFreightQty;
+        private BigDecimal seaFreightCost;
+        private Boolean isFcl;
+        private Boolean isShareFCL;
     }
 
 

@@ -755,6 +755,7 @@ public class RFQService {
             Map<String, Object> addedDetail = new LinkedHashMap<>();
             addedDetail.put("optionName", detailEntity.getOptionName());
             addedDetail.put("tierCount", detailEntity.getTiers().size());
+            addedDetail.put("tierSplitCount", detailEntity.getTierSplits().size());
             addedDetails.add(addedDetail);
         }
 
@@ -771,6 +772,7 @@ public class RFQService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("count", addedDetails.size());
         detail.put("details", addedDetails);
+        detail.put("request", requests).
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -1016,10 +1018,18 @@ public class RFQService {
         detailEntity.setPackageWeight(updatedDetail.getPackageWeight());
         detailEntity.setPackageCapacity(updatedDetail.getPackageCapacity());
         detailEntity.setUpdatedBy(updatedDetail.getUpdatedBy());
-        detailEntity.getTiers().clear();
-        updatedDetail
-                .getTiers()
-                .forEach(detailEntity::addTier);
+        if (request.getTiers() != null) {
+            detailEntity.getTiers().clear();
+            updatedDetail
+                    .getTiers()
+                    .forEach(detailEntity::addTier);
+        }
+        if (request.getTierSplits() != null) {
+            detailEntity.getTierSplits().clear();
+            updatedDetail
+                    .getTierSplits()
+                    .forEach(detailEntity::addTierSplit);
+        }
 
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -1029,6 +1039,7 @@ public class RFQService {
         detail.put("detailId", detailEntity.getId());
         detail.put("optionName", detailEntity.getOptionName());
         detail.put("tierCount", detailEntity.getTiers().size());
+        detail.put("tierSplitCount", detailEntity.getTierSplits().size());
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -2645,8 +2656,10 @@ public class RFQService {
         if (StringUtils.isBlank(request.getSpec())) {
             throw new InvalidRequestException("spec is required");
         }
-        if (request.getTiers() == null || request.getTiers().isEmpty()) {
-            throw new InvalidRequestException("tiers are required");
+        boolean hasTiers = request.getTiers() != null && !request.getTiers().isEmpty();
+        boolean hasTierSplits = request.getTierSplits() != null && !request.getTierSplits().isEmpty();
+        if (!hasTiers && !hasTierSplits) {
+            throw new InvalidRequestException("tiers or tierSplits are required");
         }
 
         RfqDetailEntity detailEntity = new RfqDetailEntity();
@@ -2666,33 +2679,65 @@ public class RFQService {
         }
         detailEntity.setUpdatedBy(updatedBy);
 
-        int nextSortOrder = 1;
-        for (CreateRequestPriceDetailRequest.CreateRequestPriceTierRequest tierRequest : request.getTiers()) {
-            if (tierRequest.getQuantity() == null) {
-                throw new InvalidRequestException("tier.quantity is required");
-            }
-            if (tierRequest.getProductPrice() == null) {
-                throw new InvalidRequestException("tier.productPrice is required");
-            }
+        if (hasTiers) {
+            int nextSortOrder = 1;
+            for (CreateRequestPriceDetailRequest.CreateRequestPriceTierRequest tierRequest : request.getTiers()) {
+                if (tierRequest.getQuantity() == null) {
+                    throw new InvalidRequestException("tier.quantity is required");
+                }
+                if (tierRequest.getProductPrice() == null) {
+                    throw new InvalidRequestException("tier.productPrice is required");
+                }
 
-            RfqTierEntity tierEntity = new RfqTierEntity();
-            tierEntity.setSupplier(supplier);
-            tierEntity.setQuantity(tierRequest.getQuantity());
-            tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
-            tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
-            tierEntity.setCurrency(tierRequest.getCurrency());
-            tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
-            tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
-            boolean isShareFcl = Boolean.TRUE.equals(tierRequest.getIsShareFCL());
-            tierEntity.setIsShareFCL(isShareFcl);
-            tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()) || isShareFcl);
-            tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
-            tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
-            tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
-            tierEntity.setSortOrder(
-                    tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder++
-            );
-            detailEntity.addTier(tierEntity);
+                RfqTierEntity tierEntity = new RfqTierEntity();
+                tierEntity.setSupplier(supplier);
+                tierEntity.setQuantity(tierRequest.getQuantity());
+                tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
+                tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
+                tierEntity.setCurrency(tierRequest.getCurrency());
+                tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
+                tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
+                boolean isShareFcl = Boolean.TRUE.equals(tierRequest.getIsShareFCL());
+                tierEntity.setIsShareFCL(isShareFcl);
+                tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()) || isShareFcl);
+                tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
+                tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
+                tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
+                tierEntity.setSortOrder(
+                        tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder++
+                );
+                detailEntity.addTier(tierEntity);
+            }
+        }
+
+        if (hasTierSplits) {
+            for (CreateRequestPriceDetailRequest.CreateRequestPriceTierSplitRequest tierSplitRequest : request.getTierSplits()) {
+                if (tierSplitRequest.getQuantity() == null) {
+                    throw new InvalidRequestException("tierSplit.quantity is required");
+                }
+                if (tierSplitRequest.getSellPrice() == null) {
+                    throw new InvalidRequestException("tierSplit.sellPrice is required");
+                }
+
+                RfqTierSplitEntity tierSplitEntity = new RfqTierSplitEntity();
+                SupplierEntity tierSplitSupplier = supplier;
+                if (StringUtils.isNotBlank(tierSplitRequest.getSupplierId())) {
+                    tierSplitSupplier = getSupplierEntity(tierSplitRequest.getSupplierId().trim());
+                }
+                tierSplitEntity.setSupplier(tierSplitSupplier);
+                tierSplitEntity.setQuantity(tierSplitRequest.getQuantity());
+                tierSplitEntity.setSellPrice(scaleMoney(tierSplitRequest.getSellPrice()));
+                tierSplitEntity.setCommission(scaleMoney(tierSplitRequest.getCommission()));
+                tierSplitEntity.setCurrency(tierSplitRequest.getCurrency());
+                tierSplitEntity.setLandFreightCost(scaleMoney(tierSplitRequest.getLandFreightCost()));
+                tierSplitEntity.setLandFreightQty(scaleMoney(tierSplitRequest.getLandFreightQty()));
+                tierSplitEntity.setSeaFreightQty(scaleMoney(tierSplitRequest.getSeaFreightQty()));
+                tierSplitEntity.setSeaFreightCost(scaleMoney(tierSplitRequest.getSeaFreightCost()));
+                boolean isShareFcl = Boolean.TRUE.equals(tierSplitRequest.getIsShareFCL());
+                tierSplitEntity.setIsShareFCL(isShareFcl);
+                tierSplitEntity.setIsFcl(Boolean.TRUE.equals(tierSplitRequest.getIsFcl()) || isShareFcl);
+                detailEntity.addTierSplit(tierSplitEntity);
+            }
         }
 
         return detailEntity;

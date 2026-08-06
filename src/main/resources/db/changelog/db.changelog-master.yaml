@@ -2762,3 +2762,122 @@ databaseChangeLog:
             tableName: rfq_tier
             columnName: commission
             newDataType: DECIMAL(18,4)
+
+  - changeSet:
+      id: 20260805-001-create-rfq-tier-split-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_tier_split
+      changes:
+        - createTable:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_rfq_tier_split
+                    nullable: false
+              - column:
+                  name: rfq_detail_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supplier_id
+                  type: VARCHAR(255)
+              - column:
+                  name: quantity
+                  type: DECIMAL(18,0)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sell_price
+                  type: DECIMAL(18,4)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: commission
+                  type: DECIMAL(18,4)
+              - column:
+                  name: currency
+                  type: VARCHAR(10)
+              - column:
+                  name: land_freight_cost
+                  type: DECIMAL(18,4)
+              - column:
+                  name: land_freight_qty
+                  type: DECIMAL(18,4)
+              - column:
+                  name: sea_freight_qty
+                  type: DECIMAL(18,4)
+              - column:
+                  name: sea_freight_cost
+                  type: DECIMAL(18,4)
+              - column:
+                  name: is_fcl
+                  type: BOOLEAN
+              - column:
+                  name: is_share_fcl
+                  type: BOOLEAN
+              - column:
+                  name: created_date
+                  type: DATETIME(6)
+              - column:
+                  name: updated_date
+                  type: DATETIME(6)
+        - addUniqueConstraint:
+            tableName: rfq_tier_split
+            columnNames: rfq_detail_id, quantity
+            constraintName: uk_rfq_tier_detail_qty
+        - createIndex:
+            tableName: rfq_tier_split
+            indexName: idx_rfq_tier_split_detail_id
+            columns:
+              - column:
+                  name: rfq_detail_id
+        - createIndex:
+            tableName: rfq_tier_split
+            indexName: idx_rfq_tier_split_supplier_id
+            columns:
+              - column:
+                  name: supplier_id
+
+  - changeSet:
+      id: 20260805-002-add-fk-rfq-tier-split-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_tier_split_detail
+                foreignKeyTableName: rfq_tier_split
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_tier_split
+            baseColumnNames: rfq_detail_id
+            referencedTableName: rfq_detail
+            referencedColumnNames: id
+            constraintName: fk_rfq_tier_split_detail
+
+  - changeSet:
+      id: 20260805-003-add-fk-rfq-tier-split-supplier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_rfq_tier_split_supplier
+                foreignKeyTableName: rfq_tier_split
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: rfq_tier_split
+            baseColumnNames: supplier_id
+            referencedTableName: supplier
+            referencedColumnNames: id
+            constraintName: fk_rfq_tier_split_supplier

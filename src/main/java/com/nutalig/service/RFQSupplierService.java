@@ -23,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
@@ -287,23 +288,26 @@ public class RFQSupplierService {
     @Transactional
     public UpsertRfqSupplierQuoteRequest extractSupplierQuoteRequest(
             String rfqId,
-            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request,
+            String userId
     ) throws Exception {
-        return extractSupplierQuoteRequestByTemplate(rfqId, request, RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE);
+        return extractSupplierQuoteRequestByTemplate(rfqId, request, RFQ_SUPPLIER_QUOTE_EXTRACTION_TEMPLATE_CODE, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public UpsertRfqSupplierQuoteRequest finalExtractSupplierQuoteRequest(
             String rfqId,
-            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request
+            com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request,
+            String userId
     ) throws Exception {
-        return extractSupplierQuoteRequestByTemplate(rfqId, request, FINAL_RFQ_EXTRACTION);
+        return extractSupplierQuoteRequestByTemplate(rfqId, request, FINAL_RFQ_EXTRACTION, userId);
     }
 
     private UpsertRfqSupplierQuoteRequest extractSupplierQuoteRequestByTemplate(
             String rfqId,
             com.nutalig.controller.rfq.request.ExtractRfqSupplierQuoteRequest request,
-            String templateCode
+            String templateCode,
+            String userId
     ) throws Exception {
         if (request == null || StringUtils.isBlank(request.getSupplierId())) {
             throw new InvalidRequestException("Supplier id is required.");
@@ -335,7 +339,23 @@ public class RFQSupplierService {
         UpsertRfqSupplierQuoteRequest extractedRequest =
                 objectMapper.readValue(sanitizedJson, UpsertRfqSupplierQuoteRequest.class);
 
-        return normalizeExtractedSupplierQuoteRequest(extractedRequest, request);
+        UpsertRfqSupplierQuoteRequest upsertRfqSupplierQuoteRequest = normalizeExtractedSupplierQuoteRequest(extractedRequest, request);
+
+        Map<String, String> reqVar = new HashMap<>();
+        reqVar.put("message", request.getSupplierMessage());
+        reqVar.put("template", templateCode);
+        reqVar.put("response", objectMapper.writeValueAsString(upsertRfqSupplierQuoteRequest));
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                rfq.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.GENERATE_MESSAGE,
+                ActivitySource.API,
+                "แปลงข้อความสำหรับคำขอราคาเลขที่ " + rfq.getId(),
+                reqVar
+        );
+        return upsertRfqSupplierQuoteRequest;
     }
 
     private String sanitizeExtractedSupplierQuoteJson(
