@@ -545,10 +545,14 @@ public class RFQController {
     }
 
     @PostMapping("/{id}/request-urgent-approve")
-    public GeneralResponse requestUrgentApprove(@PathVariable("id") String id, @RequestHeader("userId") String userId) throws Exception {
+    public GeneralResponse requestUrgentApprove(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) RequestUrgentRfqApproveRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
         log.info("=== Start request urgent approve for rfq {} by {}", id, userId);
 
-        rfqService.createUrgentRfqApprovalRequest(id, userId);
+        rfqService.createUrgentRfqApprovalRequest(id, request, userId);
 
         log.info("=== end request urgent approve for rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS);

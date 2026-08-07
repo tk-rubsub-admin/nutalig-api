@@ -726,10 +726,30 @@ public class RFQService {
     }
 
     @Transactional
-    public void createUrgentRfqApprovalRequest(String rfqId, String userId) throws Exception {
+    public void createUrgentRfqApprovalRequest(
+            String rfqId,
+            com.nutalig.controller.rfq.request.RequestUrgentRfqApproveRequest request,
+            String userId
+    ) throws Exception {
         log.info("Create urgent rfq approval request for rfq {} by {}", rfqId, userId);
 
         RfqHeaderEntity entity = getEntityById(rfqId);
+        String actor = userProfileService.getNameFromId(userId);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        String urgentRequestMessage = request == null ? null : request.getUrgentRequestMessage();
+        if (StringUtils.isBlank(urgentRequestMessage)) {
+            throw new InvalidRequestException("urgentRequestMessage is required.");
+        }
+
+        entity.setUrgentRequest(Boolean.TRUE);
+        entity.setUrgentRequestReason(urgentRequestMessage.trim());
+        entity.setUrgentRequestStatus(UrgentRequestStatus.PENDING_APPROVAL);
+        entity.setUrgentRequestedBy(actor);
+        entity.setUrgentRequestedDate(now);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(now);
+        requestPriceHeaderRepository.save(entity);
 
         approvalService.createUrgentRfqApprovalRequest(entity, userId);
     }
@@ -759,7 +779,7 @@ public class RFQService {
             addedDetails.add(addedDetail);
         }
 
-        boolean isFinalQuoted = entity.getStatus() == RfqStatus.SUPPLIER_QUOTED;
+        boolean isFinalQuoted = entity.getStatus() == RfqStatus.SUPPLIER_QUOTED || entity.getStatus() == RfqStatus.SPECIAL_PRICE_REVIEW;
         if (isFinalQuoted) {
             entity.setStatus(RfqStatus.QUOTED);
             entity.setQuotedDate(now);
@@ -1301,6 +1321,10 @@ public class RFQService {
         SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
         entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
         entity.setStatus(RfqStatus.IN_PROGRESS);
+        String currentProcurementId = entity.getProcurement() != null ? entity.getProcurement().getEmployeeId() : null;
+        if (!StringUtils.equals(currentProcurementId, userId)) {
+            entity.setProcurement(resolveProcurement(userId));
+        }
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         entity.setIsAccept(Boolean.TRUE);
@@ -1311,6 +1335,10 @@ public class RFQService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("beforeStatus", RfqStatus.NEW);
         detail.put("afterStatus", RfqStatus.IN_PROGRESS);
+        if (!StringUtils.equals(currentProcurementId, userId)) {
+            detail.put("beforeProcurement", currentProcurementId);
+            detail.put("afterProcurement", userId);
+        }
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -1604,7 +1632,11 @@ public class RFQService {
         variables.put("capacity", safeValue(rfq.getCapacity()));
         variables.put("spec", rfq.getDetails().getFirst().getSpec());
         variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
-        variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
+        if (!rfq.getDetails().isEmpty() && rfq.getDetails().getFirst().getRemark() != null && !rfq.getDetails().getFirst().getRemark().isEmpty()) {
+            variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
+        } else {
+            variables.put("remarkSection", "");
+        }
         variables.put("recommend", rfq.getDetails().getFirst().getRecommend());
         return promptTemplateEngine.render(template, variables).trim();
     }

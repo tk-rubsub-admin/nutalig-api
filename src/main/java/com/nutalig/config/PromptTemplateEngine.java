@@ -8,13 +8,12 @@ import java.util.Map;
 public class PromptTemplateEngine {
 
     public String render(String template, Map<String, String> variables) {
-
-        String result = template;
+        String result = template == null ? "" : template;
 
         for (Map.Entry<String, String> entry : variables.entrySet()) {
             result = result.replace(
                     "{{" + entry.getKey() + "}}",
-                    entry.getValue()
+                    entry.getValue() == null ? "" : entry.getValue()
             );
         }
 

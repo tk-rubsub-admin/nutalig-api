@@ -211,11 +211,11 @@ public class CustomerService {
                         throw new InvalidRequestException("customer_name is required.");
                     }
 
-                    CustomerEntity existingCustomer = findExistingCustomer(row, headerIndexMap, evaluator);
-                    if (existingCustomer != null) {
-                        skippedCount++;
-                        continue;
-                    }
+//                    CustomerEntity existingCustomer = findExistingCustomer(row, headerIndexMap, evaluator);
+//                    if (existingCustomer != null) {
+//                        skippedCount++;
+//                        continue;
+//                    }
 
                     CustomerEntity entity = buildCustomerEntityFromRow(row, headerIndexMap, evaluator, userId);
                     customerRepository.saveAndFlush(entity);
@@ -233,7 +233,7 @@ public class CustomerService {
                                     "customer", buildCustomerHistorySnapshot(entity)
                             )
                     );
-                    recordCustomerAddressCreateHistory(entity, userId, "อัปโหลดที่อยู่ลูกค้า ");
+//                    recordCustomerAddressCreateHistory(entity, userId, "อัปโหลดที่อยู่ลูกค้า ");
                     recordCustomerContactCreateHistory(entity, userId, "อัปโหลดผู้ติดต่อของลูกค้า ");
                     createdCount++;
                 } catch (Exception ex) {

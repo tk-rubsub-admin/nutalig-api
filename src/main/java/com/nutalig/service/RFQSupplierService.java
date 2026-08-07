@@ -566,6 +566,10 @@ public class RFQSupplierService {
                     continue;
                 }
 
+                if (tierRequest.getCommission() == null || BigDecimal.ZERO.equals(tierRequest.getCommission())) {
+                    tierRequest.setCommission(BigDecimal.valueOf(100));
+                }
+
                 tierRequest.setShippingCost(scaleMoney(
                         tierRequest.getShippingCost() == null ? BigDecimal.ZERO : tierRequest.getShippingCost()
                 ));
