@@ -1631,8 +1631,10 @@ public class RFQService {
         variables.put("productSubtype2", displayProductSubtype2(rfq));
         variables.put("material", displayProductMaterial(rfq));
         variables.put("capacity", safeValue(rfq.getCapacity()));
-        variables.put("spec", rfq.getDetails().getFirst().getSpec());
-        variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
+        variables.put("detailSection", buildCustomerDetailSection(rfq));
+//        variables.put("spec", rfq.getDetails().getFirst().getSpec());
+//        variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
+
         if (!rfq.getDetails().isEmpty() && rfq.getDetails().getFirst().getRemark() != null && !rfq.getDetails().getFirst().getRemark().isEmpty()) {
             variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
         } else {

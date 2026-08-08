@@ -15,6 +15,7 @@ import com.nutalig.dto.*;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.QuotationDocumentDto;
 import com.nutalig.dto.document.QuotationItemDocumentDto;
+import com.nutalig.dto.document.TermAndConditionDocumentDto;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -478,9 +479,11 @@ public class QuotationService {
 
             if (documentRequest.getIsOriginal()) {
                 pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat()));
             }
             if (documentRequest.getIsCopy()) {
                 pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat()));
             }
 
             byte[] mergedPdf = PdfMergeUtil.merge(pdfBytesList);
@@ -490,11 +493,15 @@ public class QuotationService {
 
             if (documentRequest.getIsOriginal()) {
                 List<byte[]> originalPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat());
+                byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
                 pages.addAll(originalPages);
+                pages.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 List<byte[]> copyPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat());
+                byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
                 pages.addAll(copyPages);
+                pages.add(termAndCondPages);
             }
             List<DownloadDocumentDto.FileItem> files = new ArrayList<>();
             for (int i = 0; i< pages.size(); i++) {
@@ -556,6 +563,23 @@ public class QuotationService {
         DownloadDocumentDto.FileItem pdfFile = documentDto.getFiles().getFirst();
         byte[] content = Base64.getDecoder().decode(pdfFile.getBase64());
         return fileStorageService.uploadGeneratedFile(content, quotationNo, pdfFile.getContentType());
+    }
+
+    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(Boolean isVat, EmployeeEntity sales) {
+        TermAndConditionDocumentDto dto = new TermAndConditionDocumentDto();
+        dto.setSalesName(sales.getFirstNameTh() + " " + sales.getLastNameTh());
+        if (!isVat) {
+            List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+        } else {
+            List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+        }
+        return dto;
     }
 
     private QuotationDocumentDto  buildQuotationDocumentDto(QuotationEntity quotationEntity, Boolean aFalse) {
@@ -675,7 +699,8 @@ public class QuotationService {
 
             itemDocuments.add(item);
         }
-        while (itemDocuments.size() < 8) {
+
+        while (itemDocuments.size() < 7) {
             itemDocuments.add(new QuotationItemDocumentDto());
         }
 

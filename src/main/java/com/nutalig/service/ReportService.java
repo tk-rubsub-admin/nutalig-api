@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.JRDataSource;
+import net.sf.jasperreports.engine.JREmptyDataSource;
 import net.sf.jasperreports.engine.design.JasperDesign;
 import net.sf.jasperreports.engine.xml.JRXmlLoader;
 import org.springframework.stereotype.Service;
@@ -31,7 +33,9 @@ public class ReportService {
 
     private static final String DPK_LOGO = "report/img.png";
     private static final String NUTALIG_LOGO = "report/logo_nutalig.jpg";
-    private static final String SIGNATURE = "report/signature.jpg";
+    private static final String NUTALIG_STAMP = "report/stamp_nutalig.png";
+    private static final String SIGNATURE = "report/signature.png";
+    private static final String TERM_COND_TEMPLATE = "report/termAndCondition.jrxml";
     private static final String INVOICE_TEMPLATE = "report/invoice.jrxml";
     private static final String QUOTATION_TEMPLATE = "report/quotation.jrxml";
     private static final String SALES_ORDER_TEMPLATE = "report/salesOrder.jrxml";
@@ -44,6 +48,33 @@ public class ReportService {
     private final ObjectMapper objectMapper;
 
     /* ======================= PUBLIC APIs ======================= */
+    public Object getTermAndConditionDocument(TermAndConditionDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+
+        parameters.put("salesName", dto.getSalesName());
+        parameters.put("stamp", loadResource(NUTALIG_STAMP));
+        parameters.put("signature", loadResource(SIGNATURE));
+        parameters.put("bankName", dto.getBankName());
+        parameters.put("accountName", dto.getAccountName());
+        parameters.put("accountNo", dto.getAccountNo());
+
+        JasperPrint jasperPrint = buildJasperPrint(
+                TERM_COND_TEMPLATE,
+                parameters,
+                new JREmptyDataSource(1)
+        );
+
+        if (format == ExportFileFormat.PDF) {
+            return JasperReportUtil.exportJasperToPdf(jasperPrint);
+        }
+
+        if (format == ExportFileFormat.JPG) {
+            return exportImages(jasperPrint);
+        }
+
+        return null;
+    }
+
     public Object getQuotationDocument(QuotationDocumentDto dto, ExportFileFormat format) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
@@ -291,7 +322,7 @@ public class ReportService {
     private JasperPrint buildJasperPrint(
             String templatePath,
             Map<String, Object> parameters,
-            JRBeanCollectionDataSource dataSource
+            JRDataSource dataSource
     ) throws JRException {
 
         InputStream template = loadResource(templatePath);

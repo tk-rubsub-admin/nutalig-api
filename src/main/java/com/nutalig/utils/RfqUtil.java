@@ -50,18 +50,30 @@ public class RfqUtil {
         return safeValue(rfq.getMaterialCode());
     }
 
-    public static String buildCustomerQuotedTiers(RfqHeaderEntity rfq) {
+    public static String buildCustomerDetailSection(RfqHeaderEntity rfq) {
         if (rfq.getDetails() == null || rfq.getDetails().isEmpty()) {
             return "-";
         }
+        List<String> lines = new ArrayList<>();
+        for (RfqDetailEntity detail : rfq.getDetails()) {
+            lines.add(detail.getOptionName());
+            lines.add("สเปกสินค้า : " + detail.getSpec());
+            lines.add("——————————————");
+            lines.add("ราคาเสนอ");
+            lines.add(buildCustomerQuotedTiers(detail));
+            lines.add("===========");
+            lines.add("");
+        }
+        return String.join("\n", lines);
+    }
 
-        RfqDetailEntity firstDetail = rfq.getDetails().getFirst();
-        if (firstDetail.getTiers() == null || firstDetail.getTiers().isEmpty()) {
+    public static String buildCustomerQuotedTiers(RfqDetailEntity rfqDetail) {
+        if (rfqDetail == null || rfqDetail.getTiers().isEmpty()) {
             return "-";
         }
 
         List<String> lines = new ArrayList<>();
-        for (RfqTierEntity tier : firstDetail.getTiers()) {
+        for (RfqTierEntity tier : rfqDetail.getTiers()) {
             StringBuilder tierLine = new StringBuilder("\n");
             tierLine.append("จำนวน ");
             tierLine.append(df.format(tier.getQuantity()));
