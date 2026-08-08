@@ -1323,7 +1323,7 @@ public class RFQService {
         entity.setStatus(RfqStatus.IN_PROGRESS);
         String currentProcurementId = entity.getProcurement() != null ? entity.getProcurement().getEmployeeId() : null;
         if (!StringUtils.equals(currentProcurementId, userId)) {
-            UserEntity procurement = userRepository.findById(userId);
+            UserEntity procurement = userRepository.findById(userId).get();
             entity.setProcurement(procurement.getEmployeeEntity());
         }
         entity.setUpdatedBy(actor);
