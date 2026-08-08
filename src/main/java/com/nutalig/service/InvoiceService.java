@@ -905,7 +905,7 @@ public class InvoiceService {
 
     private void sendAwaitingValidationNotifications(InvoiceEntity invoice, InvoicePaymentEntity payment) {
         try {
-            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("SUPER_ADMIN")).stream()
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
                     .filter(user -> Status.ACTIVE.equals(user.getStatus()))
                     .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
                     .toList();
