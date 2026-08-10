@@ -474,16 +474,17 @@ public class QuotationService {
                 .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
 
         String fileName = quotationEntity.getQuotationNo();
+        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
         if (documentRequest.getFormat().equals(ExportFileFormat.PDF)) {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
                 pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat()));
-                pdfBytesList.add((byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat()));
+                pdfBytesList.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat()));
-                pdfBytesList.add((byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat()));
+                pdfBytesList.add(termAndCondPages);
             }
 
             byte[] mergedPdf = PdfMergeUtil.merge(pdfBytesList);
@@ -493,13 +494,11 @@ public class QuotationService {
 
             if (documentRequest.getIsOriginal()) {
                 List<byte[]> originalPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat());
-                byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
                 pages.addAll(originalPages);
                 pages.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 List<byte[]> copyPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat());
-                byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
                 pages.addAll(copyPages);
                 pages.add(termAndCondPages);
             }

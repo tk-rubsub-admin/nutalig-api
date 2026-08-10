@@ -15,6 +15,7 @@ import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.SalesOrderDocumentDto;
 import com.nutalig.dto.document.SalesOrderItemDocumentDto;
+import com.nutalig.dto.document.TermAndConditionDocumentDto;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -60,6 +61,8 @@ public class SalesOrderService {
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
@@ -338,28 +341,32 @@ public class SalesOrderService {
                 .orElseThrow(() -> new DataNotFoundException("Sales Order " + salesOrderNo + " not found."));
 
         String fileName = salesOrderEntity.getSalesOrderNo();
+        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(salesOrderEntity.getVat().compareTo(BigDecimal.ZERO) > 0, salesOrderEntity.getSales()), documentRequest.getFormat());
         if (documentRequest.getFormat().equals(ExportFileFormat.PDF)) {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
                 pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE), documentRequest.getFormat()));
+                pdfBytesList.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE), documentRequest.getFormat()));
+                pdfBytesList.add(termAndCondPages);
             }
 
             byte[] mergedPdf = PdfMergeUtil.merge(pdfBytesList);
             return new DownloadDocumentDto(fileName, documentRequest.getFormat(), List.of(new DownloadDocumentDto.FileItem(fileName + "." + documentRequest.getFormat(), Base64.getEncoder().encodeToString(mergedPdf) , "application/pdf")));
         } else if (documentRequest.getFormat().equals(ExportFileFormat.JPG)) {
             List<byte[]> pages = new ArrayList<>();
-
             if (documentRequest.getIsOriginal()) {
                 List<byte[]> originalPages = (List<byte[]>) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE), documentRequest.getFormat());
                 pages.addAll(originalPages);
+                pages.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 List<byte[]> copyPages = (List<byte[]>) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE), documentRequest.getFormat());
                 pages.addAll(copyPages);
+                pages.add(termAndCondPages);
             }
             List<DownloadDocumentDto.FileItem> files = new ArrayList<>();
             for (int i = 0; i< pages.size(); i++) {
@@ -549,7 +556,15 @@ public class SalesOrderService {
 
     private void replaceSalesOrderItems(SalesOrderEntity entity, List<UpdateSalesOrderDetailRequest> itemRequests)
             throws DataNotFoundException {
-        entity.getItems().clear();
+        Map<Long, SalesOrderDetailEntity> existingItemsById = new LinkedHashMap<>();
+        for (SalesOrderDetailEntity item : Optional.ofNullable(entity.getItems()).orElseGet(Set::of)) {
+            if (item.getId() != null) {
+                existingItemsById.put(item.getId(), item);
+            }
+        }
+
+        Set<Long> retainedItemIds = new LinkedHashSet<>();
+        Set<SalesOrderDetailEntity> nextItems = new LinkedHashSet<>();
         int lineNo = 1;
 
         for (UpdateSalesOrderDetailRequest itemRequest : Optional.ofNullable(itemRequests).orElseGet(List::of)) {
@@ -557,8 +572,17 @@ public class SalesOrderService {
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
             BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
 
-            SalesOrderDetailEntity detail = new SalesOrderDetailEntity();
-            detail.setSalesOrder(entity);
+            SalesOrderDetailEntity detail = itemRequest.getId() != null
+                    ? existingItemsById.get(itemRequest.getId())
+                    : null;
+
+            if (detail == null) {
+                detail = new SalesOrderDetailEntity();
+                detail.setSalesOrder(entity);
+            } else {
+                retainedItemIds.add(detail.getId());
+            }
+
             detail.setLineNo(lineNo++);
             detail.setSupplier(supplier);
             detail.setName(itemRequest.getName());
@@ -579,8 +603,10 @@ public class SalesOrderService {
             detail.setSupplierShippingCost(itemRequest.getSupplierShippingCost());
             detail.setSupplierTotalUnitCost(itemRequest.getSupplierTotalUnitCost());
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
-            entity.addItem(detail);
+
+            nextItems.add(detail);
         }
+
     }
 
     private List<UpdateSalesOrderDetailRequest> toUpdateItemRequests(Set<SalesOrderDetailEntity> items) {
@@ -972,7 +998,7 @@ public class SalesOrderService {
 
             itemDocuments.add(item);
         }
-        while (itemDocuments.size() < 5) {
+        while (itemDocuments.size() < 7) {
             itemDocuments.add(new SalesOrderItemDocumentDto());
         }
 
@@ -1000,5 +1026,22 @@ public class SalesOrderService {
         return requestPriceHeaderRepository.findFirstBySaleOrderId(salesOrderNo)
                 .map(RfqHeaderEntity::getId)
                 .orElse(null);
+    }
+
+    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(Boolean isVat, EmployeeEntity sales) {
+        TermAndConditionDocumentDto dto = new TermAndConditionDocumentDto();
+        dto.setSalesName(sales.getFirstNameTh() + " " + sales.getLastNameTh());
+        if (!isVat) {
+            List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+        } else {
+            List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+        }
+        return dto;
     }
 }

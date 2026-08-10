@@ -24,4 +24,24 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrderEntity, St
             @Param("customerId") String customerId,
             @Param("excludedStatuses") Collection<SalesOrderStatus> excludedStatuses
     );
+
+    @Query("""
+        select case when count(i) > 0 then true else false end
+        from InvoiceEntity inv
+        join inv.items i
+        where i.salesOrderDetail.id = :salesOrderDetailId
+    """)
+    boolean existsInvoiceDetailBySalesOrderDetailId(
+            @Param("salesOrderDetailId") Long salesOrderDetailId
+    );
+
+    @Query("""
+        select case when count(i) > 0 then true else false end
+        from PurchaseOrderEntity po
+        join po.items i
+        where i.salesOrderDetail.id = :salesOrderDetailId
+    """)
+    boolean existsPurchaseOrderDetailBySalesOrderDetailId(
+            @Param("salesOrderDetailId") Long salesOrderDetailId
+    );
 }
