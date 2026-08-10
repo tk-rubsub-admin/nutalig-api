@@ -3098,6 +3098,7 @@ public class RFQService {
         return Specification.where(idEqual(request.getId()))
                 .and(statusIn(statuses))
                 .and(isAcceptEqual(request.getIsAccept()))
+                .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(procurementIdEqual(request.getProcurementId()))

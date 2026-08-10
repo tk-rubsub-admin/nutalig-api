@@ -48,6 +48,14 @@ public class RequestPriceHeaderSpecification {
         return (root, query, cb) -> cb.equal(root.get("isAccept"), isAccept);
     }
 
+    public static Specification<RfqHeaderEntity> urgentRequestStatusEqual(UrgentRequestStatus urgentRequestStatus) {
+        if (urgentRequestStatus == null) {
+            return null;
+        }
+
+        return (root, query, cb) -> cb.equal(root.get("urgentRequestStatus"), urgentRequestStatus);
+    }
+
     public static Specification<RfqHeaderEntity> customerIdEqual(String customerId) {
         if (StringUtils.isBlank(customerId)) {
             return null;

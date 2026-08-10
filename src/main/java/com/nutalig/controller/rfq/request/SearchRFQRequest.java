@@ -1,6 +1,7 @@
 package com.nutalig.controller.rfq.request;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -27,5 +28,6 @@ public class SearchRFQRequest {
     private Boolean isAccept;
     private Boolean prioritizeApprovedUrgent;
     private Boolean isCreatedPurchaseOrder;
+    private UrgentRequestStatus urgentRequestStatus;
 
 }
