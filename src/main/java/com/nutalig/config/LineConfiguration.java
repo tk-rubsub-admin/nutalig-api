@@ -2,8 +2,12 @@ package com.nutalig.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import jakarta.annotation.PostConstruct;
+
+@Slf4j
 @Setter
 @Getter
 @ConfigurationProperties(prefix = "line")
@@ -73,6 +77,45 @@ public class LineConfiguration {
         return login.getLinkFailureUrl();
     }
 
+    @PostConstruct
+    public void logResolvedConfiguration() {
+        log.info(
+                "Loaded line config: messageApi={}, messageChannelId={}, channelId={}, loginAuthorizeUrl={}, tokenUrl={}, redirectUri={}, scope={}, successUrl={}, failureUrl={}",
+                safe(message.getApi()),
+                safe(message.getChannel() != null ? message.getChannel().getId() : null),
+                safe(channel.getId()),
+                safe(login.getAuthorizeUrl()),
+                safe(login.getTokenUrl()),
+                safe(login.getRedirectUri()),
+                safe(login.getScope()),
+                safe(login.getLoginSuccessUrl()),
+                safe(login.getLoginFailureUrl())
+        );
+        log.debug(
+                "Loaded line config secrets: messageAccessTokenLen={}, channelAccessTokenLen={}, channelSecretLen={}, messageChannelSecretLen={}",
+                length(message.getChannel() != null ? message.getChannel().getAccessToken() : null),
+                length(channel.getAccessToken()),
+                length(channel.getSecret()),
+                length(message.getChannel() != null ? message.getChannel().getSecret() : null)
+        );
+    }
+
+    private String safe(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+
+        if (value.length() <= 8) {
+            return value;
+        }
+
+        return value.substring(0, 4) + "..." + value.substring(value.length() - 4);
+    }
+
+    private int length(String value) {
+        return value == null ? 0 : value.length();
+    }
+
     @Getter
     @Setter
     public static class Message {
@@ -104,4 +147,6 @@ public class LineConfiguration {
         private String linkSuccessUrl;
         private String linkFailureUrl;
     }
+
+    
 }
