@@ -101,15 +101,16 @@ public class LineConfiguration {
     }
 
     private String safe(String value) {
-        if (value == null || value.isBlank()) {
-            return "-";
-        }
-
-        if (value.length() <= 8) {
-            return value;
-        }
-
-        return value.substring(0, 4) + "..." + value.substring(value.length() - 4);
+//        if (value == null || value.isBlank()) {
+//            return "-";
+//        }
+//
+//        if (value.length() <= 8) {
+//            return value;
+//        }
+//
+//        return value.substring(0, 4) + "..." + value.substring(value.length() - 4);
+        return value;
     }
 
     private int length(String value) {
