@@ -2881,3 +2881,64 @@ databaseChangeLog:
             referencedTableName: supplier
             referencedColumnNames: id
             constraintName: fk_rfq_tier_split_supplier
+
+  - changeSet:
+      id: 20260810-001-add-sales-order-payment-summary
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: payment_status
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column:
+                  name: payment_status
+                  type: VARCHAR(30)
+              - column:
+                  name: paid_total
+                  type: DECIMAL(18,2)
+                  defaultValueNumeric: 0
+              - column:
+                  name: outstanding_total
+                  type: DECIMAL(18,2)
+                  defaultValueNumeric: 0
+        - createIndex:
+            tableName: sales_order
+            indexName: idx_sales_order_payment_status
+            columns:
+              - column:
+                  name: payment_status
+
+  - changeSet:
+      id: 20260810-002-backfill-sales-order-payment-summary
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              UPDATE sales_order so
+              LEFT JOIN (
+                SELECT i.sales_order_no AS sales_order_no,
+                       COALESCE(SUM(CASE WHEN ip.status = 'APPROVE' THEN ip.amount ELSE 0 END), 0) AS paid_total
+                FROM invoice i
+                LEFT JOIN invoice_payment ip ON ip.invoice_no = i.invoice_no
+                GROUP BY i.sales_order_no
+              ) summary ON summary.sales_order_no = so.sales_order_no
+              SET so.paid_total = COALESCE(summary.paid_total, 0),
+                  so.outstanding_total = CASE
+                    WHEN COALESCE(so.grand_total, 0) - COALESCE(summary.paid_total, 0) < 0 THEN 0
+                    ELSE COALESCE(so.grand_total, 0) - COALESCE(summary.paid_total, 0)
+                  END,
+                  so.payment_status = CASE
+                    WHEN COALESCE(so.grand_total, 0) <= 0 THEN 'PAID'
+                    WHEN COALESCE(summary.paid_total, 0) <= 0 THEN 'UNPAID'
+                    WHEN COALESCE(summary.paid_total, 0) < COALESCE(so.grand_total, 0) THEN 'PARTIALLY_PAID'
+                    WHEN COALESCE(summary.paid_total, 0) = COALESCE(so.grand_total, 0) THEN 'PAID'
+                    ELSE 'OVERPAID'
+                  END;

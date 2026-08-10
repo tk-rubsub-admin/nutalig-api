@@ -75,6 +75,7 @@ public class InvoiceService {
     private final FileStorageService fileStorageService;
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
+    private final SalesOrderService salesOrderService;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final UserRepository userRepository;
     private final CustomerMapper customerMapper;
@@ -155,6 +156,7 @@ public class InvoiceService {
         }
 
         invoiceRepository.save(entity);
+        salesOrderService.recalculatePaymentSummary(salesOrder.getSalesOrderNo());
         recordCreateInvoiceActivity(entity, userId);
         return entity;
     }
@@ -200,6 +202,7 @@ public class InvoiceService {
 
         markSalesOrderReadyForProcurementIfDepositPaid(invoice, PUBLIC_TOKEN_ACTOR);
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         recordAwaitingValidationDecisionActivity(
                 saved,
                 payment,
@@ -245,6 +248,7 @@ public class InvoiceService {
         invoice.setUpdatedDate(now);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         recordAwaitingValidationDecisionActivity(
                 saved,
                 payment,

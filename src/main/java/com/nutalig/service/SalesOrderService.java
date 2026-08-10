@@ -123,6 +123,9 @@ public class SalesOrderService {
         entity.setRequestPo(Boolean.TRUE.equals(request.getRequestPo()));
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
         entity.setProcurementStatus(ProcurementStatus.NOT_READY);
+        entity.setPaymentStatus(SalesOrderPaymentStatus.UNPAID);
+        entity.setPaidTotal(BigDecimal.ZERO);
+        entity.setOutstandingTotal(BigDecimal.ZERO);
         entity.setRemark(request.getRemark());
         entity.setRevNo(1);
         entity.setCreatedDate(now);
@@ -144,6 +147,7 @@ public class SalesOrderService {
 
         salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(customer);
+        recalculatePaymentSummary(entity.getSalesOrderNo());
 
         if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
             linkRfq(request.getRfqId(), salesOrderNo, userId, now);
@@ -239,6 +243,7 @@ public class SalesOrderService {
 
         salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(entity.getCustomer());
+        recalculatePaymentSummary(entity.getSalesOrderNo());
         recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
 
         return mapToDto(entity);
@@ -724,6 +729,9 @@ public class SalesOrderService {
         detail.put("requestCoa", entity.getRequestCoa());
         detail.put("requestPo", entity.getRequestPo());
         detail.put("procurementStatus", entity.getProcurementStatus());
+        detail.put("paymentStatus", entity.getPaymentStatus());
+        detail.put("paidTotal", entity.getPaidTotal());
+        detail.put("outstandingTotal", entity.getOutstandingTotal());
         detail.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
         detail.put("attachmentCount", entity.getAttachments() != null ? entity.getAttachments().size() : 0);
         detail.put("subTotal", entity.getSubTotal());
@@ -786,6 +794,9 @@ public class SalesOrderService {
         detail.put("requestCoa", entity.getRequestCoa());
         detail.put("requestPo", entity.getRequestPo());
         detail.put("procurementStatus", entity.getProcurementStatus());
+        detail.put("paymentStatus", entity.getPaymentStatus());
+        detail.put("paidTotal", entity.getPaidTotal());
+        detail.put("outstandingTotal", entity.getOutstandingTotal());
         detail.put("vatRate", entity.getVatRate());
         detail.put("remark", entity.getRemark());
         detail.put("subTotal", entity.getSubTotal());
@@ -886,6 +897,43 @@ public class SalesOrderService {
         return value == null ? 0 : value;
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void recalculatePaymentSummary(String salesOrderNo) throws DataNotFoundException {
+        if (StringUtils.isBlank(salesOrderNo)) {
+            return;
+        }
+
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+
+        BigDecimal approvedPaymentTotal = defaultIfNull(
+                invoiceRepository.sumApprovedPaymentAmountBySalesOrderNo(salesOrderNo)
+        ).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal grandTotal = defaultIfNull(entity.getGrandTotal()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal outstandingTotal = grandTotal.subtract(approvedPaymentTotal);
+        if (outstandingTotal.compareTo(BigDecimal.ZERO) < 0) {
+            outstandingTotal = BigDecimal.ZERO;
+        }
+
+        SalesOrderPaymentStatus paymentStatus;
+        if (grandTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            paymentStatus = SalesOrderPaymentStatus.PAID;
+        } else if (approvedPaymentTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            paymentStatus = SalesOrderPaymentStatus.UNPAID;
+        } else if (approvedPaymentTotal.compareTo(grandTotal) < 0) {
+            paymentStatus = SalesOrderPaymentStatus.PARTIALLY_PAID;
+        } else if (approvedPaymentTotal.compareTo(grandTotal) == 0) {
+            paymentStatus = SalesOrderPaymentStatus.PAID;
+        } else {
+            paymentStatus = SalesOrderPaymentStatus.OVERPAID;
+        }
+
+        entity.setPaymentStatus(paymentStatus);
+        entity.setPaidTotal(approvedPaymentTotal);
+        entity.setOutstandingTotal(outstandingTotal);
+        salesOrderRepository.save(entity);
+    }
+
     private SalesOrderDto mapToDto(SalesOrderEntity entity) {
         SalesOrderDto dto = new SalesOrderDto();
         dto.setSalesOrderNo(entity.getSalesOrderNo());
@@ -905,6 +953,9 @@ public class SalesOrderService {
         dto.setVat(entity.getVat());
         dto.setGrandTotal(entity.getGrandTotal());
         dto.setAmount(entity.getAmount());
+        dto.setPaymentStatus(entity.getPaymentStatus());
+        dto.setPaidTotal(entity.getPaidTotal());
+        dto.setOutstandingTotal(entity.getOutstandingTotal());
         if (entity.getCommission() != null) {
             dto.setCommission(entity.getCommission());
         } else {

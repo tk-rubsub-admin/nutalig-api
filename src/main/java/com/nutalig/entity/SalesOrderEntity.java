@@ -2,6 +2,7 @@ package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.ProcurementStatus;
+import com.nutalig.constant.SalesOrderPaymentStatus;
 import com.nutalig.constant.SalesOrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -102,6 +103,16 @@ public class SalesOrderEntity extends AuditDateEntity {
 
     @Column(name = "amount", precision = 18, scale = 2)
     private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 30)
+    private SalesOrderPaymentStatus paymentStatus;
+
+    @Column(name = "paid_total", precision = 18, scale = 2)
+    private BigDecimal paidTotal;
+
+    @Column(name = "outstanding_total", precision = 18, scale = 2)
+    private BigDecimal outstandingTotal;
 
     @Column(name = "commission", precision = 18, scale = 2)
     private BigDecimal commission;

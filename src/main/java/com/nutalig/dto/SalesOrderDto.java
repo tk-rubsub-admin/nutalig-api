@@ -3,6 +3,7 @@ package com.nutalig.dto;
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.ProcurementStatus;
 import com.nutalig.constant.SalesOrderStatus;
+import com.nutalig.constant.SalesOrderPaymentStatus;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -28,6 +29,9 @@ public class SalesOrderDto {
     private BigDecimal vat;
     private BigDecimal grandTotal;
     private BigDecimal amount;
+    private SalesOrderPaymentStatus paymentStatus;
+    private BigDecimal paidTotal;
+    private BigDecimal outstandingTotal;
     private BigDecimal commission;
     private BigDecimal coSaleCommission;
     private Boolean requestCoa;
