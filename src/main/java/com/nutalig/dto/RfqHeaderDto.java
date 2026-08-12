@@ -51,6 +51,7 @@ public class RfqHeaderDto {
     private ZonedDateTime updatedDate;
     private EmployeeDto procurement;
     private ZonedDateTime slaDate;
+    private Long acceptWorkDurationMinutes;
     private ZonedDateTime quotedDate;
     private String quotationNo;
     private List<RfqQuotationDto> quotations;

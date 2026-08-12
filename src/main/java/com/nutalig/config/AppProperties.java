@@ -30,5 +30,6 @@ public class AppProperties {
         private int endOffsetDays = 1;
         private LocalTime startTime = LocalTime.of(17, 0);
         private LocalTime endTime = LocalTime.of(17, 0);
+        private LocalTime cutoffTime = LocalTime.of(17, 0);
     }
 }

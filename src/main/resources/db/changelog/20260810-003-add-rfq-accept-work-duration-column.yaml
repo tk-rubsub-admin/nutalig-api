@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260810-003-add-rfq-accept-work-duration-column
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: accept_work_duration_minutes
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: accept_work_duration_minutes
+                  type: BIGINT

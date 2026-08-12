@@ -662,8 +662,9 @@ public class QuotationService {
                 append(sb, "จังหวัด" + address.getProvince());
             }
         }
-
-        append(sb, address.getPostcode());
+        if (StringUtils.isNotEmpty(address.getPostcode())) {
+            append(sb, address.getPostcode());
+        }
 
         return sb.toString().trim();
     }

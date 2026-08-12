@@ -94,6 +94,8 @@ public class RFQService {
     private final LineMessageService lineMessageService;
     private final ApprovalService approvalService;
     private final PromptService promptService;
+    private final BusinessDurationService businessDurationService;
+    private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
     private final PromptTemplateEngine promptTemplateEngine;
@@ -378,6 +380,13 @@ public class RFQService {
         }
 
         RfqHeaderEntity entity = getEntityById(request.getRfqId().trim());
+        RfqStatus previousStatus = entity.getStatus();
+        String roleCode = userProfileService.getRoleCodeFromId(userId);
+        boolean isSuperAdmin = StringUtils.equals(roleCode, SUPER_ADMIN_ROLE_CODE);
+
+        if (RfqStatus.SUPPLIER_QUOTED.equals(previousStatus) && !isSuperAdmin) {
+            throw new InvalidRequestException("Only SUPER_ADMIN can request information for supplier quoted RFQ.");
+        }
         Map<String, Object> beforeDetail = buildActivityDetail(entity);
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
@@ -422,10 +431,12 @@ public class RFQService {
                 detail
         );
 
-        sendRequestInformationNotificationToSales(
+        boolean notifyProcurement = RfqStatus.SUPPLIER_QUOTED.equals(previousStatus) && isSuperAdmin;
+        sendRequestInformationNotification(
                 entity,
                 StringUtils.trimToEmpty(request.getRequestInformation()),
-                updatedBy
+                updatedBy,
+                notifyProcurement
         );
 
         return mapToDto(entity);
@@ -582,7 +593,7 @@ public class RFQService {
                 entity.setContactName(entity.getCustomer().getCustomerName());
                 entity.setContactPhone(entity.getCustomer().getContacts().getFirst().getContactNumber());
             } else {
-                entity.setContactName("ลูกค้า");
+                entity.setContactName(entity.getCustomer().getCustomerName());
                 entity.setContactPhone("");
             }
         } else {
@@ -1320,6 +1331,15 @@ public class RFQService {
 
         SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
         entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
+        entity.setAcceptWorkDurationMinutes(
+                businessDurationService.calculateBusinessDurationMinutesWithCutoff(
+                        entity.getRequestedDate(),
+                        now,
+                        appProperties.getRfqPendingAcceptance() != null
+                                ? appProperties.getRfqPendingAcceptance().getCutoffTime()
+                                : null
+                )
+        );
         entity.setStatus(RfqStatus.IN_PROGRESS);
         String currentProcurementId = entity.getProcurement() != null ? entity.getProcurement().getEmployeeId() : null;
         if (!StringUtils.equals(currentProcurementId, userId)) {
@@ -3297,23 +3317,26 @@ public class RFQService {
         }
     }
 
-    private void sendRequestInformationNotificationToSales(
+    private void sendRequestInformationNotification(
             RfqHeaderEntity entity,
             String requestInformationText,
-            String requestedBy
+            String requestedBy,
+            boolean notifyProcurement
     ) {
         try {
-            EmployeeEntity salesOwner = entity.getSales();
+            EmployeeEntity owner = notifyProcurement ? entity.getProcurement() : entity.getSales();
+            String ownerType = notifyProcurement ? "procurement" : "sales";
+            String ownerLabel = notifyProcurement ? "จัดซื้อ" : "ฝ่ายขาย";
 
-            if (salesOwner == null || StringUtils.isBlank(salesOwner.getEmployeeId())) {
-                log.warn("No sales owner found for rfq {}", entity.getId());
+            if (owner == null || StringUtils.isBlank(owner.getEmployeeId())) {
+                log.warn("No {} owner found for rfq {}", ownerType, entity.getId());
                 return;
             }
 
             Optional<UserEntity> userEntityOptional =
-                    userRepository.findByEmployeeEntity_EmployeeId(salesOwner.getEmployeeId());
+                    userRepository.findByEmployeeEntity_EmployeeId(owner.getEmployeeId());
             if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
-                log.warn("No LINE-bound sales owner found for rfq {}", entity.getId());
+                log.warn("No LINE-bound {} owner found for rfq {}", ownerType, entity.getId());
                 return;
             }
 
@@ -3323,22 +3346,24 @@ public class RFQService {
             placeholders.put(
                     "detail",
                     String.format(
-                            "RFQ %s ถูกขอข้อมูลเพิ่มเติมโดย %s%s",
+                            "RFQ %s ถูกขอข้อมูลเพิ่มเติมโดย %s%s เพื่อแจ้งให้ %s ตรวจสอบ",
                             StringUtils.defaultString(entity.getId(), "-"),
                             StringUtils.defaultIfBlank(requestedBy, "-"),
                             StringUtils.isNotBlank(requestInformationText)
                                     ? " : " + StringUtils.abbreviate(requestInformationText, 180)
-                                    : ""
+                                    : "",
+                            ownerLabel
                     )
             );
-            placeholders.put("detailUrl", buildSalesRfqDetailUrl(entity.getId()));
+            placeholders.put("detailUrl", notifyProcurement ? buildRfqDetailUrl(entity.getId()) : buildSalesRfqDetailUrl(entity.getId()));
 
             JsonNode message = renderNotificationTemplate(placeholders);
             try {
                 lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
             } catch (Exception exception) {
                 log.warn(
-                        "Cannot send request information notification to sales owner {} for rfq {}",
+                        "Cannot send request information notification to {} owner {} for rfq {}",
+                        ownerType,
                         userEntityOptional.get().getId(),
                         entity.getId(),
                         exception

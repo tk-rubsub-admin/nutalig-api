@@ -213,6 +213,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "sla_date")
     private ZonedDateTime slaDate;
 
+    @Column(name = "accept_work_duration_minutes")
+    private Long acceptWorkDurationMinutes;
+
     @ToString.Include
     @Column(name = "quoted_date")
     private ZonedDateTime quotedDate;

@@ -7,6 +7,6 @@ import java.util.List;
 @Data
 public class DashboardSeriesDto {
     private String name;
-    private List<Long> data;
+    private List<Double> data;
     private String color;
 }

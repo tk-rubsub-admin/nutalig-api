@@ -1,12 +1,12 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.config.AppProperties;
 import com.nutalig.dto.*;
-import com.nutalig.entity.EmployeeEntity;
-import com.nutalig.entity.RfqHeaderEntity;
-import com.nutalig.entity.QuotationEntity;
+import com.nutalig.entity.*;
 import com.nutalig.repository.QuotationRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.RfqStatusTimelineRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -60,6 +62,9 @@ public class DashboardService {
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final QuotationRepository quotationRepository;
+    private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
+    private final BusinessDurationService businessDurationService;
+    private final AppProperties appProperties;
 
     @Transactional(readOnly = true)
     public DashboardDataDto getDashboard(
@@ -125,6 +130,10 @@ public class DashboardService {
         dashboard.setSource("api");
         dashboard.setMetrics(buildMetrics(rfqs, startDate, endDate, selectedFilters));
         dashboard.setTrendCharts(buildTrendCharts(rfqs, startDate, endDate, roleCode));
+        dashboard.setAcceptWorkDurationChart(buildAcceptWorkDurationChart(rfqs, roleCode));
+        dashboard.setSupplierQuoteDurationChart(buildSupplierQuoteDurationChart(rfqs, roleCode));
+        dashboard.setSalesCountChart(buildSalesCountChart(rfqs, roleCode));
+        dashboard.setCustomerTypeCountChart(buildCustomerTypeCountChart(rfqs, roleCode));
         dashboard.setDistributionCharts(buildDistributionCharts(rfqs, roleCode));
         dashboard.setWorkQueues(buildWorkQueues(rfqs, startDate, endDate, selectedFilters, rfqIdsWithQuotation));
         dashboard.setQuickLinks(buildQuickLinks(roleCode, startDate, endDate, selectedFilters));
@@ -137,7 +146,6 @@ public class DashboardService {
             LocalDate endDate,
             Map<String, String> selectedFilters
     ) {
-        LocalDate today = LocalDate.now(DateUtil.getTimeZone());
 
         return List.of(
                 metric(
@@ -176,9 +184,9 @@ public class DashboardService {
                         countByStatus(rfqs, RfqStatus.SUPPLIER_QUOTED),
                         "dashboard.rfq.metrics.supplierQuoted.subtitle",
                         null,
-                        "success",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.SUPPLIER_QUOTED.name())),
-                        PROCUREMENT_VISIBLE_TO
+                        "neutral",
+                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.SUPPLIER_QUOTED.name())),
+                        SALES_VISIBLE_TO
                 ),
                 metric(
                         "rfq-quoted",
@@ -201,13 +209,33 @@ public class DashboardService {
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
-                        "rfq-overdue-sla",
-                        "dashboard.rfq.metrics.overdueSla.title",
-                        countOverdueSla(rfqs, today),
-                        "dashboard.rfq.metrics.overdueSla.subtitle",
+                        "rfq-completed",
+                        "dashboard.rfq.metrics.completed.title",
+                        countByStatus(rfqs, RfqStatus.COMPLETED),
+                        "dashboard.rfq.metrics.completed.subtitle",
                         null,
-                        "danger",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of()),
+                        "success",
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.COMPLETED.name())),
+                        PROCUREMENT_VISIBLE_TO
+                ),
+                metric(
+                        "rfq-rejected",
+                        "dashboard.rfq.metrics.rejected.title",
+                        countByStatus(rfqs, RfqStatus.REJECTED),
+                        "dashboard.rfq.metrics.rejected.subtitle",
+                        null,
+                        "error",
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.REJECTED.name())),
+                        PROCUREMENT_VISIBLE_TO
+                ),
+                metric(
+                        "rfq-other",
+                        "dashboard.rfq.metrics.other.title",
+                        countByStatus(rfqs, RfqStatus.CANCELED) + countByStatus(rfqs, RfqStatus.REQUESTED_INFO) + countByStatus(rfqs, RfqStatus.CLOSED),
+                        "dashboard.rfq.metrics.other.subtitle",
+                        null,
+                        "warning",
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.REJECTED.name())),
                         PROCUREMENT_VISIBLE_TO
                 )
         );
@@ -232,11 +260,11 @@ public class DashboardService {
         volumeChart.setId("rfq-volume");
         volumeChart.setTitle("dashboard.rfq.charts.volume.title");
         volumeChart.setSubtitle("dashboard.rfq.charts.volume.subtitle");
+        volumeChart.setUnit("COUNT");
         volumeChart.setLabels(dates.stream().map(date -> date.format(REQUEST_DATE_FORMAT)).toList());
         volumeChart.setSeries(List.of(
-                series("RFQ ทั้งหมด", "#2f80ed", dates, rfqByDate, items -> (long) items.size()),
-                series("งานเร่งด่วน", "#f2994a", dates, rfqByDate, items -> items.stream().filter(item -> Boolean.TRUE.equals(item.getUrgentRequest())).count()),
-                series("ทบทวนราคาพิเศษ", "#eb5757", dates, rfqByDate, items -> items.stream().filter(item -> item.getStatus() == RfqStatus.SPECIAL_PRICE_REVIEW).count())
+                series("งานปกติ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> Boolean.FALSE.equals(item.getUrgentRequest()) || item.getUrgentRequest() == null).count()),
+                series("งานเร่งด่วน", "#f2994a", dates, rfqByDate, items -> (double) items.stream().filter(item -> Boolean.TRUE.equals(item.getUrgentRequest())).count())
         ));
         volumeChart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
 
@@ -248,28 +276,127 @@ public class DashboardService {
         stageChart.setSubtitle(StringUtils.equals(roleCode, "PROCUREMENT")
                 ? "dashboard.rfq.charts.procurementFlow.subtitle"
                 : "dashboard.rfq.charts.salesFlow.subtitle");
+        stageChart.setUnit("COUNT");
         stageChart.setLabels(dates.stream().map(date -> date.format(REQUEST_DATE_FORMAT)).toList());
         stageChart.setSeries(List.of(
-                series("ใหม่", "#56ccf2", dates, rfqByDate, items -> items.stream().filter(item -> item.getStatus() == RfqStatus.NEW).count()),
-                series("กำลังดำเนินการ", "#2f80ed", dates, rfqByDate, items -> items.stream().filter(item -> item.getStatus() == RfqStatus.IN_PROGRESS).count()),
-                series("ซัพตอบแล้ว", "#27ae60", dates, rfqByDate, items -> items.stream().filter(item -> item.getStatus() == RfqStatus.SUPPLIER_QUOTED).count()),
-                series("เสนอราคาแล้ว", "#6fcf97", dates, rfqByDate, items -> items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count())
+                series("ใหม่", "#56ccf2", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.NEW).count()),
+                series("กำลังดำเนินการ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.IN_PROGRESS).count()),
+                series("ซัพตอบแล้ว", "#27ae60", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.SUPPLIER_QUOTED).count()),
+                series("เสนอราคาแล้ว", "#6fcf97", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count())
         ));
         stageChart.setVisibleTo(StringUtils.equals(roleCode, "PROCUREMENT") ? PROCUREMENT_VISIBLE_TO : SALES_VISIBLE_TO);
 
         return List.of(volumeChart, stageChart);
     }
 
+    private DashboardTrendChartDto buildAcceptWorkDurationChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+        List<RfqHeaderEntity> eligibleRfqs = rfqs.stream()
+                .filter(rfq -> rfq.getRequestedDate() != null)
+                .toList();
+        if (eligibleRfqs.isEmpty()) {
+            return null;
+        }
+
+        Set<String> rfqIdsNeedingFallback = eligibleRfqs.stream()
+                .filter(rfq -> rfq.getAcceptWorkDurationMinutes() == null)
+                .map(RfqHeaderEntity::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, ZonedDateTime> inProgressTimelineByRfqId = buildTimelineMap(rfqIdsNeedingFallback, RfqStatus.IN_PROGRESS);
+
+        long[] bucketCounts = new long[8];
+        for (RfqHeaderEntity rfq : eligibleRfqs) {
+            Long durationMinutes = resolveAcceptWorkDurationMinutes(rfq, inProgressTimelineByRfqId);
+            if (durationMinutes == null) {
+                bucketCounts[7]++;
+                continue;
+            }
+
+            bucketCounts[getAcceptWorkDurationBucketIndex(durationMinutes)]++;
+        }
+
+        DashboardTrendChartDto chart = new DashboardTrendChartDto();
+        chart.setId("rfq-accept-work-duration");
+        chart.setTitle("dashboard.rfq.charts.acceptWorkDuration.title");
+        chart.setSubtitle("dashboard.rfq.charts.acceptWorkDuration.subtitle");
+        chart.setUnit("COUNT");
+        chart.setLabels(List.of(
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lt1h",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lte3h",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lte6h",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lte1d",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lte2d",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.lte3d",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.gt3d",
+                "dashboard.rfq.charts.acceptWorkDuration.buckets.notAccepted"
+        ));
+        DashboardSeriesDto series = new DashboardSeriesDto();
+        series.setName("จำนวน RFQ");
+        series.setColor("#f2994a");
+        series.setData(Arrays.stream(bucketCounts)
+                .boxed()
+                .map(Long::doubleValue)
+                .toList());
+        chart.setSeries(List.of(series));
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
+    }
+
+    private DashboardTrendChartDto buildSupplierQuoteDurationChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+        List<RfqHeaderEntity> eligibleRfqs = rfqs.stream()
+                .filter(rfq -> rfq.getRequestedDate() != null)
+                .toList();
+        if (eligibleRfqs.isEmpty()) {
+            return null;
+        }
+
+        Set<String> rfqIds = eligibleRfqs.stream()
+                .map(RfqHeaderEntity::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, ZonedDateTime> inProgressTimelineByRfqId = buildTimelineMap(rfqIds, RfqStatus.IN_PROGRESS);
+        Map<String, ZonedDateTime> supplierQuotedTimelineByRfqId = buildTimelineMap(rfqIds, RfqStatus.SUPPLIER_QUOTED);
+
+        long[] bucketCounts = new long[8];
+        long counted = 0;
+        for (RfqHeaderEntity rfq : eligibleRfqs) {
+            Long durationMinutes = resolveSupplierQuoteDurationMinutes(rfq, inProgressTimelineByRfqId, supplierQuotedTimelineByRfqId);
+            if (durationMinutes == null) {
+                continue;
+            }
+
+            bucketCounts[getAcceptWorkDurationBucketIndex(durationMinutes)]++;
+            counted++;
+        }
+        bucketCounts[7] = Math.max(eligibleRfqs.size() - counted, 0);
+
+        DashboardTrendChartDto chart = new DashboardTrendChartDto();
+        chart.setId("rfq-supplier-quote-duration");
+        chart.setTitle("dashboard.rfq.charts.supplierQuoteDuration.title");
+        chart.setSubtitle("dashboard.rfq.charts.supplierQuoteDuration.subtitle");
+        chart.setUnit("COUNT");
+        chart.setLabels(List.of(
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lt1h",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lte3h",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lte6h",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lte1d",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lte2d",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.lte3d",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.gt3d",
+                "dashboard.rfq.charts.supplierQuoteDuration.buckets.remaining"
+        ));
+        DashboardSeriesDto series = new DashboardSeriesDto();
+        series.setName("จำนวน RFQ");
+        series.setColor("#f2994a");
+        series.setData(Arrays.stream(bucketCounts)
+                .boxed()
+                .map(Long::doubleValue)
+                .toList());
+        chart.setSeries(List.of(series));
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
+    }
+
     private List<DashboardDistributionChartDto> buildDistributionCharts(List<RfqHeaderEntity> rfqs, String roleCode) {
         List<DashboardDistributionChartDto> charts = new ArrayList<>();
-
-        charts.add(distributionChart(
-                "rfq-by-status",
-                "dashboard.rfq.charts.status.title",
-                "dashboard.rfq.charts.status.subtitle",
-                buildBreakdown(rfqs, rfq -> displayRfqStatus(rfq.getStatus()), this::statusColor, 8),
-                ALL_RFQ_VISIBLE_TO
-        ));
 
         charts.add(distributionChart(
                 "rfq-by-family",
@@ -315,6 +442,29 @@ public class DashboardService {
         ));
 
         return charts;
+    }
+
+    private DashboardDistributionChartDto buildSalesCountChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+        if (rfqs == null || rfqs.isEmpty()) {
+            return null;
+        }
+
+        List<DashboardDistributionItemDto> items = buildBreakdown(
+                rfqs,
+                rfq -> getEmployeeLabel(rfq.getSales()),
+                12
+        );
+        if (items.isEmpty()) {
+            return null;
+        }
+
+        DashboardDistributionChartDto chart = new DashboardDistributionChartDto();
+        chart.setId("rfq-by-sales-count");
+        chart.setTitle("dashboard.rfq.charts.bySalesCount.title");
+        chart.setSubtitle("dashboard.rfq.charts.bySalesCount.subtitle");
+        chart.setItems(items);
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
     }
 
     private List<DashboardWorkQueueDto> buildWorkQueues(
@@ -446,15 +596,91 @@ public class DashboardService {
             String color,
             List<LocalDate> dates,
             Map<LocalDate, List<RfqHeaderEntity>> rfqByDate,
-            Function<List<RfqHeaderEntity>, Long> countFunction
+            Function<List<RfqHeaderEntity>, Double> valueFunction
     ) {
         DashboardSeriesDto series = new DashboardSeriesDto();
         series.setName(name);
         series.setColor(color);
         series.setData(dates.stream()
-                .map(date -> countFunction.apply(rfqByDate.getOrDefault(date, List.of())))
+                .map(date -> valueFunction.apply(rfqByDate.getOrDefault(date, List.of())))
                 .toList());
         return series;
+    }
+
+    private int getAcceptWorkDurationBucketIndex(long minutes) {
+        if (minutes < 60) {
+            return 0;
+        }
+        if (minutes < 180) {
+            return 1;
+        }
+        if (minutes < 360) {
+            return 2;
+        }
+        if (minutes < 1_440) {
+            return 3;
+        }
+        if (minutes < 2_880) {
+            return 4;
+        }
+        if (minutes < 4_320) {
+            return 5;
+        }
+        return 6;
+    }
+
+    private Long resolveAcceptWorkDurationMinutes(
+            RfqHeaderEntity rfq,
+            Map<String, ZonedDateTime> inProgressTimelineByRfqId
+    ) {
+        if (rfq.getAcceptWorkDurationMinutes() != null) {
+            return rfq.getAcceptWorkDurationMinutes();
+        }
+
+        ZonedDateTime inProgressAt = inProgressTimelineByRfqId.get(rfq.getId());
+        if (rfq.getRequestedDate() == null || inProgressAt == null) {
+            return null;
+        }
+
+        return businessDurationService.calculateBusinessDurationMinutesWithCutoff(
+                rfq.getRequestedDate(),
+                inProgressAt,
+                appProperties.getRfqPendingAcceptance() != null
+                        ? appProperties.getRfqPendingAcceptance().getCutoffTime()
+                        : null
+        );
+    }
+
+    private Long resolveSupplierQuoteDurationMinutes(
+            RfqHeaderEntity rfq,
+            Map<String, ZonedDateTime> inProgressTimelineByRfqId,
+            Map<String, ZonedDateTime> supplierQuotedTimelineByRfqId
+    ) {
+        if (rfq == null || inProgressTimelineByRfqId == null || supplierQuotedTimelineByRfqId == null) {
+            return null;
+        }
+
+        ZonedDateTime inProgressAt = inProgressTimelineByRfqId.get(rfq.getId());
+        ZonedDateTime supplierQuotedAt = supplierQuotedTimelineByRfqId.get(rfq.getId());
+        if (inProgressAt == null || supplierQuotedAt == null) {
+            return null;
+        }
+
+        return businessDurationService.calculateBusinessDurationMinutes(inProgressAt, supplierQuotedAt);
+    }
+
+    private Map<String, ZonedDateTime> buildTimelineMap(Collection<String> rfqIds, RfqStatus status) {
+        if (rfqIds == null || rfqIds.isEmpty() || status == null) {
+            return Map.of();
+        }
+
+        return rfqStatusTimelineRepository.findAllByIdRfqIdInAndIdStatusOrderByStatusDatetimeAsc(rfqIds, status).stream()
+                .collect(Collectors.toMap(
+                        timeline -> timeline.getId().getRfqId(),
+                        RfqStatusTimelineEntity::getStatusDatetime,
+                        (left, right) -> left.isBefore(right) ? left : right,
+                        LinkedHashMap::new
+                ));
     }
 
     private DashboardDistributionChartDto distributionChart(
@@ -628,6 +854,44 @@ public class DashboardService {
         }
         return StringUtils.defaultIfBlank(employee.getNickName(),
                 StringUtils.trimToEmpty(employee.getFirstNameTh()) + " " + StringUtils.trimToEmpty(employee.getLastNameTh())).trim();
+    }
+
+    private DashboardDistributionChartDto buildCustomerTypeCountChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+        if (rfqs == null || rfqs.isEmpty()) {
+            return null;
+        }
+
+        List<DashboardDistributionItemDto> items = buildBreakdown(
+                rfqs,
+                this::getCustomerTypeLabel,
+                12
+        );
+        if (items.isEmpty()) {
+            return null;
+        }
+
+        DashboardDistributionChartDto chart = new DashboardDistributionChartDto();
+        chart.setId("rfq-by-customer-type-count");
+        chart.setTitle("dashboard.rfq.charts.byCustomerTypeCount.title");
+        chart.setSubtitle("dashboard.rfq.charts.byCustomerTypeCount.subtitle");
+        chart.setItems(items);
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
+    }
+
+    private String getCustomerTypeLabel(RfqHeaderEntity rfq) {
+        if (rfq == null || rfq.getCustomer() == null || StringUtils.isBlank(rfq.getCustomer().getId())) {
+            return "ยังไม่เป็นลูกค้า";
+        }
+
+        CustomerEntity customer = rfq.getCustomer();
+        if (customer.getCustomerTier() == null) {
+            return "ไม่ระบุระดับลูกค้า";
+        }
+
+        return StringUtils.defaultIfBlank(customer.getCustomerTier().getNameEn(),
+                customer.getCustomerTier().getId().getCode()
+        );
     }
 
     private String displayRfqStatus(RfqStatus status) {

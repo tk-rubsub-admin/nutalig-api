@@ -2942,3 +2942,6 @@ databaseChangeLog:
                     WHEN COALESCE(summary.paid_total, 0) = COALESCE(so.grand_total, 0) THEN 'PAID'
                     ELSE 'OVERPAID'
                   END;
+
+  - include:
+      file: db/changelog/20260810-003-add-rfq-accept-work-duration-column.yaml
