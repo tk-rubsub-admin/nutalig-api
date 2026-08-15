@@ -1,0 +1,118 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260814-001-add-rfq-detail-archive-history-columns
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: is_archived
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: is_archived
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: VARCHAR(255)
+              - column:
+                  name: archived_at
+                  type: DATETIME(6)
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: is_archived
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: VARCHAR(255)
+              - column:
+                  name: archived_at
+                  type: DATETIME(6)
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: is_archived
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: VARCHAR(255)
+              - column:
+                  name: archived_at
+                  type: DATETIME(6)
+        - createIndex:
+            tableName: rfq_detail
+            indexName: idx_rfq_detail_header_archived
+            columns:
+              - column:
+                  name: rfq_header_id
+              - column:
+                  name: is_archived
+        - createIndex:
+            tableName: rfq_tier
+            indexName: idx_rfq_tier_detail_archived
+            columns:
+              - column:
+                  name: rfq_detail_id
+              - column:
+                  name: is_archived
+        - createIndex:
+            tableName: rfq_tier_split
+            indexName: idx_rfq_tier_split_detail_archived
+            columns:
+              - column:
+                  name: rfq_detail_id
+              - column:
+                  name: is_archived
+
+  - changeSet:
+      id: 20260814-002-create-rfq-detail-history-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: rfq_detail_history
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE rfq_detail_history (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  rfq_id VARCHAR(255) NOT NULL,
+                  detail_set_no INT NOT NULL,
+                  source_detail_id BIGINT DEFAULT NULL,
+                  option_name VARCHAR(255) DEFAULT NULL,
+                  spec TEXT NOT NULL,
+                  sort_order INT DEFAULT NULL,
+                  remark TEXT DEFAULT NULL,
+                  recommend TEXT DEFAULT NULL,
+                  commission DECIMAL(18,4) DEFAULT NULL,
+                  package_dimension TEXT DEFAULT NULL,
+                  package_weight TEXT DEFAULT NULL,
+                  package_capacity TEXT DEFAULT NULL,
+                  supplier_id VARCHAR(255) DEFAULT NULL,
+                  snapshot_json LONGTEXT NOT NULL,
+                  archived_by VARCHAR(255) DEFAULT NULL,
+                  archived_at DATETIME(6) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_rfq_detail_history_rfq (rfq_id),
+                  KEY idx_rfq_detail_history_source_detail (source_detail_id),
+                  KEY idx_rfq_detail_history_set_no (detail_set_no)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

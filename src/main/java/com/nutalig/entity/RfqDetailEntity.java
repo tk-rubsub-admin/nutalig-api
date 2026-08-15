@@ -5,6 +5,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.Where;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -62,6 +63,15 @@ public class RfqDetailEntity extends AuditDateEntity {
     @ToString.Exclude
     private SupplierEntity supplier;
 
+    @Column(name = "is_archived", nullable = false)
+    private Boolean isArchived = Boolean.FALSE;
+
+    @Column(name = "archived_by")
+    private String archivedBy;
+
+    @Column(name = "archived_at")
+    private java.time.ZonedDateTime archivedAt;
+
     @Column(name = "created_by")
     @ToString.Include
     private String createdBy;
@@ -71,9 +81,11 @@ public class RfqDetailEntity extends AuditDateEntity {
     private String updatedBy;
 
     @OneToMany(mappedBy = "requestPriceDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Where(clause = "is_archived = false")
     private List<RfqTierEntity> tiers = new ArrayList<>();
 
     @OneToMany(mappedBy = "requestPriceDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Where(clause = "is_archived = false")
     private List<RfqTierSplitEntity> tierSplits = new ArrayList<>();
 
     public void addTier(RfqTierEntity tier) {

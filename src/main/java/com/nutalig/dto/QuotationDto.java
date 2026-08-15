@@ -31,4 +31,5 @@ public class QuotationDto {
     private List<QuotationItemRequestDto> items;
     private Integer revNo;
     private Boolean isShowSummary;
+    private String shipping;
 }

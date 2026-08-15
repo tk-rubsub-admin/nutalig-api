@@ -39,9 +39,13 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -67,10 +71,12 @@ public class RFQService {
     private final static String PICTURE_FILE_TYPE = "PICTURE";
     private final static String OTHER_FILE_TYPE = "OTHER";
     private final static String RFQ_CUSTOMER_QUOTED_TH = "RFQ_CUSTOMER_QUOTED_TH";
+    private static final String SALES_ADMIN_POSITION_CODE = "SALES_ADMIN";
     private static final int MONEY_SCALE = 4;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPricePicturesRepository requestPricePicturesRepository;
     private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
+    private final RfqDetailHistoryRepository rfqDetailHistoryRepository;
     private final EmployeeProcurementMappingRepository employeeProcurementMappingRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
@@ -101,6 +107,9 @@ public class RFQService {
     private final PromptTemplateEngine promptTemplateEngine;
     private final TemplateProperties templateProperties;
     private final LineConfiguration lineConfiguration;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
@@ -329,6 +338,14 @@ public class RFQService {
         RfqHeaderEntity entity = getEntityById(id);
 
         return mapToDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RfqDetailHistoryDto> getRfqDetailHistory(String rfqId) throws DataNotFoundException {
+        getEntityById(rfqId);
+        return rfqDetailHistoryRepository.findByRfqIdOrderByDetailSetNoDescIdDesc(rfqId).stream()
+                .map(this::mapToRfqDetailHistoryDto)
+                .toList();
     }
 
     @Transactional
@@ -601,21 +618,12 @@ public class RFQService {
             entity.setContactPhone(request.getContactPhone());
         }
 
-        entity = requestPriceHeaderRepository.save(entity);
-        int copiedSupplierQuoteCount = copyReferenceSupplierQuotesIfNeeded(entity, request, userId, actor);
+        entity.setContactChannel(normalizeRequestValue(request.getContactChannel()));
 
-        java.util.Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("status", entity.getStatus());
-        detail.put("urgentRequest", entity.getUrgentRequest());
-        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
-        detail.put("urgentRequestReason", entity.getUrgentRequestReason());
-        detail.put("requestSample", entity.getRequestSample());
-        detail.put("customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null);
-        detail.put("salesId", entity.getSales() != null ? entity.getSales().getEmployeeId() : null);
-        detail.put("referenceRfqId", entity.getReferenceRfqId());
-        detail.put("shippingMethod", entity.getShippingMethod());
-        detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
-        detail.put("copiedSupplierQuoteCount", copiedSupplierQuoteCount);
+        entity = requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("request", objectMapper.writeValueAsString(request));
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -657,6 +665,90 @@ public class RFQService {
         saveRfqStatusTimeline(entity, entity.getStatus(), entity.getRequestedDate());
 
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void requestQuotationForAdmin(String rfqId, String userId) throws DataNotFoundException, InvalidRequestException {
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        if (entity.getCustomer() == null) {
+            throw new InvalidRequestException("RFQ customer is required.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
+                .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                .filter(user -> user.getEmployeeEntity() != null
+                        && user.getEmployeeEntity().getPosition() != null
+                        && user.getEmployeeEntity().getPosition().getId() != null
+                        && SALES_ADMIN_POSITION_CODE.equals(user.getEmployeeEntity().getPosition().getId().getCode()))
+                .toList();
+
+        if (adminUsers.isEmpty()) {
+            throw new InvalidRequestException("No active ADMIN users with LINE binding found for rfq {}", entity.getId());
+        }
+
+        List<UserTodoEntity> existingTodos = userTodoService.findActiveTodosByTarget(
+                "QUOTATION",
+                rfqId,
+                List.of(UserTodoStatus.TODO, UserTodoStatus.IN_PROGRESS)
+        );
+
+        String targetPath = "/create-quotation-rfq/" + rfqId;
+        String title = "ออกใบเสนอราคาเลขที่ " + rfqId;
+
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+
+        int createdCount = 0;
+        for (UserEntity adminUser : adminUsers) {
+            boolean alreadyExists = existingTodos.stream().anyMatch(todo ->
+                    todo.getOwnerUser() != null && Objects.equals(todo.getOwnerUser().getId(), adminUser.getId())
+            );
+
+            if (alreadyExists) {
+                continue;
+            }
+
+            userTodoService.buildUserTodoEntity(
+                    adminUser,
+                    UserTodoType.QUOTATION,
+                    title,
+                    "RFQ " + rfqId + " รอออกใบเสนอราคา",
+                    UserTodoStatus.TODO,
+                    UserTodoPriority.LOW,
+                    "QUOTATION",
+                    rfqId,
+                    targetPath,
+                    now.plusDays(1),
+                    1,
+                    userId
+            );
+            createdCount++;
+        }
+
+        log.info(
+                "Request quotation for admin rfq {} by {} created todos {}",
+                rfqId,
+                userId,
+                createdCount
+        );
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.REQUEST_APPROVAL,
+                ActivitySource.API,
+                "แจ้งให้แอดมินออกใบเสนอราคาสำหรับ RFQ " + entity.getId(),
+                Map.of(
+                        "rfqId", entity.getId(),
+                        "customerId", entity.getCustomer() != null ? entity.getCustomer().getId() : null,
+                        "customerName", entity.getCustomer() != null ? entity.getCustomer().getCustomerName() : null
+                )
+        );
+
+        sendRequestQuotationNotifications(rfq);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -778,6 +870,7 @@ public class RFQService {
 
         String updatedBy = userProfileService.getNameFromId(userId);
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        archiveCurrentDetailsIfAny(entity, updatedBy, now);
         List<Map<String, Object>> addedDetails = new ArrayList<>();
         for (CreateRequestPriceDetailRequest request : requests) {
             RfqDetailEntity detailEntity = buildRequestPriceDetailEntity(request, updatedBy);
@@ -798,7 +891,8 @@ public class RFQService {
 
         entity.setUpdatedBy(updatedBy);
         entity.setUpdatedDate(now);
-        requestPriceHeaderRepository.save(entity);
+        requestPriceHeaderRepository.saveAndFlush(entity);
+        entityManager.refresh(entity);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("count", addedDetails.size());
@@ -1214,11 +1308,17 @@ public class RFQService {
         RfqHeaderEntity entity = getEntityById(rfqId);
         RfqDetailEntity detailEntity = getDetailFromHeader(entity, detailId);
         String optionName = detailEntity.getOptionName();
+        String archivedBy = userProfileService.getNameFromId(userId);
+        ZonedDateTime archivedAt = ZonedDateTime.now(DateUtil.getTimeZone());
+        int detailSetNo = rfqDetailHistoryRepository.findMaxDetailSetNoByRfqId(entity.getId()) + 1;
 
-        entity.removeDetail(detailEntity);
-        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-        requestPriceHeaderRepository.save(entity);
+        archiveDetailToHistory(entity.getId(), detailEntity, detailSetNo, archivedBy, archivedAt);
+        archiveDetail(detailEntity, archivedBy, archivedAt);
+
+        entity.setUpdatedBy(archivedBy);
+        entity.setUpdatedDate(archivedAt);
+        requestPriceHeaderRepository.saveAndFlush(entity);
+        entityManager.refresh(entity);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("detailId", detailId);
@@ -2232,6 +2332,38 @@ public class RFQService {
 //        return dto;
     }
 
+    private RfqDetailHistoryDto mapToRfqDetailHistoryDto(RfqDetailHistoryEntity entity) {
+        RfqDetailHistoryDto dto = new RfqDetailHistoryDto();
+        dto.setId(entity.getId());
+        dto.setRfqId(entity.getRfqId());
+        dto.setDetailSetNo(entity.getDetailSetNo());
+        dto.setSourceDetailId(entity.getSourceDetailId());
+        dto.setOptionName(entity.getOptionName());
+        dto.setSpec(entity.getSpec());
+        dto.setSortOrder(entity.getSortOrder());
+        dto.setRemark(entity.getRemark());
+        dto.setRecommend(entity.getRecommend());
+        dto.setSnapshot(parseRfqDetailHistorySnapshot(entity));
+        dto.setArchivedBy(entity.getArchivedBy());
+        dto.setArchivedAt(entity.getArchivedAt());
+        dto.setCreatedDate(entity.getCreatedDate());
+        dto.setUpdatedDate(entity.getUpdatedDate());
+        return dto;
+    }
+
+    private RfqDetailHistorySnapshotDto parseRfqDetailHistorySnapshot(RfqDetailHistoryEntity entity) {
+        if (entity == null || StringUtils.isBlank(entity.getSnapshotJson())) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(entity.getSnapshotJson(), RfqDetailHistorySnapshotDto.class);
+        } catch (Exception exception) {
+            log.warn("Cannot parse rfq detail history snapshot for rfq {} history {}", entity.getRfqId(), entity.getId(), exception);
+            return null;
+        }
+    }
+
     private java.util.Map<String, Object> buildActivityDetail(RfqHeaderEntity entity) {
         java.util.Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("requestedDate", entity.getRequestedDate());
@@ -2817,6 +2949,136 @@ public class RFQService {
         additionalCostEntity.setValue(request.getValue());
         additionalCostEntity.setSortOrder(request.getSortOrder());
         return additionalCostEntity;
+    }
+
+    private void archiveCurrentDetailsIfAny(
+            RfqHeaderEntity entity,
+            String archivedBy,
+            ZonedDateTime archivedAt
+    ) throws Exception {
+        List<RfqDetailEntity> activeDetails = new ArrayList<>(Optional.ofNullable(entity.getDetails()).orElse(List.of()));
+        if (activeDetails.isEmpty()) {
+            return;
+        }
+
+        int detailSetNo = rfqDetailHistoryRepository.findMaxDetailSetNoByRfqId(entity.getId()) + 1;
+        for (RfqDetailEntity detail : activeDetails) {
+            archiveDetailToHistory(entity.getId(), detail, detailSetNo, archivedBy, archivedAt);
+            archiveDetail(detail, archivedBy, archivedAt);
+        }
+    }
+
+    private void archiveDetailToHistory(
+            String rfqId,
+            RfqDetailEntity detail,
+            int detailSetNo,
+            String archivedBy,
+            ZonedDateTime archivedAt
+    ) throws Exception {
+        RfqDetailHistoryEntity historyEntity = new RfqDetailHistoryEntity();
+        historyEntity.setRfqId(rfqId);
+        historyEntity.setDetailSetNo(detailSetNo);
+        historyEntity.setSourceDetailId(detail.getId());
+        historyEntity.setOptionName(detail.getOptionName());
+        historyEntity.setSpec(detail.getSpec());
+        historyEntity.setSortOrder(detail.getSortOrder());
+        historyEntity.setRemark(detail.getRemark());
+        historyEntity.setRecommend(detail.getRecommend());
+        historyEntity.setCommission(detail.getCommission());
+        historyEntity.setPackageDimension(detail.getPackageDimension());
+        historyEntity.setPackageWeight(detail.getPackageWeight());
+        historyEntity.setPackageCapacity(detail.getPackageCapacity());
+        historyEntity.setSupplierId(detail.getSupplier() == null ? null : detail.getSupplier().getId());
+        historyEntity.setSnapshotJson(objectMapper.writeValueAsString(buildDetailSnapshot(detail, detailSetNo, archivedBy, archivedAt)));
+        historyEntity.setArchivedBy(archivedBy);
+        historyEntity.setArchivedAt(archivedAt);
+        rfqDetailHistoryRepository.save(historyEntity);
+    }
+
+    private Map<String, Object> buildDetailSnapshot(
+            RfqDetailEntity detail,
+            int detailSetNo,
+            String archivedBy,
+            ZonedDateTime archivedAt
+    ) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("detailSetNo", detailSetNo);
+        snapshot.put("archivedBy", archivedBy);
+        snapshot.put("archivedAt", archivedAt == null ? null : archivedAt.toString());
+        snapshot.put("sourceDetailId", detail.getId());
+        snapshot.put("optionName", detail.getOptionName());
+        snapshot.put("spec", detail.getSpec());
+        snapshot.put("sortOrder", detail.getSortOrder());
+        snapshot.put("remark", detail.getRemark());
+        snapshot.put("recommend", detail.getRecommend());
+        snapshot.put("commission", detail.getCommission());
+        snapshot.put("packageDimension", detail.getPackageDimension());
+        snapshot.put("packageWeight", detail.getPackageWeight());
+        snapshot.put("packageCapacity", detail.getPackageCapacity());
+        snapshot.put("supplierId", detail.getSupplier() == null ? null : detail.getSupplier().getId());
+        snapshot.put("tiers", Optional.ofNullable(detail.getTiers()).orElse(List.of()).stream()
+                .map(this::buildTierSnapshot)
+                .toList());
+        snapshot.put("tierSplits", Optional.ofNullable(detail.getTierSplits()).orElse(List.of()).stream()
+                .map(this::buildTierSplitSnapshot)
+                .toList());
+        return snapshot;
+    }
+
+    private Map<String, Object> buildTierSnapshot(RfqTierEntity tier) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("sourceTierId", tier.getId());
+        snapshot.put("supplierId", tier.getSupplier() == null ? null : tier.getSupplier().getId());
+        snapshot.put("quantity", tier.getQuantity());
+        snapshot.put("productPrice", tier.getProductPrice());
+        snapshot.put("commission", tier.getCommission());
+        snapshot.put("currency", tier.getCurrency() == null ? null : tier.getCurrency().name());
+        snapshot.put("landFreightCost", tier.getLandFreightCost());
+        snapshot.put("seaFreightCost", tier.getSeaFreightCost());
+        snapshot.put("isFcl", tier.getIsFcl());
+        snapshot.put("isShareFCL", tier.getIsShareFCL());
+        snapshot.put("landTotalPrice", tier.getLandTotalPrice());
+        snapshot.put("seaTotalPrice", tier.getSeaTotalPrice());
+        snapshot.put("supplierQuoteTierId", tier.getSupplierQuoteTierId());
+        snapshot.put("sortOrder", tier.getSortOrder());
+        return snapshot;
+    }
+
+    private Map<String, Object> buildTierSplitSnapshot(RfqTierSplitEntity tierSplit) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("sourceTierSplitId", tierSplit.getId());
+        snapshot.put("supplierId", tierSplit.getSupplier() == null ? null : tierSplit.getSupplier().getId());
+        snapshot.put("quantity", tierSplit.getQuantity());
+        snapshot.put("sellPrice", tierSplit.getSellPrice());
+        snapshot.put("commission", tierSplit.getCommission());
+        snapshot.put("currency", tierSplit.getCurrency() == null ? null : tierSplit.getCurrency().name());
+        snapshot.put("landFreightCost", tierSplit.getLandFreightCost());
+        snapshot.put("landFreightQty", tierSplit.getLandFreightQty());
+        snapshot.put("seaFreightQty", tierSplit.getSeaFreightQty());
+        snapshot.put("seaFreightCost", tierSplit.getSeaFreightCost());
+        snapshot.put("isFcl", tierSplit.getIsFcl());
+        snapshot.put("isShareFCL", tierSplit.getIsShareFCL());
+        return snapshot;
+    }
+
+    private void archiveDetail(RfqDetailEntity detail, String archivedBy, ZonedDateTime archivedAt) {
+        detail.setIsArchived(Boolean.TRUE);
+        detail.setArchivedBy(archivedBy);
+        detail.setArchivedAt(archivedAt);
+        detail.setUpdatedBy(archivedBy);
+        detail.setUpdatedDate(archivedAt);
+
+        for (RfqTierEntity tier : Optional.ofNullable(detail.getTiers()).orElse(List.of())) {
+            tier.setIsArchived(Boolean.TRUE);
+            tier.setArchivedBy(archivedBy);
+            tier.setArchivedAt(archivedAt);
+        }
+
+        for (RfqTierSplitEntity tierSplit : Optional.ofNullable(detail.getTierSplits()).orElse(List.of())) {
+            tierSplit.setIsArchived(Boolean.TRUE);
+            tierSplit.setArchivedBy(archivedBy);
+            tierSplit.setArchivedAt(archivedAt);
+        }
     }
 
     private RfqHeaderEntity getEntityById(String id) throws DataNotFoundException {
@@ -3636,5 +3898,57 @@ public class RFQService {
             }
             return objectMapper.readTree(rendered);
         }
+    }
+
+    private void sendRequestQuotationNotifications(RfqHeaderEntity entity) {
+        try {
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
+                    .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                    .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                    .filter(user -> user.getEmployeeEntity() != null
+                            && user.getEmployeeEntity().getPosition() != null
+                            && user.getEmployeeEntity().getPosition().getId() != null
+                            && SALES_ADMIN_POSITION_CODE.equals(user.getEmployeeEntity().getPosition().getId().getCode()))
+                    .toList();
+
+            if (adminUsers.isEmpty()) {
+                log.warn("No active ADMIN users with LINE binding found for rfq {}", entity.getId());
+                return;
+            }
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "มีรายการรอออกใบเสนอราคา สำหรับ " + entity.getId());
+            placeholders.put("title", "รอออกใบเสนอราคา");
+            String customerName = entity.getCustomer() != null
+                    ? StringUtils.defaultIfBlank(entity.getCustomer().getCustomerName(), "-")
+                    : "-";
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ เลขที่ %s ของ %s รอออกใบเสนอราคา",
+                            entity.getId(),
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            customerName
+                    )
+            );
+            placeholders.put("detailUrl", buildRequestQuotationUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            for (UserEntity adminUser : adminUsers) {
+                try {
+                    lineMessageService.sendFlexMessage(adminUser.getLineUserId(), message);
+                } catch (Exception exception) {
+                    log.warn("Cannot send request quotation notification to admin {}", adminUser.getId(), exception);
+                }
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send request quotation notifications for rfq {}", entity.getId(), exception);
+        }
+    }
+
+    private String buildRequestQuotationUrl(String rfqId) throws InvalidRequestException {
+        return UriComponentsBuilder.fromUriString(buildFrontendBaseUrl())
+                .path("/create-quotation-rfq/" + rfqId)
+                .build()
+                .toUriString();
     }
 }

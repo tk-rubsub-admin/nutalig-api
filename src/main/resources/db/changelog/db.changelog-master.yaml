@@ -2945,3 +2945,5 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/20260810-003-add-rfq-accept-work-duration-column.yaml
+  - include:
+      file: db/changelog/20260814-001-add-rfq-detail-archive-history.yaml

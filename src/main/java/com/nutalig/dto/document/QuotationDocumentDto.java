@@ -15,6 +15,7 @@ public class QuotationDocumentDto extends DefaultDocumentDto {
     private BigDecimal vat;
     private String remark;
     private String thaiBahtText;
+    private String shipping;
 
     // Customer
     private String custName;

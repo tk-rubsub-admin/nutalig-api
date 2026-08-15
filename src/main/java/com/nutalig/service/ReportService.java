@@ -99,6 +99,7 @@ public class ReportService {
         parameters.put("remark", dto.getRemark());
         parameters.put("thaiBahtText", dto.getThaiBahtText());
         parameters.put("logo", loadResource(NUTALIG_LOGO));
+        parameters.put("shipping", dto.getShipping());
 
         parameters.put("bankName", dto.getBankName());
         parameters.put("accountName", dto.getAccountName());

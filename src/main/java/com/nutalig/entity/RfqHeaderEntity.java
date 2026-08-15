@@ -79,6 +79,7 @@ public class RfqHeaderEntity extends AuditDateEntity {
     private List<RfqPicturesEntity> pictures = new ArrayList<>();
 
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Where(clause = "is_archived = false")
     private List<RfqDetailEntity> details = new ArrayList<>();
 
     @OneToMany(mappedBy = "requestPriceHeader", cascade = CascadeType.ALL, orphanRemoval = true)

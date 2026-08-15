@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 
 @Getter
 @Setter
@@ -78,4 +79,13 @@ public class RfqTierEntity extends AuditDateEntity {
 
     @Column(name = "sort_order")
     private Integer sortOrder;
+
+    @Column(name = "is_archived", nullable = false)
+    private Boolean isArchived = Boolean.FALSE;
+
+    @Column(name = "archived_by")
+    private String archivedBy;
+
+    @Column(name = "archived_at")
+    private ZonedDateTime archivedAt;
 }

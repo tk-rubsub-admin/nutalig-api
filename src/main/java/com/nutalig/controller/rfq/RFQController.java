@@ -4,6 +4,7 @@ import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.rfq.request.*;
 import com.nutalig.controller.rfq.response.UploadRfqResponse;
+import com.nutalig.dto.RfqDetailHistoryDto;
 import com.nutalig.dto.RfqHeaderDto;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
@@ -106,6 +107,17 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @GetMapping("/{id}/detail-history")
+    public GeneralResponse<java.util.List<RfqDetailHistoryDto>> getRfqDetailHistory(@PathVariable("id") String id)
+            throws DataNotFoundException {
+        log.info("=== Start get rfq detail history {} ===", id);
+
+        java.util.List<RfqDetailHistoryDto> response = rfqService.getRfqDetailHistory(id);
+
+        log.info("=== End get rfq detail history {} size {} ===", id, response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @GetMapping("/{id}/suggest-suppliers")
     public GeneralResponse<java.util.List<SupplierDto>> suggestSuppliers(@PathVariable("id") String id)
             throws DataNotFoundException, InvalidRequestException {
@@ -141,6 +153,19 @@ public class RFQController {
 
         log.info("=== End generate final inquiry for rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/request-quotation-admin")
+    public GeneralResponse<Void> requestQuotationAdmin(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start request quotation admin rfq {} by {} ===", id, userId);
+
+        rfqService.requestQuotationForAdmin(id, userId);
+
+        log.info("=== End request quotation admin rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS);
     }
 
     @GetMapping("/{id}/inquiries")

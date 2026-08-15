@@ -118,6 +118,9 @@ public class QuotationEntity extends AuditDateEntity {
     @Column(name = "is_show_summary")
     private Boolean isShowSummary;
 
+    @Column(name = "shipping")
+    private String shipping;
+
     public void addItem(QuotationDetailEntity item) {
         if (item == null) return;
         items.add(item);

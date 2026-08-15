@@ -67,6 +67,7 @@ public class InvoiceService {
     private static final String ACTION_AWAITING_VALIDATION_VIEW = "awaiting-validation-view";
     private static final long AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS = 24 * 60 * 60;
     private static final String PUBLIC_TOKEN_ACTOR = "PUBLIC_TOKEN";
+    private static final String ACCOUNTING_ADMIN_POSITION_CODE = "ACCOUNTING_ADMIN";
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final ActivityHistoryService activityHistoryService;
@@ -912,6 +913,10 @@ public class InvoiceService {
             List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
                     .filter(user -> Status.ACTIVE.equals(user.getStatus()))
                     .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                    .filter(user -> user.getEmployeeEntity() != null
+                            && user.getEmployeeEntity().getPosition() != null
+                            && user.getEmployeeEntity().getPosition().getId() != null
+                            && ACCOUNTING_ADMIN_POSITION_CODE.equals(user.getEmployeeEntity().getPosition().getId().getCode()))
                     .toList();
 
             if (adminUsers.isEmpty()) {

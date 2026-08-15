@@ -172,6 +172,7 @@ public class QuotationService {
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
         quotationEntity.setRevNo(1);
+        quotationEntity.setShipping(requestDto.getShipping());
 
         if (StringUtils.isNotBlank(requestDto.getRfqId())) {
             RfqHeaderEntity rfqEntity = requestPriceHeaderRepository.findById(requestDto.getRfqId().trim())
@@ -612,6 +613,7 @@ public class QuotationService {
         dto.setSalesName(quotationEntity.getSales().getFirstNameTh() + " " + quotationEntity.getSales().getLastNameTh());
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(quotationEntity.getSales().getNickName());
+        dto.setShipping(quotationEntity.getShipping());
         dto.setCoSalesId(quotationEntity.getCoSalesId());
 
         if (quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
@@ -700,7 +702,7 @@ public class QuotationService {
             itemDocuments.add(item);
         }
 
-        while (itemDocuments.size() < 7) {
+        while (itemDocuments.size() < 5) {
             itemDocuments.add(new QuotationItemDocumentDto());
         }
 

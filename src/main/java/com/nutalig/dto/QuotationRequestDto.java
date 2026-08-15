@@ -22,4 +22,5 @@ public class QuotationRequestDto {
     private Boolean isVat;
     private Boolean isShowSummary;
     private List<QuotationItemRequestDto> items;
+    private String shipping;
 }
