@@ -32,4 +32,7 @@ public class FreelanceSaleEntity {
 
     @Column(name = "additional", length = 1000)
     private String additional;
+
+    @Column(name = "reference_customer")
+    private String referenceCustomer;
 }

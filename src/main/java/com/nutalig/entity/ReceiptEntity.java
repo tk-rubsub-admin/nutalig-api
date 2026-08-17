@@ -86,22 +86,22 @@ public class ReceiptEntity extends AuditDateEntity {
     @Column(name = "co_sales_id", length = 20)
     private String coSalesId;
 
-    @Column(name = "subtotal", precision = 18, scale = 2)
+    @Column(name = "subtotal", precision = 18, scale = 5)
     private BigDecimal subTotal;
 
-    @Column(name = "discount", precision = 18, scale = 2)
+    @Column(name = "discount", precision = 18, scale = 5)
     private BigDecimal discount;
 
-    @Column(name = "amount", precision = 18, scale = 2)
+    @Column(name = "amount", precision = 18, scale = 5)
     private BigDecimal amount;
 
     @Column(name = "vat_rate", precision = 10, scale = 4)
     private BigDecimal vatRate;
 
-    @Column(name = "vat", precision = 18, scale = 2)
+    @Column(name = "vat", precision = 18, scale = 5)
     private BigDecimal vat;
 
-    @Column(name = "grand_total", precision = 18, scale = 2)
+    @Column(name = "grand_total", precision = 18, scale = 5)
     private BigDecimal grandTotal;
 
     @Enumerated(EnumType.STRING)

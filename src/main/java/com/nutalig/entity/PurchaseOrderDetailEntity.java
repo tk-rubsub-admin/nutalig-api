@@ -50,7 +50,7 @@ public class PurchaseOrderDetailEntity {
     @Column(name = "spec", length = 2000)
     private String spec;
 
-    @Column(name = "quantity", precision = 18, scale = 2)
+    @Column(name = "quantity", precision = 18, scale = 5)
     private BigDecimal quantity;
 
     @Enumerated(EnumType.STRING)
@@ -66,10 +66,10 @@ public class PurchaseOrderDetailEntity {
     @Column(name = "supplier_total_unit_cost", precision = 18, scale = 4)
     private BigDecimal supplierTotalUnitCost;
 
-    @Column(name = "amount_supplier_currency", precision = 18, scale = 2)
+    @Column(name = "amount_supplier_currency", precision = 18, scale = 5)
     private BigDecimal amountSupplierCurrency;
 
-    @Column(name = "amount_thb", precision = 18, scale = 2)
+    @Column(name = "amount_thb", precision = 18, scale = 5)
     private BigDecimal amountThb;
 
     @Column(name = "image_url", length = 500)

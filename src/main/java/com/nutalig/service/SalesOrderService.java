@@ -1015,6 +1015,7 @@ public class SalesOrderService {
         dto.setAmount(entity.getAmount());
         dto.setPaymentStatus(entity.getPaymentStatus());
         dto.setPaidTotal(entity.getPaidTotal());
+        dto.setShipping(entity.getShipping());
         dto.setOutstandingTotal(entity.getOutstandingTotal());
         if (entity.getCommission() != null) {
             dto.setCommission(entity.getCommission());

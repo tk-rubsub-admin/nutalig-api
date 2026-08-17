@@ -48,13 +48,13 @@ public class QuotationDetailEntity {
     @Column(name = "spec", length = 2000)
     private String spec;
 
-    @Column(name = "unit_price", precision = 18, scale = 2)
+    @Column(name = "unit_price", precision = 18, scale = 5)
     private BigDecimal unitPrice;
 
-    @Column(name = "quantity", precision = 18, scale = 2)
+    @Column(name = "quantity", precision = 18, scale = 5)
     private BigDecimal quantity;
 
-    @Column(name = "amount", precision = 18, scale = 2)
+    @Column(name = "amount", precision = 18, scale = 5)
     private BigDecimal amount;
 
     @Column(name = "image_url", length = 500)

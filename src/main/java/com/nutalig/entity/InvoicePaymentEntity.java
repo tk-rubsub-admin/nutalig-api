@@ -33,7 +33,7 @@ public class InvoicePaymentEntity extends AuditDateEntity {
     @Column(name = "payment_date", nullable = false)
     private ZonedDateTime paymentDate;
 
-    @Column(name = "amount", precision = 18, scale = 2, nullable = false)
+    @Column(name = "amount", precision = 18, scale = 5, nullable = false)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)

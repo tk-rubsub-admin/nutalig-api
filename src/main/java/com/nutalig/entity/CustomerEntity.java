@@ -134,7 +134,7 @@ public class CustomerEntity extends AuditDateEntity {
     @ToString.Include
     private String coSalesAccount;
 
-    @Column(name = "total_sales_order_amount", precision = 18, scale = 2)
+    @Column(name = "total_sales_order_amount", precision = 18, scale = 5)
     private BigDecimal totalSalesOrderAmount;
 
     @Column(name = "created_by")

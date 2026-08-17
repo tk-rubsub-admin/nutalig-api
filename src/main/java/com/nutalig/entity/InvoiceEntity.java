@@ -70,34 +70,34 @@ public class InvoiceEntity extends AuditDateEntity {
     @Column(name = "co_sales_id", length = 20)
     private String coSalesId;
 
-    @Column(name = "subtotal", precision = 18, scale = 2)
+    @Column(name = "subtotal", precision = 18, scale = 5)
     private BigDecimal subTotal;
 
-    @Column(name = "discount", precision = 18, scale = 2)
+    @Column(name = "discount", precision = 18, scale = 5)
     private BigDecimal discount;
 
-    @Column(name = "freight", precision = 18, scale = 2)
+    @Column(name = "freight", precision = 18, scale = 5)
     private BigDecimal freight;
 
-    @Column(name = "amount", precision = 18, scale = 2)
+    @Column(name = "amount", precision = 18, scale = 5)
     private BigDecimal amount;
 
-    @Column(name = "commission", precision = 18, scale = 2)
+    @Column(name = "commission", precision = 18, scale = 5)
     private BigDecimal commission;
 
     @Column(name = "vat_rate", precision = 6, scale = 4)
     private BigDecimal vatRate;
 
-    @Column(name = "vat", precision = 18, scale = 2)
+    @Column(name = "vat", precision = 18, scale = 5)
     private BigDecimal vat;
 
-    @Column(name = "grand_total", precision = 18, scale = 2)
+    @Column(name = "grand_total", precision = 18, scale = 5)
     private BigDecimal grandTotal;
 
-    @Column(name = "paid_total", precision = 18, scale = 2)
+    @Column(name = "paid_total", precision = 18, scale = 5)
     private BigDecimal paidTotal;
 
-    @Column(name = "outstanding_total", precision = 18, scale = 2)
+    @Column(name = "outstanding_total", precision = 18, scale = 5)
     private BigDecimal outstandingTotal;
 
     @Column(name = "remark", length = 2000)

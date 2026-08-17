@@ -400,7 +400,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="91ca686e-fe92-4836-a526-bfd7c172effe" positionType="Float" stretchType="ContainerHeight" x="405" y="0" width="54" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+				<element kind="textField" uuid="91ca686e-fe92-4836-a526-bfd7c172effe" positionType="Float" stretchType="ContainerHeight" x="405" y="0" width="54" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.00000;(#,##0.00000)" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
 					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 					<expression><![CDATA[$F{price}]]></expression>
 					<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -426,7 +426,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="5998c697-4bb8-482a-abb1-4d3bdcd0e8e2" positionType="Float" stretchType="ContainerHeight" x="509" y="0" width="46" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+				<element kind="textField" uuid="5998c697-4bb8-482a-abb1-4d3bdcd0e8e2" positionType="Float" stretchType="ContainerHeight" x="509" y="0" width="46" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.00###;(#,##0.00###)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
 					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 					<expression><![CDATA[$F{amount}]]></expression>
 					<property name="com.jaspersoft.studio.unit.x" value="px"/>

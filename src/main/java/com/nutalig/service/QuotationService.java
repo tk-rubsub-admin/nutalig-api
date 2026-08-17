@@ -475,7 +475,7 @@ public class QuotationService {
                 .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
 
         String fileName = quotationEntity.getQuotationNo();
-        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVat().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
+        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
         if (documentRequest.getFormat().equals(ExportFileFormat.PDF)) {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
