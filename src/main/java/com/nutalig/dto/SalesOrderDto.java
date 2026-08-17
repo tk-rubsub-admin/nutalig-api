@@ -43,6 +43,7 @@ public class SalesOrderDto {
     private UserDto createdBy;
     private UserDto updatedBy;
     private Integer revNo;
+    private String shipping;
     private List<SalesOrderAttachmentDto> attachments;
     private List<SalesOrderDetailDto> items;
 }

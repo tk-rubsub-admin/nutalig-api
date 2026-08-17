@@ -26,5 +26,6 @@ public class CreateSalesOrderRequest {
     private Boolean requestCoa;
     private Boolean requestPo;
     private String remark;
+    private String shipping;
     private List<CreateSalesOrderDetailRequest> items;
 }

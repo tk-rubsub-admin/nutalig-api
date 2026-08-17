@@ -11,6 +11,7 @@ public class UpdateSalesOrderRequest {
     private LocalDate docDate;
     private LocalDate expireDate;
     private String coSaleId;
+    private BigDecimal subTotal;
     private BigDecimal amount;
     private BigDecimal commission;
     private BigDecimal coSaleCommission;

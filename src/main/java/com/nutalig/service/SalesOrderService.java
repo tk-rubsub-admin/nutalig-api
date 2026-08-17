@@ -58,6 +58,7 @@ import static com.nutalig.repository.specification.SalesOrderSpecification.*;
 public class SalesOrderService {
     private static final Set<SalesOrderStatus> EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES =
             EnumSet.of(SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED);
+    private static final String SALES_ADMIN_POSITION_CODE = "SALES_ADMIN";
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
@@ -75,6 +76,7 @@ public class SalesOrderService {
     private final SupplierMapper supplierMapper;
     private final UserMapper userMapper;
     private final ActivityHistoryService activityHistoryService;
+    private final LineMessageService lineMessageService;
     private final SystemConfigService systemConfigService;
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
@@ -119,6 +121,7 @@ public class SalesOrderService {
         entity.setDiscount(defaultIfNull(request.getDiscount()));
         entity.setFreight(defaultIfNull(request.getFreight()));
         entity.setShippingType(normalizeShippingType(request.getShippingType()));
+        entity.setShipping(request.getShipping());
         entity.setRequestCoa(Boolean.TRUE.equals(request.getRequestCoa()));
         entity.setRequestPo(Boolean.TRUE.equals(request.getRequestPo()));
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
@@ -154,6 +157,9 @@ public class SalesOrderService {
         }
 
         recordCreateSalesOrderActivity(entity, request, userId);
+        if (SalesOrderStatus.DRAFT.equals(status)) {
+            sendDraftSalesOrderNotification(entity, userId);
+        }
 
         return entity;
     }
@@ -212,6 +218,10 @@ public class SalesOrderService {
         if (request.getItems() != null) {
             replaceSalesOrderItems(entity, request.getItems());
         }
+        BigDecimal calculatedSubTotal = null;
+        if (request.getSubTotal() != null) {
+            entity.setSubTotal(defaultIfNull(request.getSubTotal()).setScale(2, RoundingMode.HALF_UP));
+        }
         if (request.getAmount() != null) {
             entity.setAmount(request.getAmount());
         }
@@ -234,9 +244,21 @@ public class SalesOrderService {
                 : entity.getVatRate() != null && entity.getVatRate().compareTo(BigDecimal.ZERO) > 0;
 
         SalesOrderSummary summary = calculateForUpdate(itemsForCalculate, entity.getDiscount(), entity.getFreight(), isVat);
-        entity.setSubTotal(summary.subTotal());
-        entity.setVat(summary.vat());
-        entity.setGrandTotal(summary.grandTotal());
+        calculatedSubTotal = summary.subTotal();
+        BigDecimal effectiveSubTotal = request.getSubTotal() != null
+                ? defaultIfNull(request.getSubTotal()).setScale(2, RoundingMode.HALF_UP)
+                : calculatedSubTotal;
+        BigDecimal taxableAmount = effectiveSubTotal.subtract(defaultIfNull(entity.getDiscount())).max(BigDecimal.ZERO);
+        BigDecimal vatAmount = Boolean.TRUE.equals(isVat)
+                ? taxableAmount.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        entity.setSubTotal(effectiveSubTotal);
+        entity.setVat(vatAmount);
+        entity.setGrandTotal(taxableAmount.add(vatAmount).setScale(2, RoundingMode.HALF_UP));
+        if (request.getAmount() == null) {
+            entity.setAmount(effectiveSubTotal.subtract(defaultIfNull(entity.getFreight())).setScale(2, RoundingMode.HALF_UP));
+        }
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         entity.setUpdatedBy(user);
@@ -747,9 +769,47 @@ public class SalesOrderService {
                 ActivityActorType.USER,
                 ActivityAction.CREATE,
                 ActivitySource.API,
-                "สร้าง Sales Order เลขที่ " + entity.getSalesOrderNo(),
+                summary,
                 detail
         );
+    }
+
+    private void sendDraftSalesOrderNotification(SalesOrderEntity entity, String userId) {
+        try {
+            List<UserEntity> salesAdminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
+                    .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                    .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                    .filter(user -> user.getEmployeeEntity() != null
+                            && user.getEmployeeEntity().getPosition() != null
+                            && user.getEmployeeEntity().getPosition().getId() != null
+                            && SALES_ADMIN_POSITION_CODE.equals(user.getEmployeeEntity().getPosition().getId().getCode()))
+                    .toList();
+
+            if (salesAdminUsers.isEmpty()) {
+                log.warn("No active SALES_ADMIN users with LINE binding found for sales order {}", entity.getSalesOrderNo());
+                return;
+            }
+
+            String message = String.format(
+                    "มีคำขอออกใบยืนยันสั่งซื้อเลขที่ %s จากผู้ใช้ %s",
+                    StringUtils.defaultString(entity.getSalesOrderNo(), "-"),
+                    userId
+            );
+
+            for (UserEntity salesAdminUser : salesAdminUsers) {
+                try {
+                    lineMessageService.sendTextMessageToLineUser(salesAdminUser.getLineUserId(), message);
+                } catch (Exception exception) {
+                    log.warn(
+                            "Cannot send draft sales order notification to sales admin {}",
+                            salesAdminUser.getId(),
+                            exception
+                    );
+                }
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot send draft sales order notification for sales order {}", entity.getSalesOrderNo(), exception);
+        }
     }
 
     private void recordUpdateSalesOrderActivity(

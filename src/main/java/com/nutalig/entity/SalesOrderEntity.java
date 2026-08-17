@@ -126,6 +126,9 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "request_po")
     private Boolean requestPo;
 
+    @Column(name = "shipping")
+    private String shipping;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "procurement_status", length = 30)
     private ProcurementStatus procurementStatus;

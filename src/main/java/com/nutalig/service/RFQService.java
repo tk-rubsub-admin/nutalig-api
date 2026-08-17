@@ -622,8 +622,7 @@ public class RFQService {
 
         entity = requestPriceHeaderRepository.save(entity);
 
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("request", objectMapper.writeValueAsString(request));
+        Map<String, Object> detail = buildCreateRfqRequestDetail(request);
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -2399,6 +2398,57 @@ public class RFQService {
         detail.put("urgentRejectReason", entity.getUrgentRejectReason());
         detail.put("description", entity.getDescription());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
+        return detail;
+    }
+
+    private Map<String, Object> buildCreateRfqRequestDetail(CreateRequestPriceHeaderRequest request) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        if (request == null) {
+            return detail;
+        }
+
+        detail.put("contactName", request.getContactName());
+        detail.put("contactPhone", request.getContactPhone());
+        detail.put("contactChannel", request.getContactChannel());
+        detail.put("salesId", request.getSalesId());
+        detail.put("customerId", request.getCustomerId());
+        detail.put("procurementId", request.getProcurementId());
+        detail.put("referenceRfqId", request.getReferenceRfqId());
+        detail.put("rfqTypeCode", request.getRfqTypeCode());
+        detail.put("orderTypeCode", request.getOrderTypeCode());
+        detail.put("shippingMethod", request.getShippingMethod());
+        detail.put("productFamily", request.getProductFamily());
+        detail.put("productUsage", request.getProductUsage());
+        detail.put("systemMechanic", request.getSystemMechanic());
+        detail.put("material", request.getMaterial());
+        detail.put("capacity", request.getCapacity());
+        detail.put("targetPrice", request.getTargetPrice());
+        detail.put("requestedMoqs", request.getRequestedMoqs());
+        detail.put("requestSample", request.getRequestSample());
+        detail.put("urgentRequest", request.getUrgentRequest());
+        detail.put("urgentRequestReason", request.getUrgentRequestReason());
+        detail.put("description", request.getDescription());
+        detail.put("note", request.getNote());
+        detail.put("pictureCount", request.getPictures() != null ? request.getPictures().size() : 0);
+        detail.put(
+                "pictureFileNames",
+                request.getPictures() == null
+                        ? List.of()
+                        : request.getPictures().stream()
+                        .map(MultipartFile::getOriginalFilename)
+                        .filter(StringUtils::isNotBlank)
+                        .toList()
+        );
+        detail.put("attachmentCount", request.getAttachments() != null ? request.getAttachments().size() : 0);
+        detail.put(
+                "attachmentFileNames",
+                request.getAttachments() == null
+                        ? List.of()
+                        : request.getAttachments().stream()
+                        .map(MultipartFile::getOriginalFilename)
+                        .filter(StringUtils::isNotBlank)
+                        .toList()
+        );
         return detail;
     }
 
