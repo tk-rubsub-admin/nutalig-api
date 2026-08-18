@@ -11,8 +11,9 @@ import com.nutalig.dto.RfqSupplierQuoteDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
+import com.nutalig.schedule.RfqPendingSupplierQuotedScheduler;
 import com.nutalig.service.RFQService;
-import com.nutalig.service.RfqPendingAcceptanceScheduler;
+import com.nutalig.schedule.RfqPendingAcceptanceScheduler;
 import com.nutalig.service.RFQSupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class RFQController {
     private final RFQService rfqService;
     private final RFQSupplierService rfqSupplierService;
     private final RfqPendingAcceptanceScheduler rfqPendingAcceptanceScheduler;
+    private final RfqPendingSupplierQuotedScheduler rfqPendingSupplierQuotedScheduler;
 
     @GetMapping
     public GeneralResponse<com.nutalig.controller.response.Pageable<RfqHeaderDto>> getAllRFQ(
@@ -93,6 +95,17 @@ public class RFQController {
         log.info("=== End collect pending acceptance rfqs size {} ===", response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
+
+    @PostMapping("/pending-supplier-quoted/collect")
+    public GeneralResponse<java.util.List<RfqHeaderDto>> collectPendingSupplierQuotedRfqs() {
+        log.info("=== Start collect pending supplier quoted rfqs ===");
+
+        java.util.List<RfqHeaderDto> response = rfqPendingSupplierQuotedScheduler.runPendingSupplierQuotedCollection();
+
+        log.info("=== End collect pending supplier quoted rfqs size {} ===", response.size());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
 
     @GetMapping("/{id}")
     public GeneralResponse<RfqHeaderDto> getRFQById(

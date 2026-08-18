@@ -1,7 +1,8 @@
-package com.nutalig.service;
+package com.nutalig.schedule;
 
 import com.nutalig.config.AppProperties;
 import com.nutalig.dto.RfqHeaderDto;
+import com.nutalig.service.RFQService;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,26 +32,10 @@ public class RfqPendingAcceptanceScheduler {
             return List.of();
         }
 
-        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
-        ZonedDateTime requestedDateStart = now.toLocalDate()
-                .minusDays(config.getStartOffsetDays())
-                .atTime(config.getStartTime())
-                .atZone(DateUtil.getTimeZone());
-        ZonedDateTime requestedDateEnd = now.toLocalDate()
-                .minusDays(config.getEndOffsetDays())
-                .atTime(config.getEndTime())
-                .atZone(DateUtil.getTimeZone());
-
-        if (requestedDateEnd.isBefore(requestedDateStart)) {
-            throw new IllegalArgumentException("Configured RFQ pending acceptance window is invalid.");
-        }
-
-        List<RfqHeaderDto> rfqs = rfqService.getPendingAcceptanceRfqsInWindow(requestedDateStart, requestedDateEnd);
-        rfqService.sendPendingAcceptanceSummaryNotifications(rfqs, requestedDateStart, requestedDateEnd);
+        List<RfqHeaderDto> rfqs = rfqService.getPendingAcceptanceRfqs();
+        rfqService.sendPendingAcceptanceSummaryNotifications(rfqs);
         log.info(
-                "Pending acceptance RFQ scheduler completed. windowStart={}, windowEnd={}, count={}, rfqIds={}",
-                requestedDateStart,
-                requestedDateEnd,
+                "Pending acceptance RFQ scheduler completed. count={}, rfqIds={}",
                 rfqs.size(),
                 rfqs.stream().map(RfqHeaderDto::getId).toList()
         );

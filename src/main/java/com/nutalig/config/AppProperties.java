@@ -13,6 +13,7 @@ public class AppProperties {
 
     private final Upload upload = new Upload();
     private final RfqPendingAcceptance rfqPendingAcceptance = new RfqPendingAcceptance();
+    private final RfqPendingSupplierQuoted rfqPendingSupplierQuoted = new RfqPendingSupplierQuoted();
 
     @Getter
     @Setter
@@ -31,5 +32,12 @@ public class AppProperties {
         private LocalTime startTime = LocalTime.of(17, 0);
         private LocalTime endTime = LocalTime.of(17, 0);
         private LocalTime cutoffTime = LocalTime.of(17, 0);
+    }
+
+    @Getter
+    @Setter
+    public static class RfqPendingSupplierQuoted {
+        private boolean enabled = true;
+        private String cron = "0 1 10 * * *";
     }
 }
