@@ -14,6 +14,7 @@ public class InvoiceDto {
     private String quotationNo;
     private String docDate;
     private String dueDate;
+    private String deliveryDate;
     private InvoiceStatus status;
     private DocumentStatusProfileDto statusProfile;
     private Currency currency;

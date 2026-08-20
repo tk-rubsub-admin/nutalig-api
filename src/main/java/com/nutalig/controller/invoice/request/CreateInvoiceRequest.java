@@ -10,6 +10,7 @@ public class CreateInvoiceRequest {
     private String salesOrderNo;
     private LocalDate docDate;
     private LocalDate dueDate;
+    private LocalDate deliveryDate;
     private String remark;
     private BigDecimal subTotal;
     private BigDecimal discount;

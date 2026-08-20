@@ -5,6 +5,7 @@ import com.nutalig.constant.PaymentMethod;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
+import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.invoice.response.CreateInvoiceResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -69,6 +70,20 @@ public class InvoiceController {
         InvoiceDto response = invoiceService.getInvoiceById(id);
 
         log.info("=== End get invoice by id {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}")
+    public GeneralResponse<InvoiceDto> updateInvoice(
+            @PathVariable(name = "id") String id,
+            @RequestBody UpdateInvoiceRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update invoice {} ===", id);
+
+        InvoiceDto response = invoiceService.updateInvoice(id, request, userId);
+
+        log.info("=== End update invoice {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

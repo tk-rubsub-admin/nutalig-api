@@ -1273,6 +1273,7 @@ databaseChangeLog:
                   quotation_no VARCHAR(50) DEFAULT NULL,
                   doc_date DATE DEFAULT NULL,
                   due_date DATE DEFAULT NULL,
+                  delivery_date DATE DEFAULT NULL,
                   status VARCHAR(30) NOT NULL,
                   currency VARCHAR(10) DEFAULT NULL,
                   customer_id VARCHAR(255) DEFAULT NULL,
@@ -1338,6 +1339,16 @@ databaseChangeLog:
                   CONSTRAINT fk_invoice_detail_invoice FOREIGN KEY (invoice_no) REFERENCES invoice (invoice_no),
                   CONSTRAINT fk_invoice_detail_sales_order_detail FOREIGN KEY (sales_order_detail_id) REFERENCES sales_order_detail (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  - changeSet:
+      id: 20260820-001-add-invoice-delivery-date
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE invoice
+                  ADD COLUMN delivery_date DATE DEFAULT NULL AFTER due_date;
 
   - changeSet:
       id: 20260629-001-create-invoice-payment-table

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
+import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
@@ -108,6 +109,7 @@ public class InvoiceService {
         entity.setQuotationNo(resolveQuotationNo(salesOrder.getSalesOrderNo()));
         entity.setDocDate(docDate);
         entity.setDueDate(dueDate);
+        entity.setDeliveryDate(request.getDeliveryDate());
         entity.setStatus(InvoiceStatus.ISSUED);
         entity.setCurrency(salesOrder.getCurrency());
         entity.setCustomer(salesOrder.getCustomer());
@@ -168,6 +170,55 @@ public class InvoiceService {
         InvoiceEntity entity = invoiceRepository.findById(invoiceNo)
                 .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto updateInvoice(String invoiceNo, UpdateInvoiceRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("Request is required");
+        }
+
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        if (!EnumSet.of(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID).contains(invoice.getStatus())) {
+            throw new InvalidRequestException("Invoice status must be ISSUED or PARTIALLY_PAID.");
+        }
+
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        LocalDate beforeDeliveryDate = invoice.getDeliveryDate();
+        LocalDate nextDeliveryDate = request.getDeliveryDate();
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        invoice.setDeliveryDate(nextDeliveryDate);
+        invoice.setRevNo(defaultRevNo(invoice.getRevNo()) + 1);
+        invoice.setUpdatedBy(user);
+        invoice.setUpdatedDate(now);
+
+        InvoiceEntity saved = invoiceRepository.save(invoice);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        Map<String, Object> before = new LinkedHashMap<>();
+        before.put("deliveryDate", beforeDeliveryDate);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("deliveryDate", nextDeliveryDate);
+        detail.put("before", before);
+        detail.put("after", after);
+
+        activityHistoryService.record(
+                ActivityEntityType.INVOICE,
+                saved.getInvoiceNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "อัปเดตวันที่ส่งสินค้าของ Invoice เลขที่ " + saved.getInvoiceNo(),
+                detail
+        );
+
+        return mapToDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -608,6 +659,10 @@ public class InvoiceService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private int defaultRevNo(Integer revNo) {
+        return revNo == null ? 0 : revNo;
+    }
+
     private void markSalesOrderReadyForProcurementIfDepositPaid(InvoiceEntity invoice, String userId) {
         if (invoice == null || invoice.getStatus() != InvoiceStatus.PAID || !isDepositInvoice(invoice)) {
             return;
@@ -677,6 +732,7 @@ public class InvoiceService {
         dto.setQuotationNo(entity.getQuotationNo());
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setDueDate(entity.getDueDate() != null ? entity.getDueDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setDeliveryDate(entity.getDeliveryDate() != null ? entity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
         dto.setStatus(entity.getStatus());
         dto.setStatusProfile(DocumentStatusResolver.resolveInvoice(entity.getStatus(), entity.getPayments()));
         dto.setCurrency(entity.getCurrency());
@@ -758,6 +814,7 @@ public class InvoiceService {
         dto.setQuotationNo(invoiceEntity.getQuotationNo());
         dto.setSalesOrderNo(invoiceEntity.getSalesOrder().getSalesOrderNo());
         dto.setDueDate(invoiceEntity.getDueDate() != null ?invoiceEntity.getDueDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setDeliveryDate(invoiceEntity.getDeliveryDate() != null ? invoiceEntity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
         dto.setAmount(invoiceEntity.getAmount());
         dto.setDiscount(invoiceEntity.getDiscount());
         dto.setGrandTotal(invoiceEntity.getGrandTotal());
