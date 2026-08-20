@@ -1,6 +1,7 @@
 package com.nutalig.repository.specification;
 
 import com.nutalig.constant.SalesOrderStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import com.nutalig.entity.CustomerEntity;
 import com.nutalig.entity.EmployeeEntity;
 import com.nutalig.entity.SalesOrderDetailEntity;
@@ -58,6 +59,13 @@ public class SalesOrderSpecification {
             return null;
         }
         return (root, query, cb) -> root.get("status").in(statuses);
+    }
+
+    public static Specification<SalesOrderEntity> urgentRequestStatusEqual(UrgentRequestStatus urgentRequestStatus) {
+        if (urgentRequestStatus == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("urgentRequestStatus"), urgentRequestStatus);
     }
 
     public static Specification<SalesOrderEntity> docDateBetween(LocalDate start, LocalDate end) {

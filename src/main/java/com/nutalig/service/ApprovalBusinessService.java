@@ -3,9 +3,13 @@ package com.nutalig.service;
 import com.nutalig.constant.*;
 import com.nutalig.entity.ApprovalRequestEntity;
 import com.nutalig.entity.RfqHeaderEntity;
+import com.nutalig.entity.SalesOrderEntity;
+import com.nutalig.entity.UserEntity;
 import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.UserRepository;
+import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +28,8 @@ import java.util.Map;
 public class ApprovalBusinessService {
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final UserRepository userRepository;
     private final ActivityHistoryService activityHistoryService;
     private final UserTodoService userTodoService;
     private final UserProfileService userProfileService;
@@ -33,6 +39,10 @@ public class ApprovalBusinessService {
             throws DataNotFoundException {
         if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
             handleUrgentRfqApproved(approvalRequest, actorUserId, source);
+            return;
+        }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
+            handleUrgentReadyPoApproved(approvalRequest, actorUserId, source);
             return;
         }
 
@@ -50,6 +60,10 @@ public class ApprovalBusinessService {
             handleUrgentRfqRejected(approvalRequest, actorUserId, source, reason);
             return;
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
+            handleUrgentReadyPoRejected(approvalRequest, actorUserId, source, reason);
+            return;
+        }
 
         log.info("No business rejection handler for requestType={}", approvalRequest.getRequestType());
     }
@@ -57,6 +71,9 @@ public class ApprovalBusinessService {
     public String buildTargetPath(ApprovalRequestEntity approvalRequest) {
         if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
             return "/price-inquiry/" + approvalRequest.getReferenceId();
+        }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
+            return "/sales-order/" + approvalRequest.getReferenceId();
         }
         return null;
     }
@@ -136,6 +153,96 @@ public class ApprovalBusinessService {
                 ActivityAction.REJECT,
                 source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
                 "ไม่อนุมัติคำขอเร่งด่วนของคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handleUrgentReadyPoApproved(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source
+    ) throws DataNotFoundException {
+        SalesOrderEntity entity = salesOrderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + approvalRequest.getReferenceId() + " not found."));
+        UserEntity user = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+
+        entity.setUrgentRequestStatus(UrgentRequestStatus.APPROVED);
+        entity.setUrgentApprovedBy(actor);
+        entity.setUrgentApprovedDate(now);
+        entity.setUrgentRejectedBy(null);
+        entity.setUrgentRejectedDate(null);
+        entity.setUrgentRejectReason(null);
+        entity.setProcurementStatus(ProcurementStatus.READY_FOR_PO_OVERRIDE);
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+        salesOrderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentApprovedBy", entity.getUrgentApprovedBy());
+        detail.put("urgentApprovedDate", entity.getUrgentApprovedDate());
+        detail.put("procurementStatus", entity.getProcurementStatus());
+        detail.put("approvalRequestId", approvalRequest.getId());
+        detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("approvalSource", source);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                actorUserId,
+                ActivityActorType.USER,
+                ActivityAction.APPROVE,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "อนุมัติคำขอสร้างใบสั่งซื้อเลขที่ " + entity.getSalesOrderNo(),
+                detail
+        );
+
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handleUrgentReadyPoRejected(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source,
+            String reason
+    ) throws DataNotFoundException {
+        SalesOrderEntity entity = salesOrderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + approvalRequest.getReferenceId() + " not found."));
+        UserEntity user = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+
+        entity.setUrgentRequestStatus(UrgentRequestStatus.REJECTED);
+        entity.setUrgentRejectedBy(actor);
+        entity.setUrgentRejectedDate(now);
+        entity.setUrgentRejectReason(StringUtils.trimToNull(reason));
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+        salesOrderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
+        detail.put("urgentRejectedBy", entity.getUrgentRejectedBy());
+        detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
+        detail.put("urgentRejectReason", entity.getUrgentRejectReason());
+        detail.put("approvalRequestId", approvalRequest.getId());
+        detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("approvalSource", source);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                actorUserId,
+                ActivityActorType.USER,
+                ActivityAction.REJECT,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "ไม่อนุมัติคำขอสร้างใบสั่งซื้อเลขที่ " + entity.getSalesOrderNo(),
                 detail
         );
 

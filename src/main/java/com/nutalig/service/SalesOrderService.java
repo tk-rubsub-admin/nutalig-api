@@ -75,6 +75,7 @@ public class SalesOrderService {
     private final EmployeeMapper employeeMapper;
     private final SupplierMapper supplierMapper;
     private final UserMapper userMapper;
+    private final ApprovalService approvalService;
     private final ActivityHistoryService activityHistoryService;
     private final LineMessageService lineMessageService;
     private final SystemConfigService systemConfigService;
@@ -406,6 +407,77 @@ public class SalesOrderService {
         return null;
     }
 
+    @Transactional
+    public void createUrgentApprovalRequest(
+            String salesOrderNo,
+            RequestReadyPoApproveRequest request,
+            String userId
+    ) throws Exception {
+        log.info("Create urgent approval request for sales order {} by {}", salesOrderNo, userId);
+
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        String urgentRequestMessage = request == null ? null : request.getReason();
+        if (StringUtils.isBlank(urgentRequestMessage)) {
+            throw new InvalidRequestException("urgentRequestMessage is required.");
+        }
+
+        entity.setUrgentRequest(Boolean.TRUE);
+        entity.setUrgentRequestReason(urgentRequestMessage.trim());
+        entity.setUrgentRequestStatus(UrgentRequestStatus.PENDING_APPROVAL);
+        entity.setUrgentRequestedBy(user.getDisplayName());
+        entity.setUrgentRequestedDate(now);
+        entity.setRequestPo(Boolean.TRUE);
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+
+        salesOrderRepository.save(entity);
+
+        approvalService.createUrgentReadyPoApprovalRequest(entity, userId);
+
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.REQUEST_APPROVAL,
+                ActivitySource.API,
+                "ขออนุมัติสร้างใบสั่งซื้อ",
+                null
+        );
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto approveUrgentRequest(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+        validateSuperAdmin(userId);
+
+        approvalService.approveLatestApprovalByEntity(ActivityEntityType.SALES_ORDER, id, userId);
+
+        return getSalesOrderById(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto rejectUrgentRequest(String id, RejectUrgentSalesOrderRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        validateSuperAdmin(userId);
+
+        if (request == null || StringUtils.isBlank(request.getReason())) {
+            throw new InvalidRequestException("reason is required.");
+        }
+
+        approvalService.rejectLatestApprovalByEntity(
+                ActivityEntityType.SALES_ORDER,
+                id,
+                request.getReason().trim(),
+                userId
+        );
+        return getSalesOrderById(id);
+    }
+
     private SalesOrderDocumentDto buildSalesOrderDocumentDto(SalesOrderEntity salesOrderEntity, Boolean aFalse) {
         SalesOrderDocumentDto dto = new SalesOrderDocumentDto();
         dto.setDocNo(salesOrderEntity.getSalesOrderNo());
@@ -427,6 +499,7 @@ public class SalesOrderService {
         dto.setSalesMobileNo(salesOrderEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(salesOrderEntity.getSales().getNickName());
         dto.setCoSalesId(salesOrderEntity.getCoSalesId());
+        dto.setShipping(salesOrderEntity.getShipping());
 
         if (salesOrderEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
@@ -531,6 +604,7 @@ public class SalesOrderService {
                 .and(salesIdEqual(request.getSalesId()))
                 .and(statusEqual(request.getStatus()))
                 .and(statusIn(request.getStatuses()))
+                .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
     }
@@ -1033,6 +1107,16 @@ public class SalesOrderService {
         dto.setShippingType(entity.getShippingType());
         dto.setRequestCoa(Boolean.TRUE.equals(entity.getRequestCoa()));
         dto.setRequestPo(Boolean.TRUE.equals(entity.getRequestPo()));
+        dto.setUrgentRequest(Boolean.TRUE.equals(entity.getUrgentRequest()));
+        dto.setUrgentRequestReason(entity.getUrgentRequestReason());
+        dto.setUrgentRequestStatus(entity.getUrgentRequestStatus());
+        dto.setUrgentRequestedBy(entity.getUrgentRequestedBy());
+        dto.setUrgentRequestedDate(entity.getUrgentRequestedDate());
+        dto.setUrgentApprovedBy(entity.getUrgentApprovedBy());
+        dto.setUrgentApprovedDate(entity.getUrgentApprovedDate());
+        dto.setUrgentRejectedBy(entity.getUrgentRejectedBy());
+        dto.setUrgentRejectedDate(entity.getUrgentRejectedDate());
+        dto.setUrgentRejectReason(entity.getUrgentRejectReason());
         dto.setVatRate(entity.getVatRate());
         dto.setRemark(entity.getRemark());
         dto.setRfqId(resolveRfq(entity.getSalesOrderNo()));
@@ -1087,6 +1171,15 @@ public class SalesOrderService {
         }
         dto.setItems(items);
         return dto;
+    }
+
+    private void validateSuperAdmin(String userId) throws DataNotFoundException, InvalidRequestException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        String roleCode = user.getUserRoleEntity() != null ? user.getUserRoleEntity().getRoleCode() : null;
+        if (!StringUtils.equals(roleCode, "SUPER_ADMIN")) {
+            throw new InvalidRequestException("Only SUPER_ADMIN can approve or reject urgent sales order.");
+        }
     }
 
     @NotNull

@@ -1,9 +1,6 @@
 package com.nutalig.entity;
 
-import com.nutalig.constant.Currency;
-import com.nutalig.constant.ProcurementStatus;
-import com.nutalig.constant.SalesOrderPaymentStatus;
-import com.nutalig.constant.SalesOrderStatus;
+import com.nutalig.constant.*;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,6 +8,7 @@ import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -128,6 +126,37 @@ public class SalesOrderEntity extends AuditDateEntity {
 
     @Column(name = "shipping")
     private String shipping;
+
+    @Column(name = "is_urgent_request")
+    private Boolean urgentRequest;
+
+    @Column(name = "urgent_request_reason", columnDefinition = "TEXT")
+    private String urgentRequestReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "urgent_request_status", length = 30)
+    private UrgentRequestStatus urgentRequestStatus;
+
+    @Column(name = "urgent_requested_by")
+    private String urgentRequestedBy;
+
+    @Column(name = "urgent_requested_date")
+    private ZonedDateTime urgentRequestedDate;
+
+    @Column(name = "urgent_approved_by")
+    private String urgentApprovedBy;
+
+    @Column(name = "urgent_approved_date")
+    private ZonedDateTime urgentApprovedDate;
+
+    @Column(name = "urgent_rejected_by")
+    private String urgentRejectedBy;
+
+    @Column(name = "urgent_rejected_date")
+    private ZonedDateTime urgentRejectedDate;
+
+    @Column(name = "urgent_reject_reason", columnDefinition = "TEXT")
+    private String urgentRejectReason;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "procurement_status", length = 30)

@@ -1005,15 +1005,16 @@ public class RFQService {
     @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateCustomer(
         String rfqId,
-        UpdateRfqCustomerRequest request,
+        String customerId,
         String userId
     ) throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity entity = getEntityById(rfqId);
-        if (request == null || request.getCustomerId().isEmpty()) {
+        if (StringUtils.isBlank(customerId)) {
             throw new InvalidRequestException("CustomerId is required");
         }
-        CustomerEntity customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new DataNotFoundException("Customer " + request.getCustomerId() + " not found."));
+        String trimmedCustomerId = customerId.trim();
+        CustomerEntity customer = customerRepository.findById(trimmedCustomerId)
+                .orElseThrow(() -> new DataNotFoundException("Customer " + trimmedCustomerId + " not found."));
 
         String updatedBy = userProfileService.getNameFromId(userId);
 

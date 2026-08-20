@@ -5,7 +5,10 @@ import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
+import com.nutalig.controller.rfq.request.RequestUrgentRfqApproveRequest;
 import com.nutalig.controller.salesorder.request.CreateSalesOrderRequest;
+import com.nutalig.controller.salesorder.request.RejectUrgentSalesOrderRequest;
+import com.nutalig.controller.salesorder.request.RequestReadyPoApproveRequest;
 import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
 import com.nutalig.controller.salesorder.response.CreateSalesOrderResponse;
@@ -128,5 +131,47 @@ public class SalesOrderController {
         log.info("=== End download quotation document ===");
         return ResponseEntity.ok(doc);
     }
+
+    @PostMapping("/{id}/request-urgent-approve")
+    public GeneralResponse requestUrgentApprove(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) RequestReadyPoApproveRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start request urgent approve for rfq {} by {}", id, userId);
+
+        salesOrderService.createUrgentApprovalRequest(id, request, userId);
+
+        log.info("=== end request urgent approve for rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS);
+    }
+
+    @PostMapping("/{id}/approve-urgent")
+    public GeneralResponse approveUrgentRequest(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start approve urgent sales order {} by {} ===", id, userId);
+
+        salesOrderService.approveUrgentRequest(id, userId);
+
+        log.info("=== End approve urgent sales order {} ===", id);
+        return new GeneralResponse<>(SUCCESS);
+    }
+
+    @PostMapping("/{id}/reject-urgent")
+    public GeneralResponse rejectUrgentRequest(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) RejectUrgentSalesOrderRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start reject urgent sales order {} by {} ===", id, userId);
+
+        salesOrderService.rejectUrgentRequest(id, request, userId);
+
+        log.info("=== End reject urgent sales order {} ===", id);
+        return new GeneralResponse<>(SUCCESS);
+    }
+
 
 }

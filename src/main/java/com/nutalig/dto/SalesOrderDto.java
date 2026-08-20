@@ -1,12 +1,10 @@
 package com.nutalig.dto;
 
-import com.nutalig.constant.Currency;
-import com.nutalig.constant.ProcurementStatus;
-import com.nutalig.constant.SalesOrderStatus;
-import com.nutalig.constant.SalesOrderPaymentStatus;
+import com.nutalig.constant.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Data
@@ -46,4 +44,14 @@ public class SalesOrderDto {
     private String shipping;
     private List<SalesOrderAttachmentDto> attachments;
     private List<SalesOrderDetailDto> items;
+    private Boolean urgentRequest;
+    private String urgentRequestReason;
+    private UrgentRequestStatus urgentRequestStatus;
+    private String urgentRequestedBy;
+    private ZonedDateTime urgentRequestedDate;
+    private String urgentApprovedBy;
+    private ZonedDateTime urgentApprovedDate;
+    private String urgentRejectedBy;
+    private ZonedDateTime urgentRejectedDate;
+    private String urgentRejectReason;
 }

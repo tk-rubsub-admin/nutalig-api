@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260819-001-add-urgent-request-columns-to-sales-order
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: is_urgent_request
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE sales_order
+                  ADD COLUMN is_urgent_request BIT(1) DEFAULT NULL AFTER request_po,
+                  ADD COLUMN urgent_request_reason TEXT DEFAULT NULL AFTER is_urgent_request,
+                  ADD COLUMN urgent_request_status VARCHAR(30) DEFAULT NULL AFTER urgent_request_reason,
+                  ADD COLUMN urgent_requested_by VARCHAR(255) DEFAULT NULL AFTER urgent_request_status,
+                  ADD COLUMN urgent_requested_date DATETIME(6) DEFAULT NULL AFTER urgent_requested_by,
+                  ADD COLUMN urgent_approved_by VARCHAR(255) DEFAULT NULL AFTER urgent_requested_date,
+                  ADD COLUMN urgent_approved_date DATETIME(6) DEFAULT NULL AFTER urgent_approved_by,
+                  ADD COLUMN urgent_rejected_by VARCHAR(255) DEFAULT NULL AFTER urgent_approved_date,
+                  ADD COLUMN urgent_rejected_date DATETIME(6) DEFAULT NULL AFTER urgent_rejected_by,
+                  ADD COLUMN urgent_reject_reason TEXT DEFAULT NULL AFTER urgent_rejected_date;

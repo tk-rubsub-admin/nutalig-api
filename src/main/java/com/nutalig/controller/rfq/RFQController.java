@@ -396,15 +396,29 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PatchMapping("/{id}/customers/{customerId}")
+    public GeneralResponse<RfqHeaderDto> updateCustomer(
+            @PathVariable("id") String id,
+            @PathVariable("customerId") String customerId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start update rfq customer {} by {} ===", id, userId);
+
+        RfqHeaderDto response = rfqService.updateCustomer(id, customerId, userId);
+
+        log.info("=== End update rfq customer {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PostMapping("/{id}/customers")
     public GeneralResponse<RfqHeaderDto> updateCustomer(
             @PathVariable("id") String id,
             @RequestBody UpdateRfqCustomerRequest request,
             @RequestHeader("userId") String userId
-    ) throws Exception {
+    ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start update rfq customer {} by {} ===", id, userId);
 
-        RfqHeaderDto response = rfqService.updateCustomer(id, request, userId);
+        RfqHeaderDto response = rfqService.updateCustomer(id, request == null ? null : request.getCustomerId(), userId);
 
         log.info("=== End update rfq customer {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
