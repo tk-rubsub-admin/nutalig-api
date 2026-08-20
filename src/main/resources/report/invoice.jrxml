@@ -146,7 +146,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="36f8c8e2-1203-426f-9e81-b1ffed50ae81" x="405" y="119" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="36f8c8e2-1203-426f-9e81-b1ffed50ae81" x="405" y="139" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["อ้างอิงใบเสนอราคา: " + $P{quotationNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -186,7 +186,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="07719c6c-d14a-4e5d-b464-e47e37899f51" x="405" y="139" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="07719c6c-d14a-4e5d-b464-e47e37899f51" x="405" y="119" width="150" height="20" fontName="TH SarabunPSK" fontSize="10.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["อ้างอิงใบยืนยันสั่งซื้อ: " + $P{salesOrderNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -368,7 +368,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="d5ad6dd5-933c-44aa-b92b-bfaa5f606aaa" stretchType="ContainerHeight" x="80" y="0" width="325" height="60" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
+				<element kind="textField" uuid="d5ad6dd5-933c-44aa-b92b-bfaa5f606aaa" stretchType="ContainerHeight" x="80" y="0" width="325" height="60" fontName="TH SarabunPSK" fontSize="12.0" textAdjust="StretchHeight" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
 					<expression><![CDATA[(
   ($F{name} != null && !$F{name}.trim().isEmpty()) 
     ? $F{name} + "\n" 

@@ -2345,27 +2345,19 @@ public class RFQService {
 
     public RfqHeaderDto mapToDto(RfqHeaderEntity entity) throws DataNotFoundException {
         RfqHeaderDto dto = requestPriceHeaderMapper.toDto(entity);
-        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(entity.getId());
-        dto.setQuotations(quotationEntities.stream()
-                .map(quotationEntity -> {
-                    RfqQuotationDto quotationDto = new RfqQuotationDto();
-                    quotationDto.setQuotationNo(quotationEntity.getQuotationNo());
-                    quotationDto.setRfqId(quotationEntity.getRfqId());
-                    quotationDto.setCreatedDate(quotationEntity.getCreatedDate());
-                    quotationDto.setUpdatedDate(quotationEntity.getUpdatedDate());
-                    quotationDto.setStatus(quotationEntity.getStatus());
-                    quotationDto.setStatusProfile(DocumentStatusResolver.resolveQuotation(quotationEntity.getStatus()));
-                    quotationDto.setRevNo(quotationEntity.getRevNo());
-                    quotationDto.setGrandTotal(quotationEntity.getGrandTotal());
-                    quotationDto.setDocDate(quotationEntity.getDocDate() != null ? quotationEntity.getDocDate().toString() : null);
-                    return quotationDto;
-                })
-                .toList());
-        dto.setQuotationNo(quotationEntities.isEmpty() ? null : quotationEntities.get(0).getQuotationNo());
+        List<RfqQuotationDto> quotations = getRfqQuotationDtos(entity.getId());
+        dto.setQuotations(quotations);
+        dto.setQuotationNo(quotations.isEmpty() ? null : quotations.get(0).getQuotationNo());
         return dto;
 //        dto.setServiceLevelAgreement(slaConfigService.getSlaConfigById(SLA));
 //        dto.getServiceLevelAgreement().setDayLeft(slaConfigService.calculateDayLeft(dto.getServiceLevelAgreement(), dto.getRequestedDate().toLocalDate()));
 //        return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RfqQuotationDto> getQuotationsByRfqId(String rfqId) throws DataNotFoundException {
+        getEntityById(rfqId);
+        return getRfqQuotationDtos(rfqId);
     }
 
     private RfqDetailHistoryDto mapToRfqDetailHistoryDto(RfqDetailHistoryEntity entity) {
@@ -3171,6 +3163,33 @@ public class RFQService {
     private RfqHeaderEntity getEntityById(String id) throws DataNotFoundException {
         return requestPriceHeaderRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("RFQ " + id + " not found."));
+    }
+
+    private List<RfqQuotationDto> getRfqQuotationDtos(String rfqId) {
+        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(rfqId);
+        List<RfqQuotationDto> quotations = quotationEntities.stream()
+                .map(this::toRfqQuotationDto)
+                .toList();
+
+        if (!quotations.isEmpty()) {
+            quotations.get(0).setIsLatest(true);
+        }
+
+        return quotations;
+    }
+
+    private RfqQuotationDto toRfqQuotationDto(QuotationEntity quotationEntity) {
+        RfqQuotationDto quotationDto = new RfqQuotationDto();
+        quotationDto.setQuotationNo(quotationEntity.getQuotationNo());
+        quotationDto.setRfqId(quotationEntity.getRfqId());
+        quotationDto.setCreatedDate(quotationEntity.getCreatedDate());
+        quotationDto.setUpdatedDate(quotationEntity.getUpdatedDate());
+        quotationDto.setStatus(quotationEntity.getStatus());
+        quotationDto.setStatusProfile(DocumentStatusResolver.resolveQuotation(quotationEntity.getStatus()));
+        quotationDto.setRevNo(quotationEntity.getRevNo());
+        quotationDto.setGrandTotal(quotationEntity.getGrandTotal());
+        quotationDto.setDocDate(quotationEntity.getDocDate() != null ? quotationEntity.getDocDate().toString() : null);
+        return quotationDto;
     }
 
     private SupplierEntity getSupplierEntity(String supplierId) throws DataNotFoundException {

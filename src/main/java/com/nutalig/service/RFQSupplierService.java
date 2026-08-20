@@ -1157,6 +1157,7 @@ public class RFQSupplierService {
         String template = promptService.getActivePrompt(RFQ_FINAL_QUOTE_INQUIRY_TH).getUserPromptTemplate();
         Map<String, String> variables = new LinkedHashMap<>();
         variables.put("rfqId", safeValue(rfq.getId()));
+        variables.put("date", supplierQuote.getUpdatedDate().format(DateUtil.DD_MM_YYYY));
         variables.put("supplier", supplierQuote.getSupplier() == null ? "-" : safeValue(supplierQuote.getSupplier().getSupplierName()));
         variables.put("sales", rfq.getSales().getNickName());
         variables.put("procurement", rfq.getProcurement().getNickName());

@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 public class InvoiceDocumentDto extends DefaultDocumentDto {
 
+    private String salesOrderNo;
+    private String quotationNo;
     private String referenceNo;
     private BigDecimal amount;
     private BigDecimal discount;
@@ -17,6 +19,8 @@ public class InvoiceDocumentDto extends DefaultDocumentDto {
     private BigDecimal vat;
     private String remark;
     private String thaiBahtText;
+    private String deliveryDate;
+    private String dueDate;
 
     // Customer
     private String custName;

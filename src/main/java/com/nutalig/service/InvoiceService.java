@@ -755,7 +755,9 @@ public class InvoiceService {
         dto.setDocNo(invoiceEntity.getInvoiceNo());
         dto.setDocDate(invoiceEntity.getDocDate() != null ? invoiceEntity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setIsCopy(aFalse);
-        dto.setReferenceNo(invoiceEntity.getSalesOrder() != null ? invoiceEntity.getSalesOrder().getSalesOrderNo() : invoiceEntity.getQuotationNo());
+        dto.setQuotationNo(invoiceEntity.getQuotationNo());
+        dto.setSalesOrderNo(invoiceEntity.getSalesOrder().getSalesOrderNo());
+        dto.setDueDate(invoiceEntity.getDueDate() != null ?invoiceEntity.getDueDate().format(DateUtil.DD_MM_YY) : null);
         dto.setAmount(invoiceEntity.getAmount());
         dto.setDiscount(invoiceEntity.getDiscount());
         dto.setGrandTotal(invoiceEntity.getGrandTotal());

@@ -212,6 +212,9 @@ public class SalesOrderService {
         if (request.getRequestPo() != null) {
             entity.setRequestPo(request.getRequestPo());
         }
+        if (request.getQuotationNo() != null) {
+            entity.setQuotationNo(StringUtils.trimToNull(request.getQuotationNo()));
+        }
         if (request.getRemark() != null) {
             entity.setRemark(request.getRemark());
         }

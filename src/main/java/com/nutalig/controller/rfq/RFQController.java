@@ -6,6 +6,7 @@ import com.nutalig.controller.rfq.request.*;
 import com.nutalig.controller.rfq.response.UploadRfqResponse;
 import com.nutalig.dto.RfqDetailHistoryDto;
 import com.nutalig.dto.RfqHeaderDto;
+import com.nutalig.dto.RfqQuotationDto;
 import com.nutalig.dto.RfqSupplierInquiryDto;
 import com.nutalig.dto.RfqSupplierQuoteDto;
 import com.nutalig.dto.SupplierDto;
@@ -117,6 +118,18 @@ public class RFQController {
         RfqHeaderDto response = rfqService.getRFQById(id, userId);
 
         log.info("=== End get rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{rfqId}/quotation-no")
+    public GeneralResponse<java.util.List<RfqQuotationDto>> getQuotationNosByRfqId(
+            @PathVariable("rfqId") String rfqId
+    ) throws DataNotFoundException {
+        log.info("=== Start get quotation nos for rfq {} ===", rfqId);
+
+        java.util.List<RfqQuotationDto> response = rfqService.getQuotationsByRfqId(rfqId);
+
+        log.info("=== End get quotation nos for rfq {} size {} ===", rfqId, response.size());
         return new GeneralResponse<>(SUCCESS, response);
     }
 
