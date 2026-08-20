@@ -67,6 +67,7 @@ public class InvoiceService {
     private static final String CLAIM_ACTION = "action";
     private static final String CLAIM_PAYMENT_ID = "paymentId";
     private static final String ACTION_AWAITING_VALIDATION_VIEW = "awaiting-validation-view";
+    private static final String AWAITING_VALIDATION_SUBJECT_SEPARATOR = "|";
     private static final long AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS = 24 * 60 * 60;
     private static final String PUBLIC_TOKEN_ACTOR = "PUBLIC_TOKEN";
     private static final String ACCOUNTING_ADMIN_POSITION_CODE = "ACCOUNTING_ADMIN";
@@ -1042,7 +1043,16 @@ public class InvoiceService {
         Map<String, Object> claims = new HashMap<>();
         claims.put(CLAIM_ACTION, ACTION_AWAITING_VALIDATION_VIEW);
         claims.put(CLAIM_PAYMENT_ID, paymentId);
-        return JwtUtil.generateToken(invoiceNo, claims, AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS);
+        String subject = invoiceNo + AWAITING_VALIDATION_SUBJECT_SEPARATOR + paymentId;
+        String token = JwtUtil.generateToken(subject, claims, AWAITING_VALIDATION_TOKEN_EXPIRATION_SECONDS);
+        log.info(
+                "Build awaiting validation token invoiceNo={}, paymentId={}, subject={}, token={}",
+                invoiceNo,
+                paymentId,
+                subject,
+                token
+        );
+        return token;
     }
 
     private AwaitingValidationTokenClaims parseAwaitingValidationToken(String token) throws InvalidRequestException {
@@ -1051,17 +1061,33 @@ public class InvoiceService {
         }
 
         String action = JwtUtil.getClaim(token, CLAIM_ACTION);
+        String subject = JwtUtil.getSubject(token);
+        String paymentIdValue = JwtUtil.getClaim(token, CLAIM_PAYMENT_ID);
+        log.info(
+                "Parse awaiting validation token action={}, subject={}, paymentId={}, token={}",
+                action,
+                subject,
+                paymentIdValue,
+                token
+        );
         if (!StringUtils.equalsIgnoreCase(ACTION_AWAITING_VALIDATION_VIEW, action)) {
             throw new InvalidRequestException("Awaiting validation token action mismatch.");
         }
 
-        String invoiceNo = JwtUtil.getSubject(token);
-        String paymentIdValue = JwtUtil.getClaim(token, CLAIM_PAYMENT_ID);
-        if (StringUtils.isBlank(invoiceNo) || StringUtils.isBlank(paymentIdValue)) {
-            throw new InvalidRequestException("Awaiting validation token payload is invalid.");
-        }
-
         try {
+            subject = StringUtils.trimToNull(subject);
+            if (StringUtils.isNotBlank(subject) && subject.contains(AWAITING_VALIDATION_SUBJECT_SEPARATOR)) {
+                String[] parts = subject.split("\\Q" + AWAITING_VALIDATION_SUBJECT_SEPARATOR + "\\E", 2);
+                if (parts.length == 2 && StringUtils.isNotBlank(parts[0]) && StringUtils.isNotBlank(parts[1])) {
+                    return new AwaitingValidationTokenClaims(parts[0], Long.valueOf(parts[1]));
+                }
+            }
+
+            String invoiceNo = subject;
+            if (StringUtils.isBlank(invoiceNo) || StringUtils.isBlank(paymentIdValue)) {
+                throw new InvalidRequestException("Awaiting validation token payload is invalid.");
+            }
+
             return new AwaitingValidationTokenClaims(invoiceNo, Long.valueOf(paymentIdValue));
         } catch (NumberFormatException exception) {
             throw new InvalidRequestException("Awaiting validation token payload is invalid.");
