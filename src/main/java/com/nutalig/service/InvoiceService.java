@@ -675,8 +675,8 @@ public class InvoiceService {
 
         ProcurementStatus beforeStatus = salesOrder.getProcurementStatus();
         salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
-//        salesOrderRepository.save(salesOrder);
-//        recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
+        salesOrderRepository.save(salesOrder);
+        recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
     }
 
     private boolean isDepositInvoice(InvoiceEntity invoice) {
@@ -972,7 +972,7 @@ public class InvoiceService {
 
     private void sendAwaitingValidationNotifications(InvoiceEntity invoice, InvoicePaymentEntity payment) {
         try {
-            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("SUPER_ADMIN")).stream()
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of("ADMIN")).stream()
                     .filter(user -> Status.ACTIVE.equals(user.getStatus()))
                     .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
                     .filter(user -> user.getEmployeeEntity() != null
