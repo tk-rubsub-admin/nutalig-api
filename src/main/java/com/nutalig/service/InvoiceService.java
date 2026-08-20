@@ -26,6 +26,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.UserMapper;
+import com.nutalig.repository.InvoicePaymentRepository;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
@@ -78,6 +79,7 @@ public class InvoiceService {
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
     private final InvoiceRepository invoiceRepository;
+    private final InvoicePaymentRepository invoicePaymentRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
@@ -427,7 +429,6 @@ public class InvoiceService {
         payment.setUpdatedBy(user);
         payment.setCreatedDate(now);
         payment.setUpdatedDate(now);
-        invoice.addPayment(payment);
 
         BigDecimal nextPaidTotal = beforePaidTotal.add(amount);
         BigDecimal nextOutstandingTotal = defaultIfNull(invoice.getGrandTotal()).subtract(nextPaidTotal);
@@ -443,8 +444,11 @@ public class InvoiceService {
         markSalesOrderReadyForProcurementIfDepositPaid(invoice, userId);
 
         InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
-        recordReceivePaymentActivity(saved, payment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
-        sendAwaitingValidationNotifications(saved, payment);
+        payment.setInvoice(saved);
+        InvoicePaymentEntity savedPayment = invoicePaymentRepository.saveAndFlush(payment);
+        saved.addPayment(savedPayment);
+        recordReceivePaymentActivity(saved, savedPayment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
+        sendAwaitingValidationNotifications(saved, savedPayment);
         return mapToDto(saved);
     }
 
