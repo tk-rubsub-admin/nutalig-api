@@ -1,0 +1,140 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="quaotation" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="8cac0898-3832-4fc4-bbd4-71035cbfc057">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="salesName" class="java.lang.String"/>
+	<parameter name="accountName" class="java.lang.String"/>
+	<parameter name="bankName" class="java.lang.String"/>
+	<parameter name="accountNo" class="java.lang.String"/>
+	<parameter name="signature" class="java.io.InputStream"/>
+	<parameter name="stamp" class="java.io.InputStream"/>
+	<parameter name="branchName" class="java.lang.String"/>
+	<field name="no" class="java.lang.Integer">
+		<description><![CDATA[no]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
+	</field>
+	<field name="type" class="java.lang.String">
+		<description><![CDATA[type]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="type"/>
+	</field>
+	<field name="capacity" class="java.lang.String">
+		<description><![CDATA[capacity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="capacity"/>
+	</field>
+	<field name="spec" class="java.lang.String">
+		<description><![CDATA[spec]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="spec"/>
+	</field>
+	<field name="size" class="java.lang.String">
+		<description><![CDATA[size]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="size"/>
+	</field>
+	<field name="price" class="java.math.BigDecimal">
+		<description><![CDATA[price]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="price"/>
+	</field>
+	<field name="quantity" class="java.math.BigDecimal">
+		<description><![CDATA[quantity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="quantity"/>
+	</field>
+	<field name="amount" class="java.math.BigDecimal">
+		<description><![CDATA[amount]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="amount"/>
+	</field>
+	<field name="image" class="java.io.InputStream"/>
+	<field name="name" class="java.lang.String"/>
+	<title height="258">
+		<element kind="textField" uuid="0f5d2541-616b-4a70-926e-b7ca1c9ef941" stretchType="ElementGroupHeight" x="0" y="0" width="554" height="30" markup="html" fontName="TH SarabunPSK" fontSize="12.0" textAdjust="StretchHeight" blankWhenNull="true">
+			<expression><![CDATA["<b><u>Terms and Conditions</u></b><br />"+
+"<b><u>VAT is not included in this quotation</u></b><br />" +
+"1.Enter this order in accordance with the prices, terms, Delivery method, and specifications listed above.<br />" +
+"2. no VAT 7% applied<br />" +					
+"3. final finished products meet same quality as customer want when delivered to factory for filling<br /><br />" + 
+"<b><u>Pre-order items</u></b><br />" +
+"1. Once the product has passed QC and is ready for delivery, the customer will receive an invoice for payment. The customer must complete the payment before delivery. For deliveries within Bangkok and nearby<br />" +
+"areas, or if the customer chooses to pick up the goods themselves, the pickup must be done within 1 week after payment. If the goods are picked up later than 1 week after payment, a storage fee of 5% per week of the total invoice amount will be charged.<br />" +
+"2. If the company is unable to deliver the goods, or the customer fails to pick up the goods due to incomplete final payment within 1 month without prior notice to the company, the goods listed in the invoice will be considered the property of the company. The <br />" +
+"company reserves the right to claim damages from the buyer equivalent to the total amount stated in the quotation. Additionally, a storage fee of 5% per week will be charged based on the total amount shown in the quotation.<br />" +
+"3. The product quantity might vary by 10% of ordered quantity due to production process (can be higher or lower). Customers need to pay for the actual quantity of product(s).<br />" +						
+"4. Our return and exchange policy<br />" +
+"- Item(s) must be returned within 7 days of purchase, together with the proof of purchase. <br />" +
+"- Item(s) must be unused, unworn or otherwise unused with all original trademarks attached <br />" +
+"5. After a 50% deposit has been made, product samples will be provided once the customer has submitted the artwork files. A total of 3 - 5 sample pieces will be sent for testing (if more than 3-5 samples are required, the customer must inform the company in advance).<br />" + " If any design revisions are requested, an additional fee of 7,000 THB will apply. After the customer has tested the samples and filled the product, the customer must sign on the approved sample to confirm it has passed testing and return it to the company. The company will then proceed with full production according to the agreed quantity. The production lead time is 30–60 days. The remaining balance must be paid after the production is completed and the goods are ready for delivery.<br />" +
+"6. Once the customer has signed to confirm the product and production has commenced, the company reserves the right not to issue any refunds under any circumstances.<br />" +
+"7. Within 24 hours after placing a 50% deposit, the customer may change the product design or type. However, after the 24-hour period, no changes to the product will be allowed, and the deposit will be non-refundable.<br />" +
+"8.   You need to confirm the sample product design within as soon as possible once recieved. Otherwise, the production will be delayed.<br />" +
+"9.In case of you require a sample product without deposit payment. You need to pay 5000 THB per one mock-up. Eventually, If you decide to order our product(s) this sample fee will be deducted from the lot price.<br />" +
+"10. Partners of agreement are accepted in terms and conditions as below.<br />" +		
+"11. The purchase order will be effective once it is signed by both authorised parties."]]></expression>
+			<box topPadding="5" leftPadding="5" bottomPadding="5" rightPadding="5">
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="frame" uuid="a57d22f2-25ad-4008-a732-a1a80365c23f" positionType="Float" x="0" y="30" width="555" height="140">
+			<element kind="staticText" uuid="b1d47070-39e0-402f-b5ce-23a48f08289c" positionType="Float" x="0" y="0" width="160" height="27" fontName="TH SarabunPSK" fontSize="12.0" vTextAlign="Middle">
+				<text><![CDATA[Bank Account :]]></text>
+				<box topPadding="0" leftPadding="5" bottomPadding="0" rightPadding="0">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="2d4feb62-3e32-47e1-acea-5c617caedb4c" positionType="Float" x="0" y="27" width="160" height="103" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+				<expression><![CDATA["Account Name:  " + $P{accountName} + "\n" +
+"Bank Name:  " + $P{bankName} + "\n" + 
+"Branch: " + $P{branchName} + "\n" +
+"Account Number:  " + $P{accountNo} + "\n" + 
+"Contact for Receipt: 02-18700213 (K' Oat)"]]></expression>
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="8d12dfc1-e9d6-40de-b64f-df643cadb49b" positionType="Float" x="160" y="0" width="214" height="130" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Top">
+				<expression><![CDATA["Nuttadaj Tachasirodom" + "\n" + 
+"Quoted By"+ "\n\n\n" +
+"....................................................................... " + "\n" + 
+"Ordered By" + "\n" +
+"Remark: The price following this quotation is effected \n" + "for 7 days"]]></expression>
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box topPadding="8" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="staticText" uuid="a43f469d-2a04-49c2-b179-abd13e244626" positionType="Float" x="373" y="0" width="181" height="130" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Bottom">
+				<text><![CDATA[.......................................................................
+Approved by
+Nuttadaj Tachasirodom
+Managing Director
+]]></text>
+				<box topPadding="3" leftPadding="5">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="0415d240-2726-4db5-9316-14dba8f468dd" x="420" y="8" width="100" height="58" hImageAlign="Center" vImageAlign="Bottom">
+				<expression><![CDATA[$P{signature}]]></expression>
+			</element>
+			<element kind="image" uuid="d59f20b7-4d3a-468d-96ae-10da6dd872a9" positionType="Float" x="280" y="-29" width="180" height="180" hImageAlign="Center" vImageAlign="Bottom">
+				<expression><![CDATA[$P{stamp}]]></expression>
+			</element>
+		</element>
+	</title>
+</jasperReport>

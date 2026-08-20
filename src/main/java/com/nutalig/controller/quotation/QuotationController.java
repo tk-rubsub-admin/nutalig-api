@@ -1,6 +1,7 @@
 package com.nutalig.controller.quotation;
 
 import com.nutalig.constant.ExportFileFormat;
+import com.nutalig.constant.TemplateLanguage;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.quotation.request.SearchQuotationRequest;
 import com.nutalig.controller.quotation.response.SearchQuotationResponse;
@@ -71,12 +72,13 @@ public class QuotationController {
     public ResponseEntity<DownloadDocumentDto> getQuotationDocumentById(
             @RequestParam(name = "id") String id,
             @RequestParam(name = "format") ExportFileFormat format,
+            @RequestParam(name = "lang") TemplateLanguage lang,
             @RequestParam(name = "isOriginal") Boolean isOriginal,
             @RequestParam(name = "isCopy") Boolean isCopy
     ) throws Exception {
         log.info("=== Start download quotation document ===");
 
-        DownloadDocumentDto doc = quotationService.getQuotationDocumentById(id, new DocumentRequest(format, isOriginal, isCopy));
+        DownloadDocumentDto doc = quotationService.getQuotationDocumentById(id, new DocumentRequest(format, lang, isOriginal, isCopy));
 
         if (doc == null || doc.getFiles() == null || doc.getFiles().isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -89,6 +91,7 @@ public class QuotationController {
     @PostMapping("/pdf-url")
     public GeneralResponse<UploadFileResponse> generateQuotationPdfUrl(
             @RequestParam(name = "id") String id,
+            @RequestParam(name = "lang") TemplateLanguage lang,
             @RequestParam(name = "isOriginal", defaultValue = "true") Boolean isOriginal,
             @RequestParam(name = "isCopy", defaultValue = "false") Boolean isCopy
     ) throws Exception {
@@ -96,7 +99,7 @@ public class QuotationController {
 
         UploadFileResponse response = quotationService.generateQuotationPdfUrl(
                 id,
-                new DocumentRequest(ExportFileFormat.PDF, isOriginal, isCopy)
+                new DocumentRequest(ExportFileFormat.PDF, lang, isOriginal, isCopy)
         );
 
         log.info("=== End generate quotation pdf url ===");

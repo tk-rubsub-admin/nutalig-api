@@ -73,7 +73,7 @@
 	<field name="image" class="java.io.InputStream"/>
 	<field name="name" class="java.lang.String"/>
 	<background splitType="Stretch"/>
-	<title height="200" splitType="Stretch">
+	<title height="180" splitType="Stretch">
 		<element kind="frame" uuid="3f7d5642-3b74-481d-9048-940b11765daf" x="0" y="0" width="555" height="180" forecolor="#C0C0C0">
 			<property name="com.jaspersoft.studio.unit.width" value="px"/>
 			<element kind="staticText" uuid="dacaaa14-a72d-4ed6-b2f4-a3c99b2728f3" x="0" y="1" width="554" height="58" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center">

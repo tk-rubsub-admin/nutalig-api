@@ -11,5 +11,6 @@ public class TermAndConditionDocumentDto {
     private String salesName;
     private String accountName;
     private String bankName;
+    private String branchName;
     private String accountNo;
 }

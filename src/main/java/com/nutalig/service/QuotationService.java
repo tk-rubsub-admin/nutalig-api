@@ -476,16 +476,32 @@ public class QuotationService {
                 .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
 
         String fileName = quotationEntity.getQuotationNo();
-        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) > 0, quotationEntity.getSales()), documentRequest.getFormat());
+        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(
+                buildTermAndConditionDocumentDto(
+                        quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) > 0,
+                        quotationEntity.getSales(),
+                        documentRequest.getLang()
+                ),
+                documentRequest.getFormat(),
+                documentRequest.getLang()
+        );
         if (documentRequest.getFormat().equals(ExportFileFormat.PDF)) {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
-                pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getQuotationDocument(
+                        buildQuotationDocumentDto(quotationEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
+                ));
                 pdfBytesList.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
-                pdfBytesList.add((byte[]) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getQuotationDocument(
+                        buildQuotationDocumentDto(quotationEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
+                ));
                 pdfBytesList.add(termAndCondPages);
             }
 
@@ -495,12 +511,20 @@ public class QuotationService {
             List<byte[]> pages = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
-                List<byte[]> originalPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.FALSE), documentRequest.getFormat());
+                List<byte[]> originalPages = (List<byte[]>) reportService.getQuotationDocument(
+                        buildQuotationDocumentDto(quotationEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
+                );
                 pages.addAll(originalPages);
                 pages.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
-                List<byte[]> copyPages = (List<byte[]>) reportService.getQuotationDocument(buildQuotationDocumentDto(quotationEntity, Boolean.TRUE), documentRequest.getFormat());
+                List<byte[]> copyPages = (List<byte[]>) reportService.getQuotationDocument(
+                        buildQuotationDocumentDto(quotationEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
+                );
                 pages.addAll(copyPages);
                 pages.add(termAndCondPages);
             }
@@ -566,24 +590,34 @@ public class QuotationService {
         return fileStorageService.uploadGeneratedFile(content, quotationNo, pdfFile.getContentType());
     }
 
-    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(Boolean isVat, EmployeeEntity sales) {
+    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(
+            Boolean isVat,
+            EmployeeEntity sales,
+            TemplateLanguage language
+    ) {
         TermAndConditionDocumentDto dto = new TermAndConditionDocumentDto();
         dto.setSalesName(sales.getFirstNameTh() + " " + sales.getLastNameTh());
         if (!isVat) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
-            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO", language));
+            dto.setBranchName(systemConfigService.getConfig(noVatConfig, "BRANCH_NAME", language));
         } else {
             List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
-            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO", language));
+            dto.setBranchName(systemConfigService.getConfig(vatConfig, "BRANCH_NAME", language));
         }
         return dto;
     }
 
-    private QuotationDocumentDto  buildQuotationDocumentDto(QuotationEntity quotationEntity, Boolean aFalse) {
+    private QuotationDocumentDto  buildQuotationDocumentDto(
+            QuotationEntity quotationEntity,
+            Boolean aFalse,
+            TemplateLanguage language
+    ) {
         QuotationDocumentDto dto = new QuotationDocumentDto();
         dto.setDocNo(quotationEntity.getQuotationNo());
         dto.setDocDate(quotationEntity.getDocDate().format(DateUtil.DD_MM_YY));
@@ -619,14 +653,16 @@ public class QuotationService {
 
         if (quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
-            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO", language));
+            dto.setBranchName(systemConfigService.getConfig(noVatConfig, "BRANCH_NAME", language));
         } else {
             List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
-            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO", language));
+            dto.setBranchName(systemConfigService.getConfig(vatConfig, "BRANCH_NAME", language));
         }
 
         List<QuotationItemDocumentDto> itemDocuments = getItemDocumentDtos(quotationEntity);

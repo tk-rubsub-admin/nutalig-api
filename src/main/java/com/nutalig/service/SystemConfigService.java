@@ -7,6 +7,7 @@ import com.nutalig.controller.systemconfig.request.CreateSystemConfigRequest;
 import com.nutalig.controller.systemconfig.request.SearchSystemConfigRequest;
 import com.nutalig.controller.systemconfig.request.UpdateSystemConfigRequest;
 import com.nutalig.controller.systemconfig.response.GetAllSystemConfigResponse;
+import com.nutalig.constant.TemplateLanguage;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
@@ -128,11 +129,11 @@ public class SystemConfigService {
                 .toList();
     }
 
-    public String getConfig(List<SystemConfigDto> config, String code) {
+    public String getConfig(List<SystemConfigDto> config, String code, TemplateLanguage language) {
         return config.stream()
                 .filter(c -> code.equalsIgnoreCase(c.getCode()))
                 .findFirst()
-                .map(SystemConfigDto::getNameTh)
+                .map(c -> TemplateLanguage.EN.equals(language) ? c.getNameEn() : c.getNameTh())
                 .orElse("");
     }
 

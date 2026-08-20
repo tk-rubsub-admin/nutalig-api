@@ -3,6 +3,7 @@ package com.nutalig.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.ReceiptType;
+import com.nutalig.constant.TemplateLanguage;
 import com.nutalig.dto.document.*;
 import com.nutalig.utils.JasperReportUtil;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +36,11 @@ public class ReportService {
     private static final String NUTALIG_LOGO = "report/logo_nutalig.jpg";
     private static final String NUTALIG_STAMP = "report/stamp_nutalig.png";
     private static final String SIGNATURE = "report/signature.png";
-    private static final String TERM_COND_TEMPLATE = "report/termAndCondition.jrxml";
+    private static final String TERM_COND_TEMPLATE_TH = "report/termAndCondition_th.jrxml";
+    private static final String TERM_COND_TEMPLATE_EN = "report/termAndCondition_en.jrxml";
     private static final String INVOICE_TEMPLATE = "report/invoice.jrxml";
-    private static final String QUOTATION_TEMPLATE = "report/quotation.jrxml";
+    private static final String QUOTATION_TEMPLATE_TH = "report/quotation_th.jrxml";
+    private static final String QUOTATION_TEMPLATE_EN = "report/quotation_en.jrxml";
     private static final String SALES_ORDER_TEMPLATE = "report/salesOrder.jrxml";
     private static final String PURCHASE_ORDER_TEMPLATE = "report/purchaseOrder.jrxml";
     private static final String DEPOSIT_RECEIPT_TEMPLATE = "report/depositReceipt.jrxml";
@@ -48,18 +51,19 @@ public class ReportService {
     private final ObjectMapper objectMapper;
 
     /* ======================= PUBLIC APIs ======================= */
-    public Object getTermAndConditionDocument(TermAndConditionDocumentDto dto, ExportFileFormat format) throws Exception {
+    public Object getTermAndConditionDocument(TermAndConditionDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
         parameters.put("salesName", dto.getSalesName());
         parameters.put("stamp", loadResource(NUTALIG_STAMP));
         parameters.put("signature", loadResource(SIGNATURE));
         parameters.put("bankName", dto.getBankName());
+        parameters.put("branchName", dto.getBranchName());
         parameters.put("accountName", dto.getAccountName());
         parameters.put("accountNo", dto.getAccountNo());
 
         JasperPrint jasperPrint = buildJasperPrint(
-                TERM_COND_TEMPLATE,
+                TemplateLanguage.EN.equals(language) ? TERM_COND_TEMPLATE_EN : TERM_COND_TEMPLATE_TH,
                 parameters,
                 new JREmptyDataSource(1)
         );
@@ -75,7 +79,7 @@ public class ReportService {
         return null;
     }
 
-    public Object getQuotationDocument(QuotationDocumentDto dto, ExportFileFormat format) throws Exception {
+    public Object getQuotationDocument(QuotationDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
         parameters.put("docNo", dto.getDocNo());
@@ -104,9 +108,10 @@ public class ReportService {
         parameters.put("bankName", dto.getBankName());
         parameters.put("accountName", dto.getAccountName());
         parameters.put("accountNo", dto.getAccountNo());
+        parameters.put("branchName", dto.getBranchName());
 
         JasperPrint jasperPrint = buildJasperPrint(
-                QUOTATION_TEMPLATE,
+                TemplateLanguage.EN.equals(language) ? QUOTATION_TEMPLATE_EN : QUOTATION_TEMPLATE_TH,
                 parameters,
                 new JRBeanCollectionDataSource(dto.getItems())
         );
@@ -152,6 +157,7 @@ public class ReportService {
         parameters.put("bankName", dto.getBankName());
         parameters.put("accountName", dto.getAccountName());
         parameters.put("accountNo", dto.getAccountNo());
+        parameters.put("branchName", dto.getBranchName());
 
         JasperPrint jasperPrint = buildJasperPrint(
                 SALES_ORDER_TEMPLATE,
@@ -203,6 +209,7 @@ public class ReportService {
         parameters.put("bankName", dto.getBankName());
         parameters.put("accountName", dto.getAccountName());
         parameters.put("accountNo", dto.getAccountNo());
+        parameters.put("branchName", dto.getBranchName());
 
         JasperPrint jasperPrint = buildJasperPrint(
                 INVOICE_TEMPLATE,

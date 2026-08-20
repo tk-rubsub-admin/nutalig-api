@@ -500,10 +500,16 @@ public class InvoiceService {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
-                pdfBytesList.add((byte[]) reportService.getInvoiceDocument(buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getInvoiceDocument(
+                        buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                ));
             }
             if (documentRequest.getIsCopy()) {
-                pdfBytesList.add((byte[]) reportService.getInvoiceDocument(buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getInvoiceDocument(
+                        buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                ));
             }
 
             byte[] mergedPdf = PdfMergeUtil.merge(pdfBytesList);
@@ -512,11 +518,17 @@ public class InvoiceService {
             List<byte[]> pages = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
-                List<byte[]> originalPages = (List<byte[]>) reportService.getInvoiceDocument(buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE), documentRequest.getFormat());
+                List<byte[]> originalPages = (List<byte[]>) reportService.getInvoiceDocument(
+                        buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                );
                 pages.addAll(originalPages);
             }
             if (documentRequest.getIsCopy()) {
-                List<byte[]> copyPages = (List<byte[]>) reportService.getInvoiceDocument(buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE), documentRequest.getFormat());
+                List<byte[]> copyPages = (List<byte[]>) reportService.getInvoiceDocument(
+                        buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                );
                 pages.addAll(copyPages);
             }
             List<DownloadDocumentDto.FileItem> files = new ArrayList<>();
@@ -811,7 +823,11 @@ public class InvoiceService {
         return dto;
     }
 
-    private InvoiceDocumentDto buildInvoiceDocumentDto(InvoiceEntity invoiceEntity, Boolean aFalse) {
+    private InvoiceDocumentDto buildInvoiceDocumentDto(
+            InvoiceEntity invoiceEntity,
+            Boolean aFalse,
+            TemplateLanguage language
+    ) {
         InvoiceDocumentDto dto = new InvoiceDocumentDto();
         dto.setDocNo(invoiceEntity.getInvoiceNo());
         dto.setDocDate(invoiceEntity.getDocDate() != null ? invoiceEntity.getDocDate().format(DateUtil.DD_MM_YY) : null);
@@ -861,14 +877,14 @@ public class InvoiceService {
 
         if (defaultIfNull(invoiceEntity.getVatRate()).compareTo(BigDecimal.ZERO) == 0) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
-            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO", language));
         } else {
             List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
-            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO", language));
         }
 
         dto.setItems(getItemDocumentDtos(invoiceEntity));

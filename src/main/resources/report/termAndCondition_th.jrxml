@@ -7,6 +7,7 @@
 	<parameter name="accountNo" class="java.lang.String"/>
 	<parameter name="signature" class="java.io.InputStream"/>
 	<parameter name="stamp" class="java.io.InputStream"/>
+	<parameter name="branchName" class="java.lang.String"/>
 	<field name="no" class="java.lang.Integer">
 		<description><![CDATA[no]]></description>
 		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
@@ -154,6 +155,7 @@
 			<element kind="textField" uuid="2d4feb62-3e32-47e1-acea-5c617caedb4c" positionType="Float" x="0" y="27" width="160" height="69" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
 				<expression><![CDATA["ชื่อบัญชี:  " + $P{accountName} + "\n" +
 "ธนาคาร:  " + $P{bankName} + "\n" + 
+"สาขา:" + $P{branchName} + "\n" +
 "เลขบัญชี:  " + $P{accountNo} + "\n"]]></expression>
 				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>

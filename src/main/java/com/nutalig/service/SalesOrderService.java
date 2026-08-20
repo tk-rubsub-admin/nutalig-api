@@ -377,16 +377,30 @@ public class SalesOrderService {
                 .orElseThrow(() -> new DataNotFoundException("Sales Order " + salesOrderNo + " not found."));
 
         String fileName = salesOrderEntity.getSalesOrderNo();
-        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(buildTermAndConditionDocumentDto(salesOrderEntity.getVat().compareTo(BigDecimal.ZERO) > 0, salesOrderEntity.getSales()), documentRequest.getFormat());
+        byte[] termAndCondPages = (byte[]) reportService.getTermAndConditionDocument(
+                buildTermAndConditionDocumentDto(
+                        salesOrderEntity.getVat().compareTo(BigDecimal.ZERO) > 0,
+                        salesOrderEntity.getSales(),
+                        documentRequest.getLang()
+                ),
+                documentRequest.getFormat(),
+                documentRequest.getLang()
+        );
         if (documentRequest.getFormat().equals(ExportFileFormat.PDF)) {
             List<byte[]> pdfBytesList = new ArrayList<>();
 
             if (documentRequest.getIsOriginal()) {
-                pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(
+                        buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                ));
                 pdfBytesList.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
-                pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE), documentRequest.getFormat()));
+                pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(
+                        buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                ));
                 pdfBytesList.add(termAndCondPages);
             }
 
@@ -395,12 +409,18 @@ public class SalesOrderService {
         } else if (documentRequest.getFormat().equals(ExportFileFormat.JPG)) {
             List<byte[]> pages = new ArrayList<>();
             if (documentRequest.getIsOriginal()) {
-                List<byte[]> originalPages = (List<byte[]>) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE), documentRequest.getFormat());
+                List<byte[]> originalPages = (List<byte[]>) reportService.getSalesOrderDocument(
+                        buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                );
                 pages.addAll(originalPages);
                 pages.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
-                List<byte[]> copyPages = (List<byte[]>) reportService.getSalesOrderDocument(buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE), documentRequest.getFormat());
+                List<byte[]> copyPages = (List<byte[]>) reportService.getSalesOrderDocument(
+                        buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE, documentRequest.getLang()),
+                        documentRequest.getFormat()
+                );
                 pages.addAll(copyPages);
                 pages.add(termAndCondPages);
             }
@@ -486,7 +506,11 @@ public class SalesOrderService {
         return getSalesOrderById(id);
     }
 
-    private SalesOrderDocumentDto buildSalesOrderDocumentDto(SalesOrderEntity salesOrderEntity, Boolean aFalse) {
+    private SalesOrderDocumentDto buildSalesOrderDocumentDto(
+            SalesOrderEntity salesOrderEntity,
+            Boolean aFalse,
+            TemplateLanguage language
+    ) {
         SalesOrderDocumentDto dto = new SalesOrderDocumentDto();
         dto.setDocNo(salesOrderEntity.getSalesOrderNo());
         dto.setDocDate(salesOrderEntity.getDocDate().format(DateUtil.DD_MM_YY));
@@ -512,14 +536,14 @@ public class SalesOrderService {
 
         if (salesOrderEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
-            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO", language));
         } else {
             List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
-            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO", language));
         }
 
         List<SalesOrderItemDocumentDto> itemDocuments = getItemDocumentDtos(salesOrderEntity);
@@ -1245,19 +1269,23 @@ public class SalesOrderService {
                 .orElse(null);
     }
 
-    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(Boolean isVat, EmployeeEntity sales) {
+    private TermAndConditionDocumentDto buildTermAndConditionDocumentDto(
+            Boolean isVat,
+            EmployeeEntity sales,
+            TemplateLanguage language
+    ) {
         TermAndConditionDocumentDto dto = new TermAndConditionDocumentDto();
         dto.setSalesName(sales.getFirstNameTh() + " " + sales.getLastNameTh());
         if (!isVat) {
             List<SystemConfigDto> noVatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_NO_VAT);
-            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(noVatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(noVatConfig, "ACCOUNT_NO", language));
         } else {
             List<SystemConfigDto> vatConfig = systemConfigService.getSystemConfigByGroupCode(SystemConstant.REPORT_VAT);
-            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME"));
-            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME"));
-            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO"));
+            dto.setBankName(systemConfigService.getConfig(vatConfig, "BANK_NAME", language));
+            dto.setAccountName(systemConfigService.getConfig(vatConfig, "ACCOUNT_NAME", language));
+            dto.setAccountNo(systemConfigService.getConfig(vatConfig, "ACCOUNT_NO", language));
         }
         return dto;
     }

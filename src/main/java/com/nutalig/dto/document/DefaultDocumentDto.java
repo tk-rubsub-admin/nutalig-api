@@ -12,6 +12,7 @@ public class DefaultDocumentDto {
     private FileInputStream logo;
     private String accountName;
     private String bankName;
+    private String branchName;
     private String accountNo;
     private Boolean isCopy = false;
 }
