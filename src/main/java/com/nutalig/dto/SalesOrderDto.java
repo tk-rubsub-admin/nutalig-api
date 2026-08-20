@@ -54,4 +54,5 @@ public class SalesOrderDto {
     private String urgentRejectedBy;
     private ZonedDateTime urgentRejectedDate;
     private String urgentRejectReason;
+    private String quotationNo;
 }

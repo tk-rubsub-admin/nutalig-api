@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 public class SalesOrderDocumentDto extends DefaultDocumentDto {
 
+    private String quotationNo;
     private BigDecimal discount;
     private BigDecimal grandTotal;
     private BigDecimal freight;

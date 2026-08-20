@@ -132,7 +132,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="71b009ef-8538-4f9e-81b5-1266513f2995" x="405" y="120" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="71b009ef-8538-4f9e-81b5-1266513f2995" x="405" y="140" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["TEL: " + $P{custMobileNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>

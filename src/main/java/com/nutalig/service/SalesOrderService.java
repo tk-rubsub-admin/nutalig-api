@@ -50,6 +50,7 @@ import java.util.*;
 
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.SALES_ORDER_PREFIX;
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
+import static com.nutalig.constant.SystemConstant.REPORT_ROW;
 import static com.nutalig.repository.specification.SalesOrderSpecification.*;
 
 @Slf4j
@@ -109,6 +110,7 @@ public class SalesOrderService {
 
         SalesOrderEntity entity = new SalesOrderEntity();
         entity.setSalesOrderNo(salesOrderNo);
+        entity.setQuotationNo(request.getQuotationNo());
         entity.setDocDate(request.getDocDate() == null ? today : request.getDocDate());
         entity.setExpireDate(request.getExpireDate() == null ? today.plusDays(7) : request.getExpireDate());
         entity.setStatus(status);
@@ -218,6 +220,9 @@ public class SalesOrderService {
         }
         if (request.getItems() != null) {
             replaceSalesOrderItems(entity, request.getItems());
+        }
+        if (request.getShipping() != null) {
+            entity.setShipping(request.getShipping());
         }
         BigDecimal calculatedSubTotal = null;
         if (request.getSubTotal() != null) {
@@ -482,6 +487,7 @@ public class SalesOrderService {
         SalesOrderDocumentDto dto = new SalesOrderDocumentDto();
         dto.setDocNo(salesOrderEntity.getSalesOrderNo());
         dto.setDocDate(salesOrderEntity.getDocDate().format(DateUtil.DD_MM_YY));
+        dto.setQuotationNo(salesOrderEntity.getQuotationNo());
         dto.setIsCopy(aFalse);
         dto.setDiscount(salesOrderEntity.getDiscount());
         dto.setGrandTotal(salesOrderEntity.getGrandTotal());
@@ -977,7 +983,7 @@ public class SalesOrderService {
     }
 
     private String generateSalesOrderNo() {
-        return generatedIdSequenceService.getNextIdWithMonth(SALES_ORDER_PREFIX, 6);
+        return generatedIdSequenceService.getNextIdWithMonth(SALES_ORDER_PREFIX, 4);
     }
 
     private CustomerEntity resolveCustomer(String input) throws DataNotFoundException {
@@ -1123,6 +1129,7 @@ public class SalesOrderService {
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
         dto.setRevNo(entity.getRevNo());
+        dto.setQuotationNo(entity.getQuotationNo());
 
         List<SalesOrderAttachmentDto> attachments = new ArrayList<>();
         for (SalesOrderAttachmentEntity attachment : entity.getAttachments()) {
@@ -1203,7 +1210,9 @@ public class SalesOrderService {
 
             itemDocuments.add(item);
         }
-        while (itemDocuments.size() < 5) {
+        SystemConfigEntity rowCount = systemConfigService.getConfigEntity(REPORT_ROW, "SO");
+        int row = rowCount != null ? Integer.valueOf(rowCount.getNameTh()) : 4;
+        while (itemDocuments.size() < row) {
             itemDocuments.add(new SalesOrderItemDocumentDto());
         }
 

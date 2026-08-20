@@ -22,5 +22,6 @@ public class UpdateSalesOrderRequest {
     private Boolean requestCoa;
     private Boolean requestPo;
     private String remark;
+    private String shipping;
     private List<UpdateSalesOrderDetailRequest> items;
 }

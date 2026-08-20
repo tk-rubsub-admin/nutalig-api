@@ -14,6 +14,7 @@ public enum SystemConstant {
     ORDER_TYPE,
     REPORT_VAT,
     REPORT_NO_VAT,
+    REPORT_ROW,
     QUOTATION_EXPIRE_DAY,
     SALES_ORDER_EXPIRE_DAY,
     INVOICE_EXPIRE_DAY,

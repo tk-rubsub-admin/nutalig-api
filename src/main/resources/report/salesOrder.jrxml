@@ -38,6 +38,7 @@
 	<parameter name="coSalesId" class="java.lang.String"/>
 	<parameter name="salesId" class="java.lang.String"/>
 	<parameter name="shipping" class="java.lang.String"/>
+	<parameter name="quotationNo" class="java.lang.String"/>
 	<field name="no" class="java.lang.Integer">
 		<description><![CDATA[no]]></description>
 		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
@@ -120,7 +121,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="6fd12d7b-ef39-40a5-ba41-c8c57543bdf4" x="405" y="100" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="6fd12d7b-ef39-40a5-ba41-c8c57543bdf4" x="405" y="120" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["วันที่/ Date: " + $P{docDate}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -131,9 +132,9 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="71b009ef-8538-4f9e-81b5-1266513f2995" x="405" y="120" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="71b009ef-8538-4f9e-81b5-1266513f2995" x="405" y="100" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["TEL: " + $P{custMobileNo}]]></expression>
+				<expression><![CDATA["อ้างอิง: " + $P{quotationNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<box topPadding="3" leftPadding="5">
 					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
@@ -170,6 +171,17 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</element>
 			<element kind="image" uuid="eb8f10d3-79b1-4a97-b9d9-3d2df7be8127" x="2" y="2" width="50" height="50">
 				<expression><![CDATA[$P{logo}]]></expression>
+			</element>
+			<element kind="textField" uuid="d24b2803-1f92-4d5d-b3ee-71e73253eb8b" x="405" y="140" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["TEL: " + $P{custMobileNo}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
 			</element>
 			<box>
 				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>

@@ -521,7 +521,7 @@ public class PurchaseOrderService {
     }
 
     private String generatePurchaseOrderNo() {
-        return generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 6);
+        return generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 4);
     }
 
     private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests) {

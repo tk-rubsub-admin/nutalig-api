@@ -162,6 +162,9 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "procurement_status", length = 30)
     private ProcurementStatus procurementStatus;
 
+    @Column(name = "quotation_no", length = 50)
+    private String quotationNo;
+
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder asc, id asc")
     @ToString.Exclude

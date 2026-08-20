@@ -131,6 +131,7 @@ public class ReportService {
         parameters.put("custTaxId", dto.getCustTaxId());
         parameters.put("custAddress", dto.getCustAddress());
         parameters.put("custMobileNo", dto.getCustMobileNo());
+        parameters.put("quotationNo", dto.getQuotationNo());
 
         parameters.put("salesId", dto.getSalesId());
         parameters.put("salesName", dto.getSalesName());

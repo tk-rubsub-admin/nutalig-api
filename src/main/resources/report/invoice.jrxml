@@ -44,6 +44,7 @@
 	<parameter name="quotationNo" class="java.lang.String"/>
 	<parameter name="salesOrderNo" class="java.lang.String"/>
 	<parameter name="dueDate" class="java.lang.String"/>
+	<parameter name="deliveryDate" class="java.lang.String"/>
 	<field name="no" class="java.lang.Integer">
 		<description><![CDATA[no]]></description>
 		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
@@ -79,14 +80,18 @@
 	<field name="name" class="java.lang.String"/>
 	<field name="sku" class="java.lang.String"/>
 	<background splitType="Stretch"/>
-	<title height="283">
-		<element kind="frame" uuid="4edfd933-dd4a-4693-8074-f4ed474966ba" x="0" y="1" width="555" height="282" forecolor="#C0C0C0">
+	<title height="282">
+		<element kind="frame" uuid="4edfd933-dd4a-4693-8074-f4ed474966ba" x="0" y="0" width="555" height="282" forecolor="#C0C0C0">
 			<property name="com.jaspersoft.studio.unit.width" value="px"/>
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
 			<element kind="staticText" uuid="6826a290-87fb-42dc-a650-a01407baa85a" x="52" y="0" width="502" height="51" fontName="TH SarabunPSK" fontSize="16.0" hTextAlign="Left">
 				<text><![CDATA[บริษัท นูทาร์ลิค จำกัด เลขที่ 334 ถนนลาดพร้าว 101 แขวงคลองจั่น เขตบางกะปิ กรุงเทพ 10240 โทร. 02-187-0213]]></text>
 				<box topPadding="5" leftPadding="5">
-					<topPen lineWidth="2.0"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
 			<element kind="staticText" uuid="2dfa8a65-3dd4-4332-9e55-e08a63b932ac" mode="Opaque" x="0" y="58" width="555" height="41" backcolor="#C0C0C0" fontName="TH SarabunPSK" fontSize="16.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
@@ -102,13 +107,14 @@ INVOICE (Not TAX INVOICE)]]></text>
 					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 				</box>
 			</element>
-			<element kind="textField" uuid="c972977e-8a97-40e4-a181-af582b2e44ca" x="0" y="199" width="555" height="80" fontName="TH SarabunPSK" fontSize="12.0">
+			<element kind="textField" uuid="c972977e-8a97-40e4-a181-af582b2e44ca" x="0" y="219" width="555" height="60" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["ชื่อ, ที่อยู่ (ลูกค้า): " + $P{custName} +  "เลขประจำตัวผู้เสียภาษี " + $P{custTaxId} + "\n" + 
+				<expression><![CDATA["ชื่อ, ที่อยู่ (ลูกค้า): " + $P{custName} +  " เลขประจำตัวผู้เสียภาษี " + $P{custTaxId} + "\n" + 
 "Name, Address: " + $P{custAddress} + "\n" +
 "TEL: " + $P{custMobileNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box topPadding="3" leftPadding="5">
 					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
@@ -183,6 +189,18 @@ INVOICE (Not TAX INVOICE)]]></text>
 			<element kind="textField" uuid="07719c6c-d14a-4e5d-b464-e47e37899f51" x="405" y="139" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["อ้างอิงใบยืนยันสั่งซื้อ: " + $P{salesOrderNo}]]></expression>
+				<property name="com.jaspersoft.studio.unit.x" value="px"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="6c36f520-7ebd-4657-9466-fed1afc3b2df" x="405" y="199" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
+				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+				<expression><![CDATA["กำหนดส่งสินค้า: " + $P{deliveryDate}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<box topPadding="3" leftPadding="5">
@@ -338,7 +356,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 			<element kind="frame" uuid="841a05f4-cc41-4700-aef8-db8b122e7797" x="0" y="0" width="555" height="60">
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				<element kind="textField" uuid="874fe312-b0c3-44b1-9ec2-a57404420695" x="0" y="0" width="80" height="60" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
+				<element kind="textField" uuid="874fe312-b0c3-44b1-9ec2-a57404420695" stretchType="ContainerHeight" x="0" y="0" width="80" height="60" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Center" vTextAlign="Middle">
 					<expression><![CDATA[$F{sku}]]></expression>
 					<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
 					<property name="com.jaspersoft.studio.unit.width" value="px"/>
@@ -350,7 +368,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="d5ad6dd5-933c-44aa-b92b-bfaa5f606aaa" x="80" y="0" width="325" height="60" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
+				<element kind="textField" uuid="d5ad6dd5-933c-44aa-b92b-bfaa5f606aaa" stretchType="ContainerHeight" x="80" y="0" width="325" height="60" fontName="TH SarabunPSK" fontSize="12.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Top">
 					<expression><![CDATA[(
   ($F{name} != null && !$F{name}.trim().isEmpty()) 
     ? $F{name} + "\n" 
@@ -382,7 +400,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="bc99101f-6f81-4dce-8f69-96cf652b115a" x="405" y="0" width="54" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+				<element kind="textField" uuid="bc99101f-6f81-4dce-8f69-96cf652b115a" stretchType="ContainerHeight" x="405" y="0" width="54" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.00000;(#,##0.00000)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
 					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 					<expression><![CDATA[$F{price}]]></expression>
 					<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -395,7 +413,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="a9b25051-1302-4bc6-8b4d-4e497c102271" x="459" y="0" width="50" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+				<element kind="textField" uuid="a9b25051-1302-4bc6-8b4d-4e497c102271" stretchType="ContainerHeight" x="459" y="0" width="50" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
 					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 					<expression><![CDATA[$F{quantity}]]></expression>
 					<property name="com.jaspersoft.studio.unit.x" value="px"/>
@@ -408,7 +426,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="textField" uuid="564da3eb-7f5c-4c8b-9d8f-9a2d3064ae01" x="509" y="0" width="46" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
+				<element kind="textField" uuid="564da3eb-7f5c-4c8b-9d8f-9a2d3064ae01" stretchType="ContainerHeight" x="509" y="0" width="46" height="60" fontName="TH SarabunPSK" fontSize="12.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" hTextAlign="Right" vTextAlign="Middle">
 					<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 					<expression><![CDATA[$F{amount}]]></expression>
 					<property name="com.jaspersoft.studio.unit.x" value="px"/>

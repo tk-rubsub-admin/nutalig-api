@@ -56,6 +56,7 @@ import java.time.ZonedDateTime;
 import java.util.*;
 
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.INVOICE_PREFIX;
+import static com.nutalig.constant.SystemConstant.REPORT_ROW;
 import static com.nutalig.repository.specification.InvoiceSpecification.*;
 
 @Slf4j
@@ -857,7 +858,9 @@ public class InvoiceService {
             itemDocuments.add(item);
         }
 
-        while (itemDocuments.size() < 7) {
+        SystemConfigEntity rowCount = systemConfigService.getConfigEntity(REPORT_ROW, "INV");
+        int row = rowCount != null ? Integer.valueOf(rowCount.getNameTh()) : 4;
+        while (itemDocuments.size() < row) {
             itemDocuments.add(new InvoiceItemDocumentDto());
         }
 

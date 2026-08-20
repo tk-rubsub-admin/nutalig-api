@@ -53,6 +53,7 @@ import java.util.*;
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.DOWNLOAD_QUOTATION_TH;
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.QUOTATION_NOT_FOUND_TH;
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
+import static com.nutalig.constant.SystemConstant.REPORT_ROW;
 import static com.nutalig.repository.specification.QuotationSpecification.*;
 
 @Slf4j
@@ -702,7 +703,9 @@ public class QuotationService {
             itemDocuments.add(item);
         }
 
-        while (itemDocuments.size() < 5) {
+        SystemConfigEntity rowCount = systemConfigService.getConfigEntity(REPORT_ROW, "QT");
+        int row = rowCount != null ? Integer.valueOf(rowCount.getNameTh()) : 4;
+        while (itemDocuments.size() < row) {
             itemDocuments.add(new QuotationItemDocumentDto());
         }
 

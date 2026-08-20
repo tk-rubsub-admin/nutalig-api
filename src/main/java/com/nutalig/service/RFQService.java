@@ -932,7 +932,7 @@ public class RFQService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("count", addedDetails.size());
         detail.put("details", addedDetails);
-        detail.put("request", requests);
+        detail.put("request", objectMapper.writeValueAsString(requests));
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
