@@ -1273,7 +1273,6 @@ databaseChangeLog:
                   quotation_no VARCHAR(50) DEFAULT NULL,
                   doc_date DATE DEFAULT NULL,
                   due_date DATE DEFAULT NULL,
-                  delivery_date DATE DEFAULT NULL,
                   status VARCHAR(30) NOT NULL,
                   currency VARCHAR(10) DEFAULT NULL,
                   customer_id VARCHAR(255) DEFAULT NULL,
