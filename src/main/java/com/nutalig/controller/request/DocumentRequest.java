@@ -18,7 +18,7 @@ public class DocumentRequest {
 
     public DocumentRequest(ExportFileFormat format, Boolean isOriginal, Boolean isCopy) {
         this.format = format;
-        this.lang = TemplateLanguage.EN;
+        this.lang = TemplateLanguage.TH;
         this.isOriginal = isOriginal;
         this.isCopy = isCopy;
     }

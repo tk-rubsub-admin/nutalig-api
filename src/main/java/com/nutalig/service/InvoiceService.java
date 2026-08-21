@@ -448,7 +448,7 @@ public class InvoiceService {
         InvoicePaymentEntity savedPayment = invoicePaymentRepository.saveAndFlush(payment);
         saved.addPayment(savedPayment);
         recordReceivePaymentActivity(saved, savedPayment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
-        sendAwaitingValidationNotifications(saved, savedPayment);
+//        sendAwaitingValidationNotifications(saved, savedPayment);
         return mapToDto(saved);
     }
 
