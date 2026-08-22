@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -156,7 +157,11 @@ public class ApprovalService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ApprovalRequestDto createUrgentReadyPoApprovalRequest(SalesOrderEntity salesOrderEntity, String userId) throws Exception {
+    public ApprovalRequestDto createUrgentReadyPoApprovalRequest(
+            SalesOrderEntity salesOrderEntity,
+            LocalDate paymentScheduleDate,
+            String userId
+    ) throws Exception {
         if (salesOrderEntity == null) {
             throw new InvalidRequestException("Sales order is required.");
         }
@@ -182,7 +187,9 @@ public class ApprovalService {
         request.setRequestedDate(now);
         request.setCreatedBy(userId);
         request.setUpdatedBy(userId);
-        request.setPayloadJson(objectMapper.writeValueAsString(buildUrgentReadyPoPayload(salesOrderEntity, actor)));
+        request.setPayloadJson(objectMapper.writeValueAsString(
+                buildUrgentReadyPoPayload(salesOrderEntity, paymentScheduleDate, actor)
+        ));
 
         ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
         step.setStepNo(1);
@@ -663,13 +670,21 @@ public class ApprovalService {
         return payload;
     }
 
-    private Map<String, Object> buildUrgentReadyPoPayload(SalesOrderEntity salesOrderEntity, String actorName) {
+    private Map<String, Object> buildUrgentReadyPoPayload(
+            SalesOrderEntity salesOrderEntity,
+            LocalDate paymentScheduleDate,
+            String actorName
+    ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("salesOrderNo", salesOrderEntity.getSalesOrderNo());
         payload.put("customerName", salesOrderEntity.getCustomer() != null ? salesOrderEntity.getCustomer().getCustomerName() : "-");
         payload.put("requesterName", actorName);
         payload.put("urgentReason", salesOrderEntity.getUrgentRequestReason());
         payload.put("requestedDate", salesOrderEntity.getUrgentRequestedDate() != null ? salesOrderEntity.getUrgentRequestedDate().toString() : null);
+        payload.put(
+                "paymentScheduleDate",
+                paymentScheduleDate == null ? null : paymentScheduleDate.toString()
+        );
         payload.put("requestPo", salesOrderEntity.getRequestPo());
         payload.put("procurementStatus", salesOrderEntity.getProcurementStatus() != null ? salesOrderEntity.getProcurementStatus().name() : null);
         payload.put("statusText", "รออนุมัติ");
@@ -691,6 +706,10 @@ public class ApprovalService {
             placeholders.put("requestNo", String.valueOf(payload.getOrDefault("salesOrderNo", request.getReferenceId())));
             placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
             placeholders.put("requesterName", String.valueOf(payload.getOrDefault("requesterName", request.getRequestedBy())));
+            placeholders.put(
+                    "paymentScheduleDate",
+                    String.valueOf(payload.getOrDefault("paymentScheduleDate", "-"))
+            );
             placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("urgentReason", "-")));
         } else {
             placeholders.put("entityLabel", "คำขอราคาเร่งด่วน");

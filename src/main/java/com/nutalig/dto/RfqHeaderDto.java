@@ -1,6 +1,7 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.RequestInfoTo;
 import com.nutalig.constant.UrgentRequestStatus;
 import lombok.Data;
 
@@ -60,6 +61,7 @@ public class RfqHeaderDto {
     private Boolean isCreatedPurchaseOrder;
     private String shippingMethod;
     private String requestInformation;
+    private RequestInfoTo requestTo;
     private String note;
     private String remark;
     private List<RfqStatusTimelineDto> rfqStatusTimeline;

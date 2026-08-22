@@ -1325,7 +1325,15 @@ public class RFQSupplierService {
 
         RfqSupplierQuoteDetailEntity entity = new RfqSupplierQuoteDetailEntity();
         if (request.getRfqDetailId() != null) {
-            entity.setRequestPriceDetail(getDetailFromHeader(rfq, request.getRfqDetailId()));
+            try {
+                entity.setRequestPriceDetail(getDetailFromHeader(rfq, request.getRfqDetailId()));
+            } catch (DataNotFoundException exception) {
+                log.warn(
+                        "RFQ detail {} not found in RFQ {} while saving supplier quote detail; saving without rfqDetail relation.",
+                        request.getRfqDetailId(),
+                        rfq.getId()
+                );
+            }
         }
         entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
         entity.setSpec(request.getSpec().trim());

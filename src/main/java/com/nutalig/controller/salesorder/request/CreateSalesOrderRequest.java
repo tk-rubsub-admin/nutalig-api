@@ -25,6 +25,7 @@ public class CreateSalesOrderRequest {
     private String shippingType;
     private Boolean requestCoa;
     private Boolean requestPo;
+    private LocalDate paymentScheduleDate;
     private String remark;
     private String shipping;
     private String quotationNo;

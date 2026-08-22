@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260822-001-add-request-to-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: request_to
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE rfq_header
+                  ADD COLUMN request_to VARCHAR(30) DEFAULT NULL AFTER request_information;

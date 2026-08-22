@@ -293,8 +293,8 @@ public class QuotationService {
         quotationEntity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         quotationEntity.setUpdatedBy(actor);
 
-        quotationRepository.save(quotationEntity);
-        recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
+//        quotationRepository.save(quotationEntity);
+//        recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
 
         return mapToDto(quotationEntity);
     }

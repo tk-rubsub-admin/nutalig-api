@@ -127,6 +127,7 @@ public class SalesOrderService {
         entity.setShipping(request.getShipping());
         entity.setRequestCoa(Boolean.TRUE.equals(request.getRequestCoa()));
         entity.setRequestPo(Boolean.TRUE.equals(request.getRequestPo()));
+        entity.setPaymentScheduleDate(request.getPaymentScheduleDate());
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
         entity.setProcurementStatus(ProcurementStatus.NOT_READY);
         entity.setPaymentStatus(SalesOrderPaymentStatus.UNPAID);
@@ -211,6 +212,9 @@ public class SalesOrderService {
         }
         if (request.getRequestPo() != null) {
             entity.setRequestPo(request.getRequestPo());
+        }
+        if (request.getPaymentScheduleDate() != null) {
+            entity.setPaymentScheduleDate(request.getPaymentScheduleDate());
         }
         if (request.getQuotationNo() != null) {
             entity.setQuotationNo(StringUtils.trimToNull(request.getQuotationNo()));
@@ -453,6 +457,9 @@ public class SalesOrderService {
         if (StringUtils.isBlank(urgentRequestMessage)) {
             throw new InvalidRequestException("urgentRequestMessage is required.");
         }
+        if (request == null || request.getPaymentScheduleDate() == null) {
+            throw new InvalidRequestException("paymentScheduleDate is required.");
+        }
 
         entity.setUrgentRequest(Boolean.TRUE);
         entity.setUrgentRequestReason(urgentRequestMessage.trim());
@@ -460,12 +467,13 @@ public class SalesOrderService {
         entity.setUrgentRequestedBy(user.getDisplayName());
         entity.setUrgentRequestedDate(now);
         entity.setRequestPo(Boolean.TRUE);
+        entity.setPaymentScheduleDate(request.getPaymentScheduleDate());
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);
 
         salesOrderRepository.save(entity);
 
-        approvalService.createUrgentReadyPoApprovalRequest(entity, userId);
+        approvalService.createUrgentReadyPoApprovalRequest(entity, request.getPaymentScheduleDate(), userId);
 
         activityHistoryService.record(
                 ActivityEntityType.SALES_ORDER,
@@ -960,6 +968,7 @@ public class SalesOrderService {
         detail.put("shippingType", entity.getShippingType());
         detail.put("requestCoa", entity.getRequestCoa());
         detail.put("requestPo", entity.getRequestPo());
+        detail.put("paymentScheduleDate", entity.getPaymentScheduleDate());
         detail.put("procurementStatus", entity.getProcurementStatus());
         detail.put("paymentStatus", entity.getPaymentStatus());
         detail.put("paidTotal", entity.getPaidTotal());
@@ -1140,6 +1149,7 @@ public class SalesOrderService {
         dto.setShippingType(entity.getShippingType());
         dto.setRequestCoa(Boolean.TRUE.equals(entity.getRequestCoa()));
         dto.setRequestPo(Boolean.TRUE.equals(entity.getRequestPo()));
+        dto.setPaymentScheduleDate(entity.getPaymentScheduleDate() == null ? null : entity.getPaymentScheduleDate().toString());
         dto.setUrgentRequest(Boolean.TRUE.equals(entity.getUrgentRequest()));
         dto.setUrgentRequestReason(entity.getUrgentRequestReason());
         dto.setUrgentRequestStatus(entity.getUrgentRequestStatus());

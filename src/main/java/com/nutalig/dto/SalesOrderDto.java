@@ -34,6 +34,7 @@ public class SalesOrderDto {
     private BigDecimal coSaleCommission;
     private Boolean requestCoa;
     private Boolean requestPo;
+    private String paymentScheduleDate;
     private ProcurementStatus procurementStatus;
     private String shippingType;
     private BigDecimal vatRate;

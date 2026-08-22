@@ -124,6 +124,9 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "request_po")
     private Boolean requestPo;
 
+    @Column(name = "payment_schedule_date")
+    private LocalDate paymentScheduleDate;
+
     @Column(name = "shipping")
     private String shipping;
 

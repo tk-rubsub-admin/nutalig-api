@@ -21,6 +21,7 @@ public class UpdateSalesOrderRequest {
     private String shippingType;
     private Boolean requestCoa;
     private Boolean requestPo;
+    private LocalDate paymentScheduleDate;
     private String quotationNo;
     private String remark;
     private String shipping;

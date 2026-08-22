@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260821-001-add-payment-schedule-date-to-sales-order
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: payment_schedule_date
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE sales_order
+                  ADD COLUMN payment_schedule_date DATE DEFAULT NULL AFTER request_po;
