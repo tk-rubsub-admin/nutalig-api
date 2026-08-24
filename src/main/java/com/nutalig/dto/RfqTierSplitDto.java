@@ -15,6 +15,7 @@ public class RfqTierSplitDto {
     private BigDecimal sellPrice;
     private BigDecimal commission;
     private Currency currency;
+    private String containerSize;
     private BigDecimal landFreightCost;
     private BigDecimal landFreightQty;
     private BigDecimal seaFreightQty;

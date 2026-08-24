@@ -183,6 +183,7 @@ databaseChangeLog:
                   quote_detail_id BIGINT NOT NULL,
                   quantity DECIMAL(18,0) NOT NULL,
                   product_price DECIMAL(18,4) NOT NULL,
+                  container_size VARCHAR(20) DEFAULT NULL,
                   land_freight_cost DECIMAL(18,4) DEFAULT NULL,
                   sea_freight_cost DECIMAL(18,4) DEFAULT NULL,
                   land_total_price DECIMAL(18,4) DEFAULT NULL,
@@ -2963,3 +2964,23 @@ databaseChangeLog:
       file: db/changelog/20260822-001-add-request-to-to-rfq-header.yaml
   - include:
       file: db/changelog/20260814-001-add-rfq-detail-archive-history.yaml
+  - include:
+      file: db/changelog/20260824-001-add-container-size-to-rfq-tier.yaml
+
+  - changeSet:
+      id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote_tier
+                columnName: container_size
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_tier
+            columns:
+              - column:
+                  name: container_size
+                  type: VARCHAR(20)
+                  remarks: Container size for supplier quote tier

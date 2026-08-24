@@ -502,13 +502,15 @@ public class InvoiceService {
             if (documentRequest.getIsOriginal()) {
                 pdfBytesList.add((byte[]) reportService.getInvoiceDocument(
                         buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 ));
             }
             if (documentRequest.getIsCopy()) {
                 pdfBytesList.add((byte[]) reportService.getInvoiceDocument(
                         buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 ));
             }
 
@@ -520,14 +522,16 @@ public class InvoiceService {
             if (documentRequest.getIsOriginal()) {
                 List<byte[]> originalPages = (List<byte[]>) reportService.getInvoiceDocument(
                         buildInvoiceDocumentDto(invoiceEntity, Boolean.FALSE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 );
                 pages.addAll(originalPages);
             }
             if (documentRequest.getIsCopy()) {
                 List<byte[]> copyPages = (List<byte[]>) reportService.getInvoiceDocument(
                         buildInvoiceDocumentDto(invoiceEntity, Boolean.TRUE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 );
                 pages.addAll(copyPages);
             }

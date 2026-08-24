@@ -1262,6 +1262,7 @@ public class RFQService {
         tierEntity.setProductPrice(scaleMoney(request.getProductPrice()));
         tierEntity.setCommission(scaleMoney(request.getCommission()));
         tierEntity.setCurrency(request.getCurrency());
+        tierEntity.setContainerSize(StringUtils.trimToNull(request.getContainerSize()));
         tierEntity.setLandFreightCost(scaleMoney(request.getLandFreightCost()));
         tierEntity.setSeaFreightCost(scaleMoney(request.getSeaFreightCost()));
         boolean isShareFcl = Boolean.TRUE.equals(request.getIsShareFCL());
@@ -2963,6 +2964,7 @@ public class RFQService {
                 tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
                 tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
                 tierEntity.setCurrency(tierRequest.getCurrency());
+                tierEntity.setContainerSize(StringUtils.trimToNull(tierRequest.getContainerSize()));
                 tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
                 tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
                 boolean isShareFcl = Boolean.TRUE.equals(tierRequest.getIsShareFCL());
@@ -2997,6 +2999,7 @@ public class RFQService {
                 tierSplitEntity.setSellPrice(scaleMoney(tierSplitRequest.getSellPrice()));
                 tierSplitEntity.setCommission(scaleMoney(tierSplitRequest.getCommission()));
                 tierSplitEntity.setCurrency(tierSplitRequest.getCurrency());
+                tierSplitEntity.setContainerSize(StringUtils.trimToNull(tierSplitRequest.getContainerSize()));
                 tierSplitEntity.setLandFreightCost(scaleMoney(tierSplitRequest.getLandFreightCost()));
                 tierSplitEntity.setLandFreightQty(scaleMoney(tierSplitRequest.getLandFreightQty()));
                 tierSplitEntity.setSeaFreightQty(scaleMoney(tierSplitRequest.getSeaFreightQty()));
@@ -3114,6 +3117,7 @@ public class RFQService {
         snapshot.put("productPrice", tier.getProductPrice());
         snapshot.put("commission", tier.getCommission());
         snapshot.put("currency", tier.getCurrency() == null ? null : tier.getCurrency().name());
+        snapshot.put("containerSize", tier.getContainerSize());
         snapshot.put("landFreightCost", tier.getLandFreightCost());
         snapshot.put("seaFreightCost", tier.getSeaFreightCost());
         snapshot.put("isFcl", tier.getIsFcl());
@@ -3133,6 +3137,7 @@ public class RFQService {
         snapshot.put("sellPrice", tierSplit.getSellPrice());
         snapshot.put("commission", tierSplit.getCommission());
         snapshot.put("currency", tierSplit.getCurrency() == null ? null : tierSplit.getCurrency().name());
+        snapshot.put("containerSize", tierSplit.getContainerSize());
         snapshot.put("landFreightCost", tierSplit.getLandFreightCost());
         snapshot.put("landFreightQty", tierSplit.getLandFreightQty());
         snapshot.put("seaFreightQty", tierSplit.getSeaFreightQty());

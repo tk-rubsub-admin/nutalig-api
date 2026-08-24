@@ -45,6 +45,7 @@
 	<parameter name="salesOrderNo" class="java.lang.String"/>
 	<parameter name="dueDate" class="java.lang.String"/>
 	<parameter name="deliveryDate" class="java.lang.String"/>
+	<parameter name="depositLabel" class="java.lang.String"/>
 	<field name="no" class="java.lang.Integer">
 		<description><![CDATA[no]]></description>
 		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
@@ -569,7 +570,7 @@ INVOICE (Not TAX INVOICE)]]></text>
 		</element>
 		<element kind="textField" uuid="2937e388-58e8-4ed9-a030-30d3fabea4f1" x="405" y="60" width="104" height="20" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Middle">
 			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-			<expression><![CDATA["หักมัดจำ"]]></expression>
+			<expression><![CDATA[$P{depositLabel}]]></expression>
 			<property name="com.jaspersoft.studio.unit.x" value="px"/>
 			<property name="com.jaspersoft.studio.unit.width" value="px"/>
 			<property name="com.jaspersoft.studio.unit.y" value="px"/>

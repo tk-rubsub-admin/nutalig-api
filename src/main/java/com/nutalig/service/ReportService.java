@@ -41,7 +41,10 @@ public class ReportService {
     private static final String INVOICE_TEMPLATE = "report/invoice.jrxml";
     private static final String QUOTATION_TEMPLATE_TH = "report/quotation_th.jrxml";
     private static final String QUOTATION_TEMPLATE_EN = "report/quotation_en.jrxml";
-    private static final String SALES_ORDER_TEMPLATE = "report/salesOrder.jrxml";
+    private static final String SALES_ORDER_TEMPLATE = "report/salesOrder_th.jrxml";
+    private static final String SALES_ORDER_TEMPLATE_EN = "report/salesOrder_en.jrxml";
+    private static final String INVOICE_TEMPLATE_TH = "report/invoice_th.jrxml";
+    private static final String INVOICE_TEMPLATE_EN = "report/invoice_en.jrxml";
     private static final String PURCHASE_ORDER_TEMPLATE = "report/purchaseOrder.jrxml";
     private static final String DEPOSIT_RECEIPT_TEMPLATE = "report/depositReceipt.jrxml";
     private static final String DEPOSIT_RECEIPT_TAX_INVOICE_TEMPLATE = "report/depositReceiptTaxInvoice.jrxml";
@@ -127,7 +130,7 @@ public class ReportService {
         return null;
     }
 
-    public Object getSalesOrderDocument(SalesOrderDocumentDto dto, ExportFileFormat format) throws Exception {
+    public Object getSalesOrderDocument(SalesOrderDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
         parameters.put("docNo", dto.getDocNo());
@@ -160,7 +163,7 @@ public class ReportService {
         parameters.put("branchName", dto.getBranchName());
 
         JasperPrint jasperPrint = buildJasperPrint(
-                SALES_ORDER_TEMPLATE,
+                TemplateLanguage.EN.equals(language) ? SALES_ORDER_TEMPLATE_EN : SALES_ORDER_TEMPLATE,
                 parameters,
                 new JRBeanCollectionDataSource(dto.getItems())
         );
@@ -176,7 +179,7 @@ public class ReportService {
         return null;
     }
 
-    public Object getInvoiceDocument(InvoiceDocumentDto dto, ExportFileFormat format) throws Exception {
+    public Object getInvoiceDocument(InvoiceDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
         parameters.put("docNo", dto.getDocNo());
@@ -212,7 +215,7 @@ public class ReportService {
         parameters.put("branchName", dto.getBranchName());
 
         JasperPrint jasperPrint = buildJasperPrint(
-                INVOICE_TEMPLATE,
+                TemplateLanguage.EN.equals(language) ? INVOICE_TEMPLATE_EN : INVOICE_TEMPLATE_TH,
                 parameters,
                 new JRBeanCollectionDataSource(dto.getItems())
         );

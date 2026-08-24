@@ -566,6 +566,7 @@ public class RFQSupplierService {
                     continue;
                 }
 
+                tierRequest.setContainerSize(StringUtils.trimToNull(tierRequest.getContainerSize()));
                 if (tierRequest.getCommission() == null || BigDecimal.ZERO.equals(tierRequest.getCommission())) {
                     tierRequest.setCommission(BigDecimal.valueOf(100));
                 }
@@ -674,6 +675,9 @@ public class RFQSupplierService {
             throw new InvalidRequestException("Supplier quote is required.");
         }
         Map<String, Object> beforeDetail = buildSupplierQuoteActivityDetail(quote);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        boolean shouldPromoteToSupplierQuoted = RfqStatus.SPECIAL_PRICE_REVIEW.equals(rfq.getStatus());
+        RfqStatus beforeStatus = rfq.getStatus();
 
         if (StringUtils.isNotBlank(request.getSupplierId())
                 && !Objects.equals(request.getSupplierId(), quote.getSupplier().getId())) {
@@ -692,6 +696,30 @@ public class RFQSupplierService {
         applySupplierQuoteRequest(rfq, quote, request, userId);
 
         quote = rfqSupplierQuoteRepository.save(quote);
+
+        if (shouldPromoteToSupplierQuoted) {
+            rfq.setStatus(RfqStatus.SUPPLIER_QUOTED);
+            rfq.setQuotedDate(now);
+            rfq.setUpdatedBy(userProfileService.getNameFromId(userId));
+            rfq.setUpdatedDate(now);
+            rfq = requestPriceHeaderRepository.save(rfq);
+            saveRfqStatusTimeline(rfq, RfqStatus.SUPPLIER_QUOTED, now);
+
+            Map<String, Object> statusDetail = new LinkedHashMap<>();
+            statusDetail.put("beforeStatus", beforeStatus);
+            statusDetail.put("afterStatus", RfqStatus.SUPPLIER_QUOTED);
+
+            activityHistoryService.record(
+                    ActivityEntityType.RFQ,
+                    rfq.getId(),
+                    userId,
+                    ActivityActorType.USER,
+                    ActivityAction.STATUS_CHANGE,
+                    ActivitySource.API,
+                    "ปรับสถานะคำขอราคาเลขที่ " + rfq.getId() + " เป็น " + RfqStatus.SUPPLIER_QUOTED,
+                    statusDetail
+            );
+        }
 
         Map<String, Object> afterDetail = buildSupplierQuoteActivityDetail(quote);
         Map<String, Object> detail = new LinkedHashMap<>();
@@ -888,6 +916,7 @@ public class RFQSupplierService {
                 ? entity.getCurrency()
                 : entity.getShippingCostCurrency());
         dto.setCurrency(dto.getProductPriceCurrency());
+        dto.setContainerSize(entity.getContainerSize());
         dto.setSortOrder(entity.getSortOrder());
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setUpdatedDate(entity.getUpdatedDate());
@@ -1079,6 +1108,7 @@ public class RFQSupplierService {
         detail.put("currency", entity.getProductPriceCurrency() == null
                 ? entity.getCurrency()
                 : entity.getProductPriceCurrency());
+        detail.put("containerSize", entity.getContainerSize());
         detail.put("sortOrder", entity.getSortOrder());
         return detail;
     }
@@ -1373,6 +1403,7 @@ public class RFQSupplierService {
                 ? request.getCurrency()
                 : request.getShippingCostCurrency());
         entity.setCurrency(entity.getProductPriceCurrency());
+        entity.setContainerSize(StringUtils.trimToNull(request.getContainerSize()));
         entity.setSortOrder(sortOrder);
         return entity;
     }

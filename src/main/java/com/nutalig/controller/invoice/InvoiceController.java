@@ -2,6 +2,7 @@ package com.nutalig.controller.invoice;
 
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.PaymentMethod;
+import com.nutalig.constant.TemplateLanguage;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
@@ -139,12 +140,16 @@ public class InvoiceController {
     public ResponseEntity<DownloadDocumentDto> getInvoiceDocumentById(
             @RequestParam(name = "id") String id,
             @RequestParam(name = "format") ExportFileFormat format,
+            @RequestParam(name = "lang", defaultValue = "TH") TemplateLanguage lang,
             @RequestParam(name = "isOriginal") Boolean isOriginal,
             @RequestParam(name = "isCopy") Boolean isCopy
     ) throws Exception {
         log.info("=== Start download invoice document ===");
 
-        DownloadDocumentDto doc = invoiceService.getInvoiceDocumentById(id, new DocumentRequest(format, isOriginal, isCopy));
+        DownloadDocumentDto doc = invoiceService.getInvoiceDocumentById(
+                id,
+                new DocumentRequest(format, lang, isOriginal, isCopy)
+        );
 
         if (doc == null || doc.getFiles() == null || doc.getFiles().isEmpty()) {
             return ResponseEntity.notFound().build();

@@ -50,4 +50,7 @@ public class RfqSupplierQuoteTierEntity extends AuditDateEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "currency", length = 10)
     private Currency currency;
+
+    @Column(name = "container_size", length = 20)
+    private String containerSize;
 }

@@ -396,14 +396,16 @@ public class SalesOrderService {
             if (documentRequest.getIsOriginal()) {
                 pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(
                         buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 ));
                 pdfBytesList.add(termAndCondPages);
             }
             if (documentRequest.getIsCopy()) {
                 pdfBytesList.add((byte[]) reportService.getSalesOrderDocument(
                         buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 ));
                 pdfBytesList.add(termAndCondPages);
             }
@@ -415,7 +417,8 @@ public class SalesOrderService {
             if (documentRequest.getIsOriginal()) {
                 List<byte[]> originalPages = (List<byte[]>) reportService.getSalesOrderDocument(
                         buildSalesOrderDocumentDto(salesOrderEntity, Boolean.FALSE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 );
                 pages.addAll(originalPages);
                 pages.add(termAndCondPages);
@@ -423,7 +426,8 @@ public class SalesOrderService {
             if (documentRequest.getIsCopy()) {
                 List<byte[]> copyPages = (List<byte[]>) reportService.getSalesOrderDocument(
                         buildSalesOrderDocumentDto(salesOrderEntity, Boolean.TRUE, documentRequest.getLang()),
-                        documentRequest.getFormat()
+                        documentRequest.getFormat(),
+                        documentRequest.getLang()
                 );
                 pages.addAll(copyPages);
                 pages.add(termAndCondPages);
@@ -646,6 +650,7 @@ public class SalesOrderService {
                 .and(statusEqual(request.getStatus()))
                 .and(statusIn(request.getStatuses()))
                 .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
+                .and(procurementStatusIn(request.getProcurementStatus()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
     }

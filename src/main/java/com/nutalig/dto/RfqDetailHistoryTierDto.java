@@ -13,6 +13,7 @@ public class RfqDetailHistoryTierDto {
     private BigDecimal productPrice;
     private BigDecimal commission;
     private Currency currency;
+    private String containerSize;
     private BigDecimal landFreightCost;
     private BigDecimal seaFreightCost;
     private Boolean isFcl;

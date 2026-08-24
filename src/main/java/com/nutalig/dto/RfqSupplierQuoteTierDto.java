@@ -16,6 +16,7 @@ public class RfqSupplierQuoteTierDto {
     private Currency productPriceCurrency;
     private Currency shippingCostCurrency;
     private Currency currency;
+    private String containerSize;
     private Integer sortOrder;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;

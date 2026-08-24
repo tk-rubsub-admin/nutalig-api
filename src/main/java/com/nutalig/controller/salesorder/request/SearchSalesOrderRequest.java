@@ -2,6 +2,7 @@ package com.nutalig.controller.salesorder.request;
 
 import com.nutalig.constant.SalesOrderStatus;
 import com.nutalig.constant.UrgentRequestStatus;
+import com.nutalig.constant.ProcurementStatus;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -17,5 +18,6 @@ public class SearchSalesOrderRequest {
     private SalesOrderStatus status;
     private List<SalesOrderStatus> statuses;
     private UrgentRequestStatus urgentRequestStatus;
+    private List<ProcurementStatus> procurementStatus;
     private String keyword;
 }

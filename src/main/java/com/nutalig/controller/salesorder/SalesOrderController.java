@@ -1,6 +1,7 @@
 package com.nutalig.controller.salesorder;
 
 import com.nutalig.constant.ExportFileFormat;
+import com.nutalig.constant.TemplateLanguage;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
@@ -117,12 +118,16 @@ public class SalesOrderController {
     public ResponseEntity<DownloadDocumentDto> getSalesOrderDocumentById(
             @RequestParam(name = "id") String id,
             @RequestParam(name = "format") ExportFileFormat format,
+            @RequestParam(name = "lang", defaultValue = "TH") TemplateLanguage lang,
             @RequestParam(name = "isOriginal") Boolean isOriginal,
             @RequestParam(name = "isCopy") Boolean isCopy
     ) throws Exception {
         log.info("=== Start download sales order document ===");
 
-        DownloadDocumentDto doc = salesOrderService.getSalesOrderDocumentById(id, new DocumentRequest(format, isOriginal, isCopy));
+        DownloadDocumentDto doc = salesOrderService.getSalesOrderDocumentById(
+                id,
+                new DocumentRequest(format, lang, isOriginal, isCopy)
+        );
 
         if (doc == null || doc.getFiles() == null || doc.getFiles().isEmpty()) {
             return ResponseEntity.notFound().build();

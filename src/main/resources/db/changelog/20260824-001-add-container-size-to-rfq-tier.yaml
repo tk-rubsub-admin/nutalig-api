@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260824-001-add-container-size-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: container_size
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: container_size
+                  type: VARCHAR(20)
+                  remarks: Container size for FCL tiers
+
+  - changeSet:
+      id: 20260824-002-add-container-size-to-rfq-tier-split
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier_split
+                columnName: container_size
+      changes:
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: container_size
+                  type: VARCHAR(20)
+                  remarks: Container size for FCL tier splits
