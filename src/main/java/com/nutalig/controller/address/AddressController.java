@@ -1,6 +1,7 @@
 package com.nutalig.controller.address;
 
 import com.nutalig.controller.response.GeneralResponse;
+import com.nutalig.dto.CountryDto;
 import com.nutalig.dto.DistrictDto;
 import com.nutalig.dto.ProvinceDto;
 import com.nutalig.dto.SubDistrictDto;
@@ -22,6 +23,16 @@ import static com.nutalig.constant.ResponseStatus.SUCCESS;
 public class AddressController {
 
     private final AddressService addressService;
+
+    @GetMapping("/v1/countries")
+    public GeneralResponse<List<CountryDto>> getCountry() {
+        log.info("=== Start get country ===");
+
+        List<CountryDto> countryDtos = addressService.getAllCountry();
+
+        log.info("=== End get country ===");
+        return new GeneralResponse<>(SUCCESS, countryDtos);
+    }
 
     @GetMapping("/v1/provinces")
     public GeneralResponse<List<ProvinceDto>> getProvince() {

@@ -1,0 +1,21 @@
+[
+  { "code": "BN", "code3": "BRN", "name": "Brunei", "nameTh": "บรูไน" },
+  { "code": "KH", "code3": "KHM", "name": "Cambodia", "nameTh": "กัมพูชา" },
+  { "code": "CN", "code3": "CHN", "name": "China", "nameTh": "จีน" },
+  { "code": "ID", "code3": "IDN", "name": "Indonesia", "nameTh": "อินโดนีเซีย" },
+  { "code": "JP", "code3": "JPN", "name": "Japan", "nameTh": "ญี่ปุ่น" },
+  { "code": "JO", "code3": "JOR", "name": "Jordan", "nameTh": "จอร์แดน" },
+  { "code": "LA", "code3": "LAO", "name": "Laos", "nameTh": "ลาว" },
+  { "code": "MY", "code3": "MYS", "name": "Malaysia", "nameTh": "มาเลเซีย" },
+  { "code": "MM", "code3": "MMR", "name": "Myanmar", "nameTh": "เมียนมา" },
+  { "code": "OM", "code3": "OMN", "name": "Oman", "nameTh": "โอมาน" },
+  { "code": "PH", "code3": "PHL", "name": "Philippines", "nameTh": "ฟิลิปปินส์" },
+  { "code": "QA", "code3": "QAT", "name": "Qatar", "nameTh": "กาตาร์" },
+  { "code": "SA", "code3": "SAU", "name": "Saudi Arabia", "nameTh": "ซาอุดีอาระเบีย" },
+  { "code": "SG", "code3": "SGP", "name": "Singapore", "nameTh": "สิงคโปร์" },
+  { "code": "KR", "code3": "KOR", "name": "South Korea", "nameTh": "เกาหลีใต้" },
+  { "code": "TW", "code3": "TWN", "name": "Taiwan", "nameTh": "ไต้หวัน" },
+  { "code": "TH", "code3": "THA", "name": "Thailand", "nameTh": "ไทย" },
+  { "code": "TL", "code3": "TLS", "name": "Timor-Leste", "nameTh": "ติมอร์-เลสเต" },
+  { "code": "VN", "code3": "VNM", "name": "Vietnam", "nameTh": "เวียดนาม" }
+]

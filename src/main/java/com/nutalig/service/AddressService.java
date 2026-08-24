@@ -1,5 +1,8 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nutalig.dto.CountryDto;
 import com.nutalig.dto.DistrictDto;
 import com.nutalig.dto.ProvinceDto;
 import com.nutalig.dto.SubDistrictDto;
@@ -14,8 +17,10 @@ import com.nutalig.repository.SubDistrictRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -29,6 +34,7 @@ public class AddressService {
     private final DistrictRepository districtRepository;
     private final SubDistrictRepository subDistrictRepository;
     private final AddressMapper addressMapper;
+    private final ObjectMapper objectMapper;
 
     public List<ProvinceDto> getAllProvince() {
         log.info("Get Province in Thailand");
@@ -42,6 +48,25 @@ public class AddressService {
                 .map(addressMapper::toProvinceDto)
                 .sorted(Comparator.comparing(ProvinceDto::getNameTh))
                 .toList();
+    }
+
+    public List<CountryDto> getAllCountry() {
+        log.info("Get countries from country.json");
+
+        ClassPathResource resource = new ClassPathResource("country.json");
+
+        try {
+            List<CountryDto> countryDtos = objectMapper.readValue(
+                    resource.getInputStream(),
+                    new TypeReference<List<CountryDto>>() {
+                    }
+            );
+
+            log.info("Get country size : {}", countryDtos.size());
+            return countryDtos;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to load countries from country.json", e);
+        }
     }
 
     public List<DistrictDto> getDistrictByProvince(String provinceId) {
