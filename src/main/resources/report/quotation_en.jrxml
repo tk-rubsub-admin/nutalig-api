@@ -346,9 +346,12 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="image" uuid="f5263f5f-a455-4f39-8952-a78ef1d396bd" positionType="Float" stretchType="ContainerHeight" x="37" y="2" width="89" height="59" hImageAlign="Center" vImageAlign="Middle">
+				<element kind="image" uuid="f5263f5f-a455-4f39-8952-a78ef1d396bd" positionType="Float" stretchType="ContainerHeight" x="50" y="5" width="50" height="50" hImageAlign="Center" vImageAlign="Middle">
 					<expression><![CDATA[$F{image}]]></expression>
 					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.unit.x" value="px"/>
+					<property name="com.jaspersoft.studio.unit.y" value="px"/>
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</element>
 				<box>
 					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
