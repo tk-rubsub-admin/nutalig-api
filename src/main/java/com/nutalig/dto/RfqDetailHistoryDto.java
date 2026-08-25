@@ -11,6 +11,7 @@ public class RfqDetailHistoryDto {
     private Integer detailSetNo;
     private Long sourceDetailId;
     private String optionName;
+    private String plan;
     private String spec;
     private Integer sortOrder;
     private String remark;

@@ -11,6 +11,7 @@ public class RfqSupplierQuoteDetailDto {
     private Long id;
     private Long rfqDetailId;
     private String optionName;
+    private String plan;
     private String spec;
     private Integer sortOrder;
     private String remark;

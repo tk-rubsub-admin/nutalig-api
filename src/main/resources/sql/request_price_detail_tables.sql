@@ -2,6 +2,7 @@ CREATE TABLE rfq_detail (
     id BIGINT NOT NULL AUTO_INCREMENT,
     rfq_header_id VARCHAR(255) NOT NULL,
     option_name VARCHAR(255) NULL,
+    plan VARCHAR(255) NULL,
     spec TEXT NOT NULL,
     sort_order INT NULL,
     remark TEXT NULL,

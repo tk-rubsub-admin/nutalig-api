@@ -459,6 +459,7 @@ public class RFQSupplierService {
                         Map<String, Object> hint = new LinkedHashMap<>();
                         hint.put("id", detail.getId());
                         hint.put("optionName", StringUtils.trimToNull(detail.getOptionName()));
+                        hint.put("plan", StringUtils.trimToNull(detail.getPlan()));
                         hint.put("spec", StringUtils.trimToNull(detail.getSpec()));
                         hint.put("remark", StringUtils.trimToNull(detail.getRemark()));
                         return hint;
@@ -514,6 +515,7 @@ public class RFQSupplierService {
             }
 
             detail.setOptionName(StringUtils.trimToNull(detail.getOptionName()));
+            detail.setPlan(StringUtils.trimToNull(detail.getPlan()));
             detail.setSpec(StringUtils.trimToNull(detail.getSpec()));
             detail.setRemark(StringUtils.trimToNull(detail.getRemark()));
             detail.setPackageName(StringUtils.trimToNull(detail.getPackageName()));
@@ -881,6 +883,7 @@ public class RFQSupplierService {
         dto.setId(entity.getId());
         dto.setRfqDetailId(entity.getRequestPriceDetail() == null ? null : entity.getRequestPriceDetail().getId());
         dto.setOptionName(entity.getOptionName());
+        dto.setPlan(entity.getPlan());
         dto.setSpec(entity.getSpec());
         dto.setSortOrder(entity.getSortOrder());
         dto.setRemark(entity.getRemark());
@@ -1082,6 +1085,7 @@ public class RFQSupplierService {
         detail.put("id", entity.getId());
         detail.put("rfqDetailId", entity.getRequestPriceDetail() == null ? null : entity.getRequestPriceDetail().getId());
         detail.put("optionName", entity.getOptionName());
+        detail.put("plan", entity.getPlan());
         detail.put("spec", entity.getSpec());
         detail.put("sortOrder", entity.getSortOrder());
         detail.put("remark", entity.getRemark());
@@ -1356,7 +1360,7 @@ public class RFQSupplierService {
         RfqSupplierQuoteDetailEntity entity = new RfqSupplierQuoteDetailEntity();
         if (request.getRfqDetailId() != null) {
             try {
-                entity.setRequestPriceDetail(getDetailFromHeader(rfq, request.getRfqDetailId()));
+        entity.setRequestPriceDetail(getDetailFromHeader(rfq, request.getRfqDetailId()));
             } catch (DataNotFoundException exception) {
                 log.warn(
                         "RFQ detail {} not found in RFQ {} while saving supplier quote detail; saving without rfqDetail relation.",
@@ -1366,6 +1370,7 @@ public class RFQSupplierService {
             }
         }
         entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
+        entity.setPlan(StringUtils.trimToNull(request.getPlan()));
         entity.setSpec(request.getSpec().trim());
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
         entity.setSortOrder(sortOrder);
@@ -1616,7 +1621,7 @@ public class RFQSupplierService {
                 .sorted(Comparator.comparing(RfqDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqDetailEntity::getId))
                 .toList()) {
-            lines.add(index + ". " + safeValue(detail.getOptionName()));
+            lines.add(index + ". " + formatOptionNameWithPlan(detail.getOptionName(), detail.getPlan()));
             lines.add("Spec: " + safeValue(detail.getSpec()));
             if (StringUtils.isNotBlank(detail.getRemark())) {
                 lines.add("Remark: " + detail.getRemark().trim());
@@ -1677,7 +1682,7 @@ public class RFQSupplierService {
                 .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteDetailEntity::getId))
                 .toList()) {
-            lines.add("Option ที่ " + index + ". " + safeValue(detail.getOptionName()));
+            lines.add("Option ที่ " + index + ". " + formatOptionNameWithPlan(detail.getOptionName(), detail.getPlan()));
             lines.add("Spec: " + safeValue(detail.getSpec()));
             if (StringUtils.isNotBlank(detail.getRemark())) {
                 lines.add("Remark: " + detail.getRemark().trim());
@@ -1784,6 +1789,18 @@ public class RFQSupplierService {
                 .path(StringUtils.defaultString(rfqId))
                 .build()
                 .toUriString();
+    }
+
+    private String formatOptionNameWithPlan(String optionName, String plan) {
+        String trimmedOptionName = StringUtils.trimToNull(optionName);
+        String trimmedPlan = StringUtils.trimToNull(plan);
+        if (trimmedOptionName == null) {
+            return trimmedPlan == null ? "-" : trimmedPlan;
+        }
+        if (trimmedPlan == null) {
+            return trimmedOptionName;
+        }
+        return trimmedOptionName + " (" + trimmedPlan + ")";
     }
 
     private String buildFrontendBaseUrl() throws InvalidRequestException {

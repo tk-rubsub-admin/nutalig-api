@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260825-001-add-plan-to-rfq-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: plan
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: plan
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260825-002-add-plan-to-rfq-supplier-quote-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_supplier_quote_detail
+                columnName: plan
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_detail
+            columns:
+              - column:
+                  name: plan
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260825-003-add-plan-to-rfq-detail-history
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail_history
+                columnName: plan
+      changes:
+        - addColumn:
+            tableName: rfq_detail_history
+            columns:
+              - column:
+                  name: plan
+                  type: VARCHAR(255)

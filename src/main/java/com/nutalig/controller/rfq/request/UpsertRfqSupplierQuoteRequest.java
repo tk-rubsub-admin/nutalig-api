@@ -24,6 +24,7 @@ public class UpsertRfqSupplierQuoteRequest {
     public static class DetailRequest {
         private Long rfqDetailId;
         private String optionName;
+        private String plan;
         private String spec;
         private Integer sortOrder;
         private String remark;

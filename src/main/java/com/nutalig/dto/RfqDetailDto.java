@@ -11,6 +11,7 @@ public class RfqDetailDto {
 
     private Long id;
     private String optionName;
+    private String plan;
     private String spec;
     private Integer sortOrder;
     private String remark;

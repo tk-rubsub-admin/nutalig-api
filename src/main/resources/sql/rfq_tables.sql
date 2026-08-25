@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS rfq_detail (
     id BIGINT NOT NULL AUTO_INCREMENT,
     rfq_header_id VARCHAR(255) NOT NULL,
     option_name VARCHAR(255) DEFAULT NULL,
+    plan VARCHAR(255) DEFAULT NULL,
     spec TEXT NOT NULL,
     sort_order INT DEFAULT NULL,
     remark TEXT DEFAULT NULL,

@@ -34,6 +34,9 @@ public class RfqSupplierQuoteDetailEntity extends AuditDateEntity {
     @Column(name = "option_name", length = 255)
     private String optionName;
 
+    @Column(name = "plan", length = 255)
+    private String plan;
+
     @Column(name = "spec", columnDefinition = "TEXT", nullable = false)
     private String spec;
 

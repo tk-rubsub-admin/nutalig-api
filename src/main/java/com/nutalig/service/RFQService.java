@@ -914,6 +914,7 @@ public class RFQService {
 
             Map<String, Object> addedDetail = new LinkedHashMap<>();
             addedDetail.put("optionName", detailEntity.getOptionName());
+            addedDetail.put("plan", detailEntity.getPlan());
             addedDetail.put("tierCount", detailEntity.getTiers().size());
             addedDetail.put("tierSplitCount", detailEntity.getTierSplits().size());
             addedDetails.add(addedDetail);
@@ -1171,6 +1172,7 @@ public class RFQService {
         );
 
         detailEntity.setOptionName(updatedDetail.getOptionName());
+        detailEntity.setPlan(updatedDetail.getPlan());
         detailEntity.setSpec(updatedDetail.getSpec());
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
         detailEntity.setRemark(updatedDetail.getRemark());
@@ -1200,6 +1202,7 @@ public class RFQService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("detailId", detailEntity.getId());
         detail.put("optionName", detailEntity.getOptionName());
+        detail.put("plan", detailEntity.getPlan());
         detail.put("tierCount", detailEntity.getTiers().size());
         detail.put("tierSplitCount", detailEntity.getTierSplits().size());
 
@@ -1361,6 +1364,7 @@ public class RFQService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("detailId", detailId);
         detail.put("optionName", optionName);
+        detail.put("plan", detailEntity.getPlan());
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -2047,6 +2051,7 @@ public class RFQService {
         RfqSupplierQuoteDetailEntity detail = new RfqSupplierQuoteDetailEntity();
         detail.setRequestPriceDetail(null);
         detail.setOptionName(sourceDetail.getOptionName());
+        detail.setPlan(sourceDetail.getPlan());
         detail.setSpec(sourceDetail.getSpec());
         detail.setSortOrder(sourceDetail.getSortOrder());
         detail.setRemark(sourceDetail.getRemark());
@@ -2369,6 +2374,7 @@ public class RFQService {
         dto.setDetailSetNo(entity.getDetailSetNo());
         dto.setSourceDetailId(entity.getSourceDetailId());
         dto.setOptionName(entity.getOptionName());
+        dto.setPlan(entity.getPlan());
         dto.setSpec(entity.getSpec());
         dto.setSortOrder(entity.getSortOrder());
         dto.setRemark(entity.getRemark());
@@ -2933,6 +2939,7 @@ public class RFQService {
 
         RfqDetailEntity detailEntity = new RfqDetailEntity();
         detailEntity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
+        detailEntity.setPlan(StringUtils.trimToNull(request.getPlan()));
         detailEntity.setSpec(request.getSpec().trim());
         detailEntity.setSortOrder(request.getSortOrder());
         detailEntity.setRemark(StringUtils.trimToNull(request.getRemark()));
@@ -3064,6 +3071,7 @@ public class RFQService {
         historyEntity.setDetailSetNo(detailSetNo);
         historyEntity.setSourceDetailId(detail.getId());
         historyEntity.setOptionName(detail.getOptionName());
+        historyEntity.setPlan(detail.getPlan());
         historyEntity.setSpec(detail.getSpec());
         historyEntity.setSortOrder(detail.getSortOrder());
         historyEntity.setRemark(detail.getRemark());
@@ -3091,6 +3099,7 @@ public class RFQService {
         snapshot.put("archivedAt", archivedAt == null ? null : archivedAt.toString());
         snapshot.put("sourceDetailId", detail.getId());
         snapshot.put("optionName", detail.getOptionName());
+        snapshot.put("plan", detail.getPlan());
         snapshot.put("spec", detail.getSpec());
         snapshot.put("sortOrder", detail.getSortOrder());
         snapshot.put("remark", detail.getRemark());
