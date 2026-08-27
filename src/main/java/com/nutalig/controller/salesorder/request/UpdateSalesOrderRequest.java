@@ -1,6 +1,7 @@
 package com.nutalig.controller.salesorder.request;
 
 import lombok.Data;
+import com.nutalig.dto.QuotationCustomerSnapshotDto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,5 +26,6 @@ public class UpdateSalesOrderRequest {
     private String quotationNo;
     private String remark;
     private String shipping;
+    private QuotationCustomerSnapshotDto customerSnapshot;
     private List<UpdateSalesOrderDetailRequest> items;
 }

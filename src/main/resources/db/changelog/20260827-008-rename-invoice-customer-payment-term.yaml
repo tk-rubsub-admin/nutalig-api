@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260827-008-rename-invoice-customer-payment-term
+      author: codex
+      changes:
+        - renameColumn:
+            tableName: invoice
+            oldColumnName: customer_payment_term_snapshot
+            newColumnName: customer_payment_term
+            columnDataType: VARCHAR(100)

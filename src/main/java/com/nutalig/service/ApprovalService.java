@@ -38,6 +38,7 @@ public class ApprovalService {
     private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
     private static final String URGENT_RFQ_TEMPLATE_CODE = "urgent-rfq-approval";
     private static final String URGENT_READY_PO_TEMPLATE_CODE = "urgent-ready-po-approval";
+    private static final String INVOICE_PAYMENT_TERM_TEMPLATE_CODE = "invoice-change-payment-term-approval";
     private static final String CLAIM_STEP_ID = "stepId";
     private static final String CLAIM_ACTION = "action";
     private static final String CLAIM_SOURCE = "source";
@@ -153,6 +154,63 @@ public class ApprovalService {
                 )
         );
 
+        return toDto(request);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ApprovalRequestDto createInvoicePaymentTermApprovalRequest(InvoiceEntity invoiceEntity, String userId) throws Exception {
+        if (invoiceEntity == null) {
+            throw new InvalidRequestException("Invoice is required.");
+        }
+
+        List<UserEntity> approvers = findApproversByRole(SUPER_ADMIN_ROLE_CODE);
+        if (approvers.isEmpty()) {
+            throw new InvalidRequestException("No SUPER_ADMIN approver is available.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(userId);
+        ApprovalRequestEntity request = new ApprovalRequestEntity();
+        request.setRequestNo(generateApprovalRequestNo());
+        request.setEntityType(ActivityEntityType.INVOICE);
+        request.setReferenceId(invoiceEntity.getInvoiceNo());
+        request.setRequestType(ApprovalRequestType.INVOICE_PAYMENT_TERM);
+        request.setTemplateCode(INVOICE_PAYMENT_TERM_TEMPLATE_CODE);
+        request.setTitle("อนุมัติใบแจ้งหนี้ " + invoiceEntity.getInvoiceNo());
+        request.setStatus(ApprovalRequestStatus.PENDING);
+        request.setCurrentStepNo(1);
+        request.setRequestedBy(actor);
+        request.setRequestedDate(now);
+        request.setCreatedBy(userId);
+        request.setUpdatedBy(userId);
+        request.setPayloadJson(objectMapper.writeValueAsString(buildInvoicePaymentTermPayload(invoiceEntity, actor)));
+
+        ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
+        step.setStepNo(1);
+        step.setApproverRoleCode(SUPER_ADMIN_ROLE_CODE);
+        step.setStatus(ApprovalStepStatus.PENDING);
+        step.setCreatedBy(userId);
+        step.setUpdatedBy(userId);
+        request.addStep(step);
+        request = approvalRequestRepository.save(request);
+
+        recordAudit(request, step, ApprovalAuditEventType.REQUEST_CREATED, getUserOrNull(userId), null,
+                ApprovalSource.SYSTEM, "สร้าง approval request สำหรับใบแจ้งหนี้ " + invoiceEntity.getInvoiceNo(),
+                buildAuditDetail(Map.of("entityType", request.getEntityType(), "referenceId", request.getReferenceId(),
+                        "requestType", request.getRequestType(), "templateCode", request.getTemplateCode())), userId);
+        recordAudit(request, step, ApprovalAuditEventType.STEP_CREATED, getUserOrNull(userId), null,
+                ApprovalSource.SYSTEM, "สร้าง approval step ลำดับที่ " + step.getStepNo() + " สำหรับ " + request.getRequestNo(),
+                buildAuditDetail(buildMap("stepNo", step.getStepNo(), "approverRoleCode", step.getApproverRoleCode())), userId);
+        createApprovalTodos(request, step, approvers, userId);
+        try {
+            sendCurrentStepApprovalCard(request, step, approvers, userId);
+        } catch (Exception exception) {
+            log.warn("Cannot send approval card for request {}", request.getRequestNo(), exception);
+        }
+        activityHistoryService.record(ActivityEntityType.APPROVAL_REQUEST, String.valueOf(request.getId()), userId,
+                ActivityActorType.USER, ActivityAction.REQUEST_APPROVAL, ActivitySource.API,
+                "สร้างคำขออนุมัติ " + request.getRequestNo(), Map.of("requestType", request.getRequestType(),
+                        "entityType", request.getEntityType(), "referenceId", request.getReferenceId()));
         return toDto(request);
     }
 
@@ -691,6 +749,21 @@ public class ApprovalService {
         return payload;
     }
 
+    private Map<String, Object> buildInvoicePaymentTermPayload(InvoiceEntity invoiceEntity, String actorName) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("invoiceNo", invoiceEntity.getInvoiceNo());
+        payload.put("salesOrderId", invoiceEntity.getSalesOrder().getSalesOrderNo());
+        payload.put("customerName", StringUtils.defaultIfBlank(invoiceEntity.getCustomer().getCustomerName(), "-"));
+        payload.put("requesterName", actorName);
+        String customerPaymentTerm = invoiceEntity.getCustomer().getCustomerPaymentTerm().getNameTh();
+        String newPaymentTerm = invoiceEntity.getCustomerPaymentTerm().getNameTh();
+        payload.put("paymentTerm", customerPaymentTerm);
+        payload.put("newPaymentTerm", newPaymentTerm);
+        payload.put("urgentReason", "ลูกค้าขอเปลี่ยนเงื่อนไขการชำระเงินจาก " + customerPaymentTerm + " เป็น " + newPaymentTerm + " สำหรับใบแจ้งหนี้่ใบนี้");
+        payload.put("statusText", "รออนุมัติ");
+        return payload;
+    }
+
     private Map<String, String> buildApprovalPlaceholders(
             ApprovalRequestEntity request,
             Map<String, Object> payload,
@@ -710,6 +783,13 @@ public class ApprovalService {
                     "paymentScheduleDate",
                     String.valueOf(payload.getOrDefault("paymentScheduleDate", "-"))
             );
+            placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("urgentReason", "-")));
+        } else if (request.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
+            placeholders.put("entityLabel", "ใบแจ้งหนี้รออนุมัติ");
+            placeholders.put("requestNo", String.valueOf(payload.getOrDefault("invoiceNo", request.getReferenceId())));
+            placeholders.put("salesOrderId", String.valueOf(payload.getOrDefault("salesOrderId", "-")));
+            placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
+            placeholders.put("requesterName", String.valueOf(payload.getOrDefault("requesterName", request.getRequestedBy())));
             placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("urgentReason", "-")));
         } else {
             placeholders.put("entityLabel", "คำขอราคาเร่งด่วน");
@@ -741,6 +821,12 @@ public class ApprovalService {
         if (request.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
             return UriComponentsBuilder.fromUriString(frontendBaseUrl)
                     .path("/sales-order/" + request.getReferenceId())
+                    .build()
+                    .toUriString();
+        }
+        if (request.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
+            return UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                    .path("/invoice/" + request.getReferenceId())
                     .build()
                     .toUriString();
         }

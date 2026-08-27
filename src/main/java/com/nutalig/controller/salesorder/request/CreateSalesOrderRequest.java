@@ -1,6 +1,7 @@
 package com.nutalig.controller.salesorder.request;
 
 import com.nutalig.constant.SalesOrderStatus;
+import com.nutalig.dto.QuotationCustomerSnapshotDto;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -16,6 +17,8 @@ public class CreateSalesOrderRequest {
     private String customerId;
     private String customerAddressId;
     private String customerContactId;
+    private String customerBranchCode;
+    private QuotationCustomerSnapshotDto customerSnapshot;
     private String salesId;
     private String coSaleId;
     private BigDecimal coSaleCommission;

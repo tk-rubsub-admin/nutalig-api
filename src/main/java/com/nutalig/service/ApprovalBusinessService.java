@@ -3,11 +3,13 @@ package com.nutalig.service;
 import com.nutalig.constant.*;
 import com.nutalig.entity.ApprovalRequestEntity;
 import com.nutalig.entity.RfqHeaderEntity;
+import com.nutalig.entity.InvoiceEntity;
 import com.nutalig.entity.SalesOrderEntity;
 import com.nutalig.entity.UserEntity;
 import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.utils.DateUtil;
@@ -28,6 +30,7 @@ import java.util.Map;
 public class ApprovalBusinessService {
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final UserRepository userRepository;
     private final ActivityHistoryService activityHistoryService;
@@ -43,6 +46,10 @@ public class ApprovalBusinessService {
         }
         if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
             handleUrgentReadyPoApproved(approvalRequest, actorUserId, source);
+            return;
+        }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
+            handleInvoicePaymentTermApproved(approvalRequest, actorUserId, source);
             return;
         }
 
@@ -64,6 +71,10 @@ public class ApprovalBusinessService {
             handleUrgentReadyPoRejected(approvalRequest, actorUserId, source, reason);
             return;
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
+            handleInvoicePaymentTermRejected(approvalRequest, actorUserId, source, reason);
+            return;
+        }
 
         log.info("No business rejection handler for requestType={}", approvalRequest.getRequestType());
     }
@@ -75,7 +86,63 @@ public class ApprovalBusinessService {
         if (approvalRequest.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
             return "/sales-order/" + approvalRequest.getReferenceId();
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
+            return "/invoice/" + approvalRequest.getReferenceId();
+        }
         return null;
+    }
+
+    private void handleInvoicePaymentTermApproved(
+            ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source
+    ) throws DataNotFoundException {
+        InvoiceEntity invoice = invoiceRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + approvalRequest.getReferenceId() + " not found."));
+        UserEntity user = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+        invoice.setStatus(InvoiceStatus.ISSUED);
+        invoice.setRequiredApproveStatus(UrgentRequestStatus.APPROVED);
+        invoice.setApprovedBy(actor);
+        invoice.setApprovedDate(now);
+        invoice.setRejectedBy(null);
+        invoice.setRejectedDate(null);
+        invoice.setRejectReason(null);
+        invoice.setUpdatedBy(user);
+        invoice.setUpdatedDate(now);
+        invoiceRepository.save(invoice);
+        activityHistoryService.record(ActivityEntityType.INVOICE, invoice.getInvoiceNo(), actorUserId,
+                ActivityActorType.USER, ActivityAction.APPROVE,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "อนุมัติใบแจ้งหนี้เลขที่ " + invoice.getInvoiceNo(),
+                Map.of("approvalRequestId", approvalRequest.getId(), "approvalRequestNo", approvalRequest.getRequestNo(),
+                        "paymentTerm", invoice.getCustomerPaymentTerm() == null ? "" : invoice.getCustomerPaymentTerm().getId().getCode()));
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handleInvoicePaymentTermRejected(
+            ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source, String reason
+    ) throws DataNotFoundException {
+        InvoiceEntity invoice = invoiceRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + approvalRequest.getReferenceId() + " not found."));
+        UserEntity user = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(actorUserId);
+        invoice.setRequiredApproveStatus(UrgentRequestStatus.REJECTED);
+        invoice.setRejectedBy(actor);
+        invoice.setRejectedDate(now);
+        invoice.setRejectReason(StringUtils.trimToNull(reason));
+        invoice.setUpdatedBy(user);
+        invoice.setUpdatedDate(now);
+        invoiceRepository.save(invoice);
+        activityHistoryService.record(ActivityEntityType.INVOICE, invoice.getInvoiceNo(), actorUserId,
+                ActivityActorType.USER, ActivityAction.REJECT,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "ไม่อนุมัติใบแจ้งหนี้เลขที่ " + invoice.getInvoiceNo(),
+                Map.of("approvalRequestId", approvalRequest.getId(), "approvalRequestNo", approvalRequest.getRequestNo(),
+                        "reason", StringUtils.defaultString(reason), "paymentTerm", invoice.getCustomerPaymentTerm() == null ? "" : invoice.getCustomerPaymentTerm().getId().getCode()));
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
     }
 
     private void handleUrgentRfqApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source)

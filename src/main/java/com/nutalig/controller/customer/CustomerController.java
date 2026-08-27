@@ -196,4 +196,30 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{customerId}/branches")
+    public GeneralResponse<CustomerDto> addCustomerBranch(@PathVariable String customerId,
+            @RequestBody CustomerBranchRequest request, @RequestHeader("userId") String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.addCustomerBranch(customerId, request, userId));
+    }
+
+    @PatchMapping("/{customerId}/branches/{branchCode}")
+    public GeneralResponse<CustomerDto> updateCustomerBranch(@PathVariable String customerId, @PathVariable String branchCode,
+            @RequestBody CustomerBranchRequest request, @RequestHeader("userId") String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.updateCustomerBranch(customerId, branchCode, request, userId));
+    }
+
+    @DeleteMapping("/{customerId}/branches/{branchCode}")
+    public GeneralResponse<CustomerDto> deleteCustomerBranch(@PathVariable String customerId, @PathVariable String branchCode,
+            @RequestHeader("userId") String userId) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.deleteCustomerBranch(customerId, branchCode, userId));
+    }
+
+    @PatchMapping("/{customerId}/branches/{branchCode}/default")
+    public GeneralResponse<CustomerDto> setCustomerDefaultBranch(@PathVariable String customerId, @PathVariable String branchCode,
+            @RequestHeader("userId") String userId) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.setCustomerDefaultBranch(customerId, branchCode, userId));
+    }
+
 }

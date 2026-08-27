@@ -126,13 +126,13 @@ public class QuotationService {
                     .stream()
                     .filter(addr -> Boolean.TRUE.equals(addr.getIsDefault()))
                     .findFirst()
-                    .get();
+                    .orElse(null);
         } else {
             customerAddressEntity = customerEntity.getAddresses()
                     .stream()
                     .filter(addr -> addr.getId().toString().equals(requestDto.getCustomerAddressId()))
                     .findFirst()
-                    .get();
+                    .orElse(null);
         }
         CustomerContactEntity customerContactEntity = null;
         if (StringUtils.isEmpty(requestDto.getCustomerContactId())) {
@@ -140,13 +140,13 @@ public class QuotationService {
                     .stream()
                     .filter(con -> Boolean.TRUE.equals(con.getIsDefault()))
                     .findFirst()
-                    .get();
+                    .orElse(null);
         } else {
             customerContactEntity = customerEntity.getContacts()
                     .stream()
                     .filter(con -> requestDto.getCustomerContactId().equals(con.getId().toString()))
                     .findFirst()
-                    .get();
+                    .orElse(null);
         }
 
         String actor = userProfileService.getNameFromId(createdBy);
@@ -166,8 +166,9 @@ public class QuotationService {
         quotationEntity.setStatus(QuotationStatus.ISSUED);
         quotationEntity.setCurrency(Currency.THB);
         quotationEntity.setCustomer(customerEntity);
-        quotationEntity.setCustomerAddress(customerAddressEntity);
-        quotationEntity.setCustomerContact(customerContactEntity);
+        // New quotations render immutable customer data from these snapshots.
+        applyCustomerSnapshot(quotationEntity, customerEntity, customerAddressEntity, customerContactEntity,
+                requestDto.getCustomerBranchCode(), requestDto.getCustomerSnapshot());
         quotationEntity.setSales(saleEntity);
         quotationEntity.setRfqId(StringUtils.trimToNull(requestDto.getRfqId()));
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
@@ -272,6 +273,9 @@ public class QuotationService {
         if (requestDto.getItems() != null) {
             replaceQuotationItems(quotationEntity, requestDto.getItems());
         }
+        if (requestDto.getCustomerSnapshot() != null) {
+            applyCustomerSnapshot(quotationEntity, null, null, null, null, requestDto.getCustomerSnapshot());
+        }
 
         List<QuotationItemRequestDto> itemsForCalculate = requestDto.getItems() != null
                 ? requestDto.getItems()
@@ -297,6 +301,22 @@ public class QuotationService {
         recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
 
         return mapToDto(quotationEntity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public QuotationDto syncCustomerSnapshot(String quotationNo, String userId) throws DataNotFoundException {
+        QuotationEntity quotation = quotationRepository.findById(quotationNo)
+                .orElseThrow(() -> new DataNotFoundException("Quotation " + quotationNo + " not found."));
+        CustomerEntity customer = quotation.getCustomer();
+        if (customer == null) throw new DataNotFoundException("Customer for quotation " + quotationNo + " not found.");
+        CustomerAddressEntity address = customer.getAddresses().stream()
+                .filter(value -> Boolean.TRUE.equals(value.getIsDefault())).findFirst().orElse(null);
+        CustomerContactEntity contact = customer.getContacts().stream()
+                .filter(value -> Boolean.TRUE.equals(value.getIsDefault())).findFirst().orElse(null);
+        applyCustomerSnapshot(quotation, customer, address, contact, null, null);
+        quotation.setUpdatedBy(userProfileService.getNameFromId(userId));
+        quotation.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        return mapToDto(quotationRepository.save(quotation));
     }
 
     private void recordCreateQuotationActivity(QuotationEntity quotationEntity, QuotationRequestDto requestDto, String createdBy) {
@@ -640,10 +660,11 @@ public class QuotationService {
         }
         dto.setRemark(quotationEntity.getRemark());
         dto.setThaiBahtText(ThaiBahtText.convertBahtText(quotationEntity.getGrandTotal()));
-        dto.setCustName(quotationEntity.getCustomer().getCustomerName());
-        dto.setCustTaxId(quotationEntity.getCustomer().getTaxId());
-        dto.setCustAddress(buildFullAddress(quotationEntity.getCustomerAddress()));
-        dto.setCustMobileNo(quotationEntity.getCustomerContact().getContactNumber());
+        QuotationCustomerSnapshotDto customerSnapshot = toCustomerSnapshot(quotationEntity);
+        dto.setCustName(StringUtils.defaultString(customerSnapshot.getCustomerName()));
+        dto.setCustTaxId(customerSnapshot.getTaxId());
+        dto.setCustAddress(customerSnapshot.getAddress());
+        dto.setCustMobileNo(customerSnapshot.getContactNumber());
         dto.setSalesId(quotationEntity.getSales().getEmployeeId());
         dto.setSalesName(quotationEntity.getSales().getFirstNameTh() + " " + quotationEntity.getSales().getLastNameTh());
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
@@ -706,6 +727,56 @@ public class QuotationService {
         }
 
         return sb.toString().trim();
+    }
+
+    private void applyCustomerSnapshot(QuotationEntity quotation, CustomerEntity customer,
+                                       CustomerAddressEntity address, CustomerContactEntity contact,
+                                       String requestedBranchCode, QuotationCustomerSnapshotDto supplied) {
+        if (supplied != null && StringUtils.isNotBlank(supplied.getCustomerName())) {
+            quotation.setCustomerNameSnapshot(StringUtils.trimToNull(supplied.getCustomerName()));
+            quotation.setCustomerTaxIdSnapshot(StringUtils.trimToNull(supplied.getTaxId()));
+            quotation.setCustomerBranchCodeSnapshot(StringUtils.trimToNull(supplied.getBranchCode()));
+            quotation.setCustomerBranchNameSnapshot(StringUtils.trimToNull(supplied.getBranchName()));
+            quotation.setCustomerAddressSnapshot(StringUtils.trimToNull(supplied.getAddress()));
+            quotation.setCustomerContactSnapshot(StringUtils.trimToNull(supplied.getContactName()));
+            quotation.setCustomerPhoneSnapshot(StringUtils.trimToNull(supplied.getContactNumber()));
+            return;
+        }
+        CustomerBranchEntity branch = customer.getBranches().stream()
+                .filter(value -> StringUtils.equals(value.getBranchCode(), requestedBranchCode))
+                .findFirst()
+                .orElseGet(() -> customer.getBranches().stream().filter(value -> Boolean.TRUE.equals(value.getIsDefault()))
+                        .findFirst().orElse(null));
+        quotation.setCustomerNameSnapshot(customer.getCustomerName());
+        quotation.setCustomerTaxIdSnapshot(customer.getTaxId());
+        quotation.setCustomerBranchCodeSnapshot(branch == null ? customer.getBranchNumber() : branch.getBranchCode());
+        quotation.setCustomerBranchNameSnapshot(branch == null ? customer.getBranchName() : branch.getBranchName());
+        quotation.setCustomerAddressSnapshot(buildFullAddress(address));
+        quotation.setCustomerContactSnapshot(contact == null ? null : contact.getContactName());
+        quotation.setCustomerPhoneSnapshot(contact == null ? null : contact.getContactNumber());
+    }
+
+    private QuotationCustomerSnapshotDto toCustomerSnapshot(QuotationEntity quotation) {
+        QuotationCustomerSnapshotDto snapshot = new QuotationCustomerSnapshotDto();
+        if (quotation.getCustomerNameSnapshot() != null) {
+            snapshot.setCustomerName(quotation.getCustomerNameSnapshot());
+            snapshot.setTaxId(quotation.getCustomerTaxIdSnapshot());
+            snapshot.setBranchCode(quotation.getCustomerBranchCodeSnapshot());
+            snapshot.setBranchName(quotation.getCustomerBranchNameSnapshot());
+            snapshot.setAddress(quotation.getCustomerAddressSnapshot());
+            snapshot.setContactName(quotation.getCustomerContactSnapshot());
+            snapshot.setContactNumber(quotation.getCustomerPhoneSnapshot());
+            return snapshot;
+        }
+        CustomerEntity customer = quotation.getCustomer();
+        snapshot.setCustomerName(customer == null ? null : customer.getCustomerName());
+        snapshot.setTaxId(customer == null ? null : customer.getTaxId());
+        snapshot.setBranchCode(customer == null ? null : customer.getBranchNumber());
+        snapshot.setBranchName(customer == null ? null : customer.getBranchName());
+        snapshot.setAddress(buildFullAddress(quotation.getCustomerAddress()));
+        snapshot.setContactName(quotation.getCustomerContact() == null ? null : quotation.getCustomerContact().getContactName());
+        snapshot.setContactNumber(quotation.getCustomerContact() == null ? null : quotation.getCustomerContact().getContactNumber());
+        return snapshot;
     }
 
     private void append(StringBuilder sb, String value) {
@@ -888,6 +959,7 @@ public class QuotationService {
         dto.setCustomer(customerDto);
         dto.setCustomerAddress(customerAddressDto);
         dto.setCustomerContact(customerContactDto);
+        dto.setCustomerSnapshot(toCustomerSnapshot(entity));
         dto.setSaleAccount(salesDto);
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setQuotationNo(entity.getQuotationNo());

@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260827-005-add-sales-order-customer-snapshots
+      author: codex
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column: { name: customer_name_snapshot, type: VARCHAR(255) }
+              - column: { name: customer_tax_id_snapshot, type: VARCHAR(50) }
+              - column: { name: customer_branch_code_snapshot, type: VARCHAR(50) }
+              - column: { name: customer_branch_name_snapshot, type: VARCHAR(255) }
+              - column: { name: customer_address_snapshot, type: VARCHAR(2000) }
+              - column: { name: customer_contact_snapshot, type: VARCHAR(255) }
+              - column: { name: customer_phone_snapshot, type: VARCHAR(100) }

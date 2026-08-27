@@ -10,6 +10,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.CustomerDashboardBreakdownDto;
 import com.nutalig.dto.CustomerDashboardDto;
 import com.nutalig.dto.CustomerDto;
+import com.nutalig.entity.CustomerBranchEntity;
 import com.nutalig.dto.UserDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
@@ -132,6 +133,7 @@ public class CustomerService {
         entity.setCreatedBy(userId);
         entity.setUpdatedBy(userId);
         applySalesAccounts(entity, request.getSalesAccounts(), request.getSalesAccount());
+        applyBranches(entity, request.getBranches(), request.getBranchNumber(), request.getBranchName(), userId, true);
 
         // address
         if (request.getAddress() != null) {
@@ -392,6 +394,15 @@ public class CustomerService {
             entity.setCoSalesAccount(StringUtils.trimToNull(request.getCoSalesAccount()));
         }
 
+        if (request.getBranches() != null) {
+            applyBranches(entity, request.getBranches(), null, null, userId, true);
+        } else if (isCompany(entity) && (request.getBranchNumber() != null || request.getBranchName() != null)) {
+            // Legacy clients may still PATCH only branchNumber / branchName.
+            applyBranches(entity, null, entity.getBranchNumber(), entity.getBranchName(), userId, true);
+        } else if (!isCompany(entity) && request.getCustomerType() != null) {
+            entity.getBranches().clear();
+        }
+
         entity.setUpdatedBy(userId);
         entity = customerRepository.save(entity);
 
@@ -534,6 +545,65 @@ public class CustomerService {
         return customerMapper.toDto(entity);
     }
 
+    @Transactional
+    public CustomerDto addCustomerBranch(String customerId, CustomerBranchRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity entity = findCompanyCustomer(customerId);
+        List<CustomerBranchRequest> branches = new ArrayList<>();
+        for (CustomerBranchEntity branch : entity.getBranches()) {
+            CustomerBranchRequest existing = new CustomerBranchRequest();
+            existing.setBranchCode(branch.getBranchCode());
+            existing.setBranchName(branch.getBranchName());
+            existing.setIsDefault(branch.getIsDefault());
+            branches.add(existing);
+        }
+        branches.add(request);
+        applyBranches(entity, branches, null, null, userId, true);
+        entity.setUpdatedBy(userId);
+        return customerMapper.toDto(customerRepository.save(entity));
+    }
+
+    @Transactional
+    public CustomerDto updateCustomerBranch(String customerId, String branchCode, CustomerBranchRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity entity = findCompanyCustomer(customerId);
+        CustomerBranchEntity branch = findBranch(entity, branchCode);
+        if (request.getBranchCode() != null && !StringUtils.equals(branchCode, request.getBranchCode())) {
+            throw new InvalidRequestException("Branch code is part of the branch identifier and cannot be changed.");
+        }
+        if (request.getBranchName() != null) branch.setBranchName(requiredBranchValue(request.getBranchName(), "Branch name"));
+        if (Boolean.TRUE.equals(request.getIsDefault())) setDefaultBranch(entity, branch);
+        validateBranchCodes(entity.getBranches());
+        syncLegacyBranch(entity);
+        branch.setUpdatedBy(userId);
+        entity.setUpdatedBy(userId);
+        return customerMapper.toDto(customerRepository.save(entity));
+    }
+
+    @Transactional
+    public CustomerDto deleteCustomerBranch(String customerId, String branchCode, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity entity = findCompanyCustomer(customerId);
+        CustomerBranchEntity branch = findBranch(entity, branchCode);
+        if (entity.getBranches().size() == 1) throw new InvalidRequestException("A company must have at least one branch.");
+        entity.getBranches().remove(branch);
+        if (Boolean.TRUE.equals(branch.getIsDefault())) setDefaultBranch(entity, entity.getBranches().get(0));
+        syncLegacyBranch(entity);
+        entity.setUpdatedBy(userId);
+        return customerMapper.toDto(customerRepository.save(entity));
+    }
+
+    @Transactional
+    public CustomerDto setCustomerDefaultBranch(String customerId, String branchCode, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity entity = findCompanyCustomer(customerId);
+        CustomerBranchEntity branch = findBranch(entity, branchCode);
+        setDefaultBranch(entity, branch);
+        syncLegacyBranch(entity);
+        entity.setUpdatedBy(userId);
+        return customerMapper.toDto(customerRepository.save(entity));
+    }
+
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomer(SearchCustomerRequest criteria) {
         log.info("Get all customer with criteria : {}", criteria);
@@ -673,6 +743,92 @@ public class CustomerService {
         List<String> normalizedSalesAccounts = normalizeSalesAccounts(salesAccounts, salesAccount);
         entity.setSalesAccounts(new ArrayList<>(normalizedSalesAccounts));
         entity.setSalesAccount(normalizedSalesAccounts.isEmpty() ? null : normalizedSalesAccounts.get(0));
+    }
+
+    /** Keeps customer.branchNumber/name as the compatibility snapshot of the default branch. */
+    private void applyBranches(CustomerEntity entity, List<CustomerBranchRequest> requestedBranches,
+                               String legacyCode, String legacyName, String userId, boolean requireForCompany)
+            throws InvalidRequestException {
+        if (!isCompany(entity)) {
+            if (requestedBranches != null) entity.getBranches().clear();
+            return;
+        }
+        List<CustomerBranchRequest> values = requestedBranches;
+        if (values == null) {
+            CustomerBranchRequest legacy = new CustomerBranchRequest();
+            legacy.setBranchCode(legacyCode);
+            legacy.setBranchName(legacyName);
+            legacy.setIsDefault(true);
+            values = List.of(legacy);
+        }
+        if (values.isEmpty()) {
+            if (requireForCompany) throw new InvalidRequestException("A company must have at least one default branch.");
+            return;
+        }
+        long defaultCount = values.stream().filter(value -> Boolean.TRUE.equals(value.getIsDefault())).count();
+        if (defaultCount == 0) throw new InvalidRequestException("A company must have one default branch.");
+        if (defaultCount > 1) throw new InvalidRequestException("Only one customer branch can be default.");
+
+        Map<String, CustomerBranchEntity> existing = new HashMap<>();
+        entity.getBranches().forEach(branch -> existing.put(branch.getBranchCode(), branch));
+        Set<String> requestedCodes = new HashSet<>();
+        for (CustomerBranchRequest value : values) {
+            String branchCode = requiredBranchValue(value.getBranchCode(), "Branch code");
+            requestedCodes.add(branchCode);
+            CustomerBranchEntity branch = existing.get(branchCode);
+            if (branch == null) branch = new CustomerBranchEntity();
+            branch.setBranchCode(branchCode);
+            branch.setBranchName(requiredBranchValue(value.getBranchName(), "Branch name"));
+            branch.setIsDefault(Boolean.TRUE.equals(value.getIsDefault()));
+            if (!existing.containsKey(branchCode)) branch.setCreatedBy(userId);
+            branch.setUpdatedBy(userId);
+            if (!existing.containsKey(branchCode)) entity.addBranch(branch);
+        }
+        entity.getBranches().removeIf(branch -> !requestedCodes.contains(branch.getBranchCode()));
+        validateBranchCodes(entity.getBranches());
+        syncLegacyBranch(entity);
+    }
+
+    private CustomerEntity findCompanyCustomer(String customerId) throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity entity = customerRepository.findById(customerId)
+                .orElseThrow(() -> new DataNotFoundException("Customer " + customerId + " not found."));
+        if (!isCompany(entity)) throw new InvalidRequestException("Branches are only available for company customers.");
+        return entity;
+    }
+
+    private boolean isCompany(CustomerEntity entity) {
+        return entity.getCustomerType() != null && entity.getCustomerType().getId() != null
+                && "COMPANY".equals(entity.getCustomerType().getId().getCode());
+    }
+
+    private String requiredBranchValue(String value, String fieldName) throws InvalidRequestException {
+        String normalized = StringUtils.trimToNull(value);
+        if (normalized == null) throw new InvalidRequestException(fieldName + " is required.");
+        return normalized;
+    }
+
+    private void validateBranchCodes(List<CustomerBranchEntity> branches) throws InvalidRequestException {
+        Set<String> codes = new HashSet<>();
+        for (CustomerBranchEntity branch : branches) {
+            if (!codes.add(branch.getBranchCode())) throw new InvalidRequestException("Branch code must be unique within a customer.");
+        }
+    }
+
+    private CustomerBranchEntity findBranch(CustomerEntity entity, String branchCode) throws DataNotFoundException {
+        return entity.getBranches().stream()
+                .filter(value -> StringUtils.equals(value.getBranchCode(), branchCode))
+                .findFirst().orElseThrow(() -> new DataNotFoundException("Customer branch " + branchCode + " not found."));
+    }
+
+    private void setDefaultBranch(CustomerEntity entity, CustomerBranchEntity selected) {
+        entity.getBranches().forEach(branch -> branch.setIsDefault(branch == selected));
+    }
+
+    private void syncLegacyBranch(CustomerEntity entity) {
+        CustomerBranchEntity defaultBranch = entity.getBranches().stream()
+                .filter(branch -> Boolean.TRUE.equals(branch.getIsDefault())).findFirst().orElse(null);
+        entity.setBranchNumber(defaultBranch == null ? null : defaultBranch.getBranchCode());
+        entity.setBranchName(defaultBranch == null ? null : defaultBranch.getBranchName());
     }
 
     private List<String> normalizeSalesAccounts(List<String> salesAccounts, String salesAccount) {
@@ -1044,6 +1200,7 @@ public class CustomerService {
                 customerType,
                 "Customer type"
         ));
+        applyBranches(entity, null, entity.getBranchNumber(), entity.getBranchName(), userId, true);
 
         String creditTerm = readCell(row, headerIndexMap, evaluator, "customer_credit_term");
         entity.setCustomerCreditTerm(getOptionalSystemConfig(

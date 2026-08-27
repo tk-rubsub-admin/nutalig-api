@@ -152,6 +152,10 @@ public class CustomerEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CustomerContactEntity> contacts = new ArrayList<>();
 
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("isDefault DESC, branchCode ASC")
+    private List<CustomerBranchEntity> branches = new ArrayList<>();
+
     public void addAddress(CustomerAddressEntity address) {
         addresses.add(address);
         address.setCustomer(this);
@@ -160,5 +164,10 @@ public class CustomerEntity extends AuditDateEntity {
     public void addContact(CustomerContactEntity contact) {
         contacts.add(contact);
         contact.setCustomer(this);
+    }
+
+    public void addBranch(CustomerBranchEntity branch) {
+        branches.add(branch);
+        branch.setCustomer(this);
     }
 }

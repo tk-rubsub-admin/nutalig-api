@@ -68,6 +68,14 @@ public class QuotationController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{id}/sync-customer-snapshot")
+    public GeneralResponse<QuotationDto> syncCustomerSnapshot(
+            @PathVariable String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, quotationService.syncCustomerSnapshot(id, userId));
+    }
+
     @GetMapping("/document")
     public ResponseEntity<DownloadDocumentDto> getQuotationDocumentById(
             @RequestParam(name = "id") String id,

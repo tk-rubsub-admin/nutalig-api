@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260828-001-add-invoice-required-approve-columns
+      author: codex
+      changes:
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column: { name: is_required_approve, type: BOOLEAN }
+              - column: { name: required_approve_reason, type: TEXT }
+              - column: { name: required_approve_status, type: VARCHAR(30) }
+              - column: { name: request_required_approved_by, type: VARCHAR(255) }
+              - column: { name: request_required_approved_date, type: DATETIME(6) }
+              - column: { name: approved_by, type: VARCHAR(255) }
+              - column: { name: approved_date, type: DATETIME(6) }
+              - column: { name: rejected_by, type: VARCHAR(255) }
+              - column: { name: rejected_date, type: DATETIME(6) }
+              - column: { name: reject_reason, type: TEXT }

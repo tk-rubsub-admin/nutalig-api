@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260827-002-create-customer-branch
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_branch
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE customer_branch (
+                  customer_id VARCHAR(255) NOT NULL,
+                  branch_code VARCHAR(50) NOT NULL,
+                  branch_name VARCHAR(255) NOT NULL,
+                  is_default BIT NOT NULL DEFAULT b'0',
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (customer_id, branch_code),
+                  KEY idx_customer_branch_customer (customer_id),
+                  CONSTRAINT fk_customer_branch_customer FOREIGN KEY (customer_id) REFERENCES customer (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  - changeSet:
+      id: 20260827-003-backfill-customer-default-branches
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO customer_branch (customer_id, branch_code, branch_name, is_default, created_by, updated_by, created_date, updated_date)
+              SELECT c.id,
+                     COALESCE(NULLIF(TRIM(c.branch_number), ''), '00000'),
+                     COALESCE(NULLIF(TRIM(c.branch_name), ''), 'สำนักงานใหญ่'),
+                     b'1', c.created_by, c.updated_by, c.created_date, c.updated_date
+              FROM customer c
+              WHERE c.customer_type = 'COMPANY'
+                AND NOT EXISTS (SELECT 1 FROM customer_branch cb WHERE cb.customer_id = c.id);

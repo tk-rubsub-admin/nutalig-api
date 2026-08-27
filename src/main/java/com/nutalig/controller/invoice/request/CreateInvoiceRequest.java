@@ -1,5 +1,6 @@
 package com.nutalig.controller.invoice.request;
 
+import com.nutalig.dto.QuotationCustomerSnapshotDto;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -17,4 +18,6 @@ public class CreateInvoiceRequest {
     private BigDecimal amount;
     private BigDecimal vat;
     private BigDecimal grandTotal;
+    private String customerPaymentTerm;
+    private QuotationCustomerSnapshotDto customerSnapshot;
 }

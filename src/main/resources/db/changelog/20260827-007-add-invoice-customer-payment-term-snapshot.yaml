@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260827-007-add-invoice-customer-payment-term-snapshot
+      author: codex
+      changes:
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column: { name: customer_payment_term_snapshot, type: VARCHAR(100) }

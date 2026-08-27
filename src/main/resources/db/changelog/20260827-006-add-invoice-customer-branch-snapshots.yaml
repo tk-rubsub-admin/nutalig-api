@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260827-006-add-invoice-customer-branch-snapshots
+      author: codex
+      changes:
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column: { name: customer_branch_code_snapshot, type: VARCHAR(50) }
+              - column: { name: customer_branch_name_snapshot, type: VARCHAR(255) }

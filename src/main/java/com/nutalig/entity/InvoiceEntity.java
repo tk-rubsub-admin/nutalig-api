@@ -2,13 +2,18 @@ package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.InvoiceStatus;
+import com.nutalig.constant.UrgentRequestStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JoinColumnOrFormula;
+import org.hibernate.annotations.JoinColumnsOrFormulas;
+import org.hibernate.annotations.JoinFormula;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -115,6 +120,12 @@ public class InvoiceEntity extends AuditDateEntity {
     @Column(name = "customer_tax_id_snapshot", length = 50)
     private String customerTaxIdSnapshot;
 
+    @Column(name = "customer_branch_code_snapshot", length = 50)
+    private String customerBranchCodeSnapshot;
+
+    @Column(name = "customer_branch_name_snapshot", length = 255)
+    private String customerBranchNameSnapshot;
+
     @Column(name = "customer_address_snapshot", length = 2000)
     private String customerAddressSnapshot;
 
@@ -123,6 +134,14 @@ public class InvoiceEntity extends AuditDateEntity {
 
     @Column(name = "customer_phone_snapshot", length = 100)
     private String customerPhoneSnapshot;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula = @JoinFormula(value = "'CUSTOMER_PAYMENT_TERM'", referencedColumnName = "group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "customer_payment_term", referencedColumnName = "code"))
+    })
+    @ToString.Exclude
+    private SystemConfigEntity customerPaymentTerm;
 
     @Column(name = "sales_name_snapshot", length = 255)
     private String salesNameSnapshot;
@@ -146,6 +165,37 @@ public class InvoiceEntity extends AuditDateEntity {
     @OrderBy("paymentDate desc, id desc")
     @ToString.Exclude
     private Set<InvoicePaymentEntity> payments = new LinkedHashSet<>();
+
+    @Column(name = "is_required_approve")
+    private Boolean requiredApprove;
+
+    @Column(name = "required_approve_reason", columnDefinition = "TEXT")
+    private String requiredApproveReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "required_approve_status", length = 30)
+    private UrgentRequestStatus requiredApproveStatus;
+
+    @Column(name = "request_required_approved_by")
+    private String requestRequiredApprovedBy;
+
+    @Column(name = "request_required_approved_date")
+    private ZonedDateTime requestRequiredApprovedDate;
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "approved_date")
+    private ZonedDateTime approvedDate;
+
+    @Column(name = "rejected_by")
+    private String rejectedBy;
+
+    @Column(name = "rejected_date")
+    private ZonedDateTime rejectedDate;
+
+    @Column(name = "reject_reason", columnDefinition = "TEXT")
+    private String rejectReason;
 
     public void addItem(InvoiceDetailEntity item) {
         if (item == null) return;

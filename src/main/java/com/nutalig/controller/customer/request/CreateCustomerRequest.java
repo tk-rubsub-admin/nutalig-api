@@ -13,6 +13,7 @@ public class CreateCustomerRequest {
     private String taxId;
     private String branchNumber;
     private String branchName;
+    private List<CustomerBranchRequest> branches;
     private String creditTerm;
     private String paymentTerm;
     private String billingCondition;

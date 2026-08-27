@@ -11,6 +11,7 @@ import com.nutalig.controller.salesorder.request.*;
 import com.nutalig.dto.SalesOrderAttachmentDto;
 import com.nutalig.dto.SalesOrderDetailDto;
 import com.nutalig.dto.SalesOrderDto;
+import com.nutalig.dto.QuotationCustomerSnapshotDto;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.SalesOrderDocumentDto;
@@ -118,6 +119,8 @@ public class SalesOrderService {
         entity.setCustomer(customer);
         entity.setCustomerAddress(customerAddress);
         entity.setCustomerContact(customerContact);
+        applyCustomerSnapshot(entity, customer, customerAddress, customerContact,
+                request.getCustomerBranchCode(), request.getCustomerSnapshot());
         entity.setSales(sales);
         entity.setCoSalesId(request.getCoSaleId());
         entity.setCoSaleCommission(request.getCoSaleCommission());
@@ -230,6 +233,9 @@ public class SalesOrderService {
         }
         if (request.getShipping() != null) {
             entity.setShipping(request.getShipping());
+        }
+        if (request.getCustomerSnapshot() != null) {
+            applyCustomerSnapshot(entity, null, null, null, null, request.getCustomerSnapshot());
         }
         BigDecimal calculatedSubTotal = null;
         if (request.getSubTotal() != null) {
@@ -535,10 +541,12 @@ public class SalesOrderService {
         dto.setVat(salesOrderEntity.getVat());
         dto.setRemark(salesOrderEntity.getRemark());
         dto.setThaiBahtText(ThaiBahtText.convertBahtText(salesOrderEntity.getGrandTotal()));
-        dto.setCustName(salesOrderEntity.getCustomer().getCustomerName());
-        dto.setCustTaxId(salesOrderEntity.getCustomer().getTaxId());
-        dto.setCustAddress(buildFullAddress(salesOrderEntity.getCustomerAddress()));
-        dto.setCustMobileNo(salesOrderEntity.getCustomerContact().getContactNumber());
+        QuotationCustomerSnapshotDto customerSnapshot = toCustomerSnapshot(salesOrderEntity);
+        dto.setCustName(customerSnapshot.getCustomerName()
+                + (StringUtils.isBlank(customerSnapshot.getBranchCode()) ? "" : " (" + customerSnapshot.getBranchCode() + ")"));
+        dto.setCustTaxId(customerSnapshot.getTaxId());
+        dto.setCustAddress(customerSnapshot.getAddress());
+        dto.setCustMobileNo(customerSnapshot.getContactNumber());
         dto.setSalesId(salesOrderEntity.getSales().getEmployeeId());
         dto.setSalesName(salesOrderEntity.getSales().getFirstNameTh() + " " + salesOrderEntity.getSales().getLastNameTh());
         dto.setSalesMobileNo(salesOrderEntity.getSales().getPhoneNumber());
@@ -598,6 +606,48 @@ public class SalesOrderService {
         append(sb, address.getPostcode());
 
         return sb.toString().trim();
+    }
+
+    private void applyCustomerSnapshot(SalesOrderEntity order, CustomerEntity customer,
+                                       CustomerAddressEntity address, CustomerContactEntity contact,
+                                       String requestedBranchCode, QuotationCustomerSnapshotDto supplied) {
+        if (supplied != null) {
+            order.setCustomerNameSnapshot(supplied.getCustomerName());
+            order.setCustomerTaxIdSnapshot(supplied.getTaxId());
+            order.setCustomerBranchCodeSnapshot(supplied.getBranchCode());
+            order.setCustomerBranchNameSnapshot(supplied.getBranchName());
+            order.setCustomerAddressSnapshot(supplied.getAddress());
+            order.setCustomerContactSnapshot(supplied.getContactName());
+            order.setCustomerPhoneSnapshot(supplied.getContactNumber());
+            return;
+        }
+        CustomerBranchEntity branch = customer.getBranches().stream()
+                .filter(value -> StringUtils.equals(value.getBranchCode(), requestedBranchCode)).findFirst()
+                .orElseGet(() -> customer.getBranches().stream().filter(value -> Boolean.TRUE.equals(value.getIsDefault())).findFirst().orElse(null));
+        order.setCustomerNameSnapshot(customer.getCustomerName());
+        order.setCustomerTaxIdSnapshot(customer.getTaxId());
+        order.setCustomerBranchCodeSnapshot(branch == null ? customer.getBranchNumber() : branch.getBranchCode());
+        order.setCustomerBranchNameSnapshot(branch == null ? customer.getBranchName() : branch.getBranchName());
+        order.setCustomerAddressSnapshot(buildFullAddress(address));
+        order.setCustomerContactSnapshot(contact == null ? null : contact.getContactName());
+        order.setCustomerPhoneSnapshot(contact == null ? null : contact.getContactNumber());
+    }
+
+    private QuotationCustomerSnapshotDto toCustomerSnapshot(SalesOrderEntity order) {
+        QuotationCustomerSnapshotDto snapshot = new QuotationCustomerSnapshotDto();
+        if (order.getCustomerNameSnapshot() != null) {
+            snapshot.setCustomerName(order.getCustomerNameSnapshot()); snapshot.setTaxId(order.getCustomerTaxIdSnapshot());
+            snapshot.setBranchCode(order.getCustomerBranchCodeSnapshot()); snapshot.setBranchName(order.getCustomerBranchNameSnapshot());
+            snapshot.setAddress(order.getCustomerAddressSnapshot()); snapshot.setContactName(order.getCustomerContactSnapshot());
+            snapshot.setContactNumber(order.getCustomerPhoneSnapshot()); return snapshot;
+        }
+        CustomerEntity customer = order.getCustomer();
+        snapshot.setCustomerName(customer == null ? null : customer.getCustomerName()); snapshot.setTaxId(customer == null ? null : customer.getTaxId());
+        snapshot.setBranchCode(customer == null ? null : customer.getBranchNumber()); snapshot.setBranchName(customer == null ? null : customer.getBranchName());
+        snapshot.setAddress(buildFullAddress(order.getCustomerAddress()));
+        snapshot.setContactName(order.getCustomerContact() == null ? null : order.getCustomerContact().getContactName());
+        snapshot.setContactNumber(order.getCustomerContact() == null ? null : order.getCustomerContact().getContactNumber());
+        return snapshot;
     }
 
     private void refreshCustomerOrderTotal(CustomerEntity customer) {
@@ -1036,20 +1086,24 @@ public class SalesOrderService {
             throws DataNotFoundException {
         return customer.getAddresses().stream()
                 .filter(address -> StringUtils.isBlank(customerAddressId)
-                        ? Boolean.TRUE.equals(address.getIsDefault())
+                ? Boolean.TRUE.equals(address.getIsDefault())
                         : customerAddressId.equals(address.getId().toString()))
                 .findFirst()
-                .orElseThrow(() -> new DataNotFoundException("Customer address " + customerAddressId + " not found."));
+                // Customer data on a sales order is stored as a snapshot.  An address is
+                // therefore optional when the snapshot is entered manually.
+                .orElse(null);
     }
 
     private CustomerContactEntity resolveCustomerContact(CustomerEntity customer, String customerContactId)
             throws DataNotFoundException {
         return customer.getContacts().stream()
                 .filter(contact -> StringUtils.isBlank(customerContactId)
-                        ? Boolean.TRUE.equals(contact.getIsDefault())
+                ? Boolean.TRUE.equals(contact.getIsDefault())
                         : customerContactId.equals(contact.getId().toString()))
                 .findFirst()
-                .orElseThrow(() -> new DataNotFoundException("Customer contact " + customerContactId + " not found."));
+                // Customer data on a sales order is stored as a snapshot.  A contact is
+                // therefore optional when the snapshot is entered manually.
+                .orElse(null);
     }
 
     private EmployeeEntity resolveSales(String input) throws DataNotFoundException {
@@ -1126,6 +1180,7 @@ public class SalesOrderService {
         dto.setCustomer(customerMapper.toDto(entity.getCustomer()));
         dto.setCustomerAddress(customerMapper.toAddressDto(entity.getCustomerAddress()));
         dto.setCustomerContact(customerMapper.toContactDto(entity.getCustomerContact()));
+        dto.setCustomerSnapshot(toCustomerSnapshot(entity));
         dto.setSaleAccount(employeeMapper.toDto(entity.getSales()));
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setSubTotal(entity.getSubTotal());

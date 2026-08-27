@@ -7,6 +7,7 @@ import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
 import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
+import com.nutalig.controller.invoice.request.RejectInvoiceRequiredApproveRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.invoice.response.CreateInvoiceResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -86,6 +87,23 @@ public class InvoiceController {
 
         log.info("=== End update invoice {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/required-approve/approve")
+    public GeneralResponse<InvoiceDto> approveRequiredApprove(
+            @PathVariable(name = "id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.approveRequiredApprove(id, userId));
+    }
+
+    @PatchMapping("/{id}/required-approve/reject")
+    public GeneralResponse<InvoiceDto> rejectRequiredApprove(
+            @PathVariable(name = "id") String id,
+            @RequestBody RejectInvoiceRequiredApproveRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.rejectRequiredApprove(id, request, userId));
     }
 
     @GetMapping("/awaiting-validation")

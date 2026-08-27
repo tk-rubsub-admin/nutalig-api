@@ -8,6 +8,7 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
 import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
+import com.nutalig.controller.invoice.request.RejectInvoiceRequiredApproveRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
@@ -17,6 +18,7 @@ import com.nutalig.dto.InvoiceDetailDto;
 import com.nutalig.dto.InvoiceDto;
 import com.nutalig.dto.InvoicePaymentDto;
 import com.nutalig.dto.InvoicePaymentSlipFileDto;
+import com.nutalig.dto.QuotationCustomerSnapshotDto;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.InvoiceDocumentDto;
@@ -27,10 +29,12 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.UserMapper;
+import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.UserRepository;
+import com.nutalig.repository.SystemConfigRepository;
 import com.nutalig.security.JwtUtil;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
@@ -81,14 +85,18 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
+    private final ApprovalService approvalService;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final UserRepository userRepository;
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
     private final UserMapper userMapper;
+    private final SystemConfigMapper systemConfigMapper;
     private final ObjectMapper objectMapper;
     private final LineMessageService lineMessageService;
     private final LineConfiguration lineConfiguration;
+    private final UserProfileService userProfileService;
 
     @Transactional(rollbackFor = Exception.class)
     public InvoiceEntity createInvoice(CreateInvoiceRequest request, String userId)
@@ -112,7 +120,6 @@ public class InvoiceService {
         entity.setDocDate(docDate);
         entity.setDueDate(dueDate);
         entity.setDeliveryDate(request.getDeliveryDate());
-        entity.setStatus(InvoiceStatus.ISSUED);
         entity.setCurrency(salesOrder.getCurrency());
         entity.setCustomer(salesOrder.getCustomer());
         entity.setCustomerAddress(salesOrder.getCustomerAddress());
@@ -131,11 +138,22 @@ public class InvoiceService {
         entity.setOutstandingTotal(defaultIfNull(salesOrder.getGrandTotal()));
         entity.setRemark(StringUtils.defaultIfBlank(request.getRemark(), salesOrder.getRemark()));
         entity.setRevNo(1);
-        entity.setCustomerNameSnapshot(salesOrder.getCustomer() != null ? salesOrder.getCustomer().getCustomerName() : null);
-        entity.setCustomerTaxIdSnapshot(salesOrder.getCustomer() != null ? salesOrder.getCustomer().getTaxId() : null);
-        entity.setCustomerAddressSnapshot(buildCustomerAddressSnapshot(salesOrder.getCustomerAddress()));
-        entity.setCustomerContactSnapshot(salesOrder.getCustomerContact() != null ? salesOrder.getCustomerContact().getContactName() : null);
-        entity.setCustomerPhoneSnapshot(salesOrder.getCustomerContact() != null ? salesOrder.getCustomerContact().getContactNumber() : null);
+        applyCustomerSnapshot(entity, salesOrder, request.getCustomerSnapshot());
+        entity.setCustomerPaymentTerm(resolveCustomerPaymentTerm(StringUtils.defaultIfBlank(request.getCustomerPaymentTerm(),
+                salesOrder.getCustomer() != null && salesOrder.getCustomer().getCustomerPaymentTerm() != null
+                        ? salesOrder.getCustomer().getCustomerPaymentTerm().getId().getCode()
+                        : null)));
+        if (requiresPaymentTermApproval(entity.getCustomerPaymentTerm() == null ? null : entity.getCustomerPaymentTerm().getId().getCode())) {
+            entity.setStatus(InvoiceStatus.DRAFT);
+            entity.setRequiredApprove(Boolean.TRUE);
+            entity.setRequiredApproveReason("ลูกค้าขอเปลี่ยนเงื่อนไขการชำระเงิน");
+            entity.setRequiredApproveStatus(UrgentRequestStatus.PENDING_APPROVAL);
+            entity.setRequestRequiredApprovedBy(user.getId());
+            entity.setRequestRequiredApprovedDate(now);
+        } else {
+            entity.setStatus(InvoiceStatus.ISSUED);
+            entity.setRequiredApprove(Boolean.FALSE);
+        }
         entity.setSalesNameSnapshot(buildSalesNameSnapshot(salesOrder.getSales()));
         entity.setCreatedBy(user);
         entity.setUpdatedBy(user);
@@ -162,6 +180,13 @@ public class InvoiceService {
         }
 
         invoiceRepository.save(entity);
+        if (requiresPaymentTermApproval(entity.getCustomerPaymentTerm() == null ? null : entity.getCustomerPaymentTerm().getId().getCode())) {
+            try {
+                approvalService.createInvoicePaymentTermApprovalRequest(entity, userId);
+            } catch (Exception exception) {
+                throw new InvalidRequestException("Cannot create invoice approval request: " + exception.getMessage());
+            }
+        }
         salesOrderService.recalculatePaymentSummary(salesOrder.getSalesOrderNo());
         recordCreateInvoiceActivity(entity, userId);
         return entity;
@@ -183,8 +208,8 @@ public class InvoiceService {
 
         InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
                 .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
-        if (!EnumSet.of(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID).contains(invoice.getStatus())) {
-            throw new InvalidRequestException("Invoice status must be ISSUED or PARTIALLY_PAID.");
+        if (!EnumSet.of(InvoiceStatus.DRAFT,InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID).contains(invoice.getStatus())) {
+            throw new InvalidRequestException("Invoice status must be DRAFT, ISSUED or PARTIALLY_PAID.");
         }
 
         UserEntity user = userRepository.findById(userId)
@@ -193,13 +218,47 @@ public class InvoiceService {
         LocalDate beforeDeliveryDate = invoice.getDeliveryDate();
         LocalDate nextDeliveryDate = request.getDeliveryDate();
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        boolean shouldCreateRequiredApproveRequest = false;
 
         invoice.setDeliveryDate(nextDeliveryDate);
+        if (request.getCustomerPaymentTerm() != null) {
+            invoice.setCustomerPaymentTerm(resolveCustomerPaymentTerm(request.getCustomerPaymentTerm()));
+            String paymentTermCode = invoice.getCustomerPaymentTerm() == null
+                    ? null
+                    : invoice.getCustomerPaymentTerm().getId().getCode();
+            if (requiresPaymentTermApproval(paymentTermCode)) {
+                boolean wasPendingApproval = UrgentRequestStatus.PENDING_APPROVAL.equals(invoice.getRequiredApproveStatus());
+                invoice.setStatus(InvoiceStatus.DRAFT);
+                invoice.setRequiredApprove(Boolean.TRUE);
+                invoice.setRequiredApproveReason("ลูกค้าขอเปลี่ยนเงื่อนไขการชำระเงิน");
+                invoice.setRequiredApproveStatus(UrgentRequestStatus.PENDING_APPROVAL);
+                invoice.setRequestRequiredApprovedBy(user.getId());
+                invoice.setRequestRequiredApprovedDate(now);
+                invoice.setApprovedBy(null);
+                invoice.setApprovedDate(null);
+                invoice.setRejectedBy(null);
+                invoice.setRejectedDate(null);
+                invoice.setRejectReason(null);
+                shouldCreateRequiredApproveRequest = !wasPendingApproval;
+            } else {
+                invoice.setStatus(InvoiceStatus.ISSUED);
+            }
+        }
+        if (request.getCustomerSnapshot() != null) {
+            applyCustomerSnapshot(invoice, null, request.getCustomerSnapshot());
+        }
         invoice.setRevNo(defaultRevNo(invoice.getRevNo()) + 1);
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        if (shouldCreateRequiredApproveRequest) {
+            try {
+                approvalService.createInvoicePaymentTermApprovalRequest(saved, userId);
+            } catch (Exception exception) {
+                throw new InvalidRequestException("Cannot create invoice approval request: " + exception.getMessage());
+            }
+        }
 
         Map<String, Object> detail = new LinkedHashMap<>();
         Map<String, Object> before = new LinkedHashMap<>();
@@ -216,11 +275,33 @@ public class InvoiceService {
                 ActivityActorType.USER,
                 ActivityAction.UPDATE,
                 ActivitySource.API,
-                "อัปเดตวันที่ส่งสินค้าของ Invoice เลขที่ " + saved.getInvoiceNo(),
+                "อัปเดต Invoice เลขที่ " + saved.getInvoiceNo(),
                 detail
         );
 
         return mapToDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto approveRequiredApprove(String invoiceNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        validateRequiredApproveSuperAdmin(userId);
+        validateRequiredApprovePending(invoiceNo);
+        approvalService.approveLatestApprovalByEntity(ActivityEntityType.INVOICE, invoiceNo, userId);
+        return getInvoiceById(invoiceNo);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto rejectRequiredApprove(
+            String invoiceNo, RejectInvoiceRequiredApproveRequest request, String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        validateRequiredApproveSuperAdmin(userId);
+        if (request == null || StringUtils.isBlank(request.getReason())) {
+            throw new InvalidRequestException("reason is required.");
+        }
+        validateRequiredApprovePending(invoiceNo);
+        approvalService.rejectLatestApprovalByEntity(ActivityEntityType.INVOICE, invoiceNo, request.getReason().trim(), userId);
+        return getInvoiceById(invoiceNo);
     }
 
     @Transactional(readOnly = true)
@@ -572,6 +653,35 @@ public class InvoiceService {
         }
     }
 
+    private boolean requiresPaymentTermApproval(String paymentTerm) {
+        return Set.of("DEP30_BBS", "AFS100", "DEP35_35_30_BBS").contains(StringUtils.trimToEmpty(paymentTerm));
+    }
+
+    private void validateRequiredApproveSuperAdmin(String userId) throws InvalidRequestException {
+        if (!StringUtils.equals("SUPER_ADMIN", userProfileService.getRoleCodeFromId(userId))) {
+            throw new InvalidRequestException("Only SUPER_ADMIN can approve or reject invoice.");
+        }
+    }
+
+    private void validateRequiredApprovePending(String invoiceNo)
+            throws DataNotFoundException, InvalidRequestException {
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        if (!Boolean.TRUE.equals(invoice.getRequiredApprove())
+                || !UrgentRequestStatus.PENDING_APPROVAL.equals(invoice.getRequiredApproveStatus())) {
+            throw new InvalidRequestException("Invoice is not pending approval.");
+        }
+    }
+
+    private SystemConfigEntity resolveCustomerPaymentTerm(String paymentTerm) throws DataNotFoundException {
+        String code = StringUtils.trimToNull(paymentTerm);
+        if (code == null) {
+            return null;
+        }
+        return systemConfigRepository.findByIdGroupCodeAndIdCode(SystemConstant.CUSTOMER_PAYMENT_TERM, code)
+                .orElseThrow(() -> new DataNotFoundException("Customer payment term " + code + " not found."));
+    }
+
     private String generateInvoiceNo() {
         return generatedIdSequenceService.getNextIdWithMonth(INVOICE_PREFIX, 4);
     }
@@ -595,6 +705,51 @@ public class InvoiceService {
         appendSnapshot(builder, address.getPostcode());
         appendSnapshot(builder, address.getCountry());
         return builder.toString().trim();
+    }
+
+    private void applyCustomerSnapshot(InvoiceEntity invoice, SalesOrderEntity salesOrder,
+                                       QuotationCustomerSnapshotDto supplied) {
+        if (supplied != null) {
+            invoice.setCustomerNameSnapshot(supplied.getCustomerName());
+            invoice.setCustomerTaxIdSnapshot(supplied.getTaxId());
+            invoice.setCustomerBranchCodeSnapshot(supplied.getBranchCode());
+            invoice.setCustomerBranchNameSnapshot(supplied.getBranchName());
+            invoice.setCustomerAddressSnapshot(supplied.getAddress());
+            invoice.setCustomerContactSnapshot(supplied.getContactName());
+            invoice.setCustomerPhoneSnapshot(supplied.getContactNumber());
+            return;
+        }
+
+        invoice.setCustomerNameSnapshot(salesOrder == null ? null : salesOrder.getCustomerNameSnapshot());
+        invoice.setCustomerTaxIdSnapshot(salesOrder == null ? null : salesOrder.getCustomerTaxIdSnapshot());
+        invoice.setCustomerBranchCodeSnapshot(salesOrder == null ? null : salesOrder.getCustomerBranchCodeSnapshot());
+        invoice.setCustomerBranchNameSnapshot(salesOrder == null ? null : salesOrder.getCustomerBranchNameSnapshot());
+        invoice.setCustomerAddressSnapshot(salesOrder == null ? null : salesOrder.getCustomerAddressSnapshot());
+        invoice.setCustomerContactSnapshot(salesOrder == null ? null : salesOrder.getCustomerContactSnapshot());
+        invoice.setCustomerPhoneSnapshot(salesOrder == null ? null : salesOrder.getCustomerPhoneSnapshot());
+    }
+
+    private QuotationCustomerSnapshotDto toCustomerSnapshot(InvoiceEntity invoice) {
+        QuotationCustomerSnapshotDto snapshot = new QuotationCustomerSnapshotDto();
+        if (invoice.getCustomerNameSnapshot() != null) {
+            snapshot.setCustomerName(invoice.getCustomerNameSnapshot());
+            snapshot.setTaxId(invoice.getCustomerTaxIdSnapshot());
+            snapshot.setBranchCode(invoice.getCustomerBranchCodeSnapshot());
+            snapshot.setBranchName(invoice.getCustomerBranchNameSnapshot());
+            snapshot.setAddress(invoice.getCustomerAddressSnapshot());
+            snapshot.setContactName(invoice.getCustomerContactSnapshot());
+            snapshot.setContactNumber(invoice.getCustomerPhoneSnapshot());
+            return snapshot;
+        }
+        CustomerEntity customer = invoice.getCustomer();
+        snapshot.setCustomerName(customer == null ? null : customer.getCustomerName());
+        snapshot.setTaxId(customer == null ? null : customer.getTaxId());
+        snapshot.setBranchCode(customer == null ? null : customer.getBranchNumber());
+        snapshot.setBranchName(customer == null ? null : customer.getBranchName());
+        snapshot.setAddress(buildFullAddress(invoice.getCustomerAddress()));
+        snapshot.setContactName(invoice.getCustomerContact() == null ? null : invoice.getCustomerContact().getContactName());
+        snapshot.setContactNumber(invoice.getCustomerContact() == null ? null : invoice.getCustomerContact().getContactNumber());
+        return snapshot;
     }
 
     private String buildSalesNameSnapshot(EmployeeEntity sales) {
@@ -777,6 +932,7 @@ public class InvoiceService {
         dto.setCustomer(customerMapper.toDto(entity.getCustomer()));
         dto.setCustomerAddress(customerMapper.toAddressDto(entity.getCustomerAddress()));
         dto.setCustomerContact(customerMapper.toContactDto(entity.getCustomerContact()));
+        dto.setCustomerSnapshot(toCustomerSnapshot(entity));
         dto.setSaleAccount(employeeMapper.toDto(entity.getSales()));
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setSubTotal(entity.getSubTotal());
@@ -793,10 +949,23 @@ public class InvoiceService {
         dto.setRevNo(entity.getRevNo());
         dto.setCustomerNameSnapshot(entity.getCustomerNameSnapshot());
         dto.setCustomerTaxIdSnapshot(entity.getCustomerTaxIdSnapshot());
+        dto.setCustomerBranchCodeSnapshot(entity.getCustomerBranchCodeSnapshot());
+        dto.setCustomerBranchNameSnapshot(entity.getCustomerBranchNameSnapshot());
         dto.setCustomerAddressSnapshot(entity.getCustomerAddressSnapshot());
         dto.setCustomerContactSnapshot(entity.getCustomerContactSnapshot());
         dto.setCustomerPhoneSnapshot(entity.getCustomerPhoneSnapshot());
+        dto.setCustomerPaymentTerm(systemConfigMapper.toDto(entity.getCustomerPaymentTerm()));
         dto.setSalesNameSnapshot(entity.getSalesNameSnapshot());
+        dto.setRequiredApprove(entity.getRequiredApprove());
+        dto.setRequiredApproveReason(entity.getRequiredApproveReason());
+        dto.setRequiredApproveStatus(entity.getRequiredApproveStatus());
+        dto.setRequestRequiredApprovedBy(entity.getRequestRequiredApprovedBy());
+        dto.setRequestRequiredApprovedDate(entity.getRequestRequiredApprovedDate());
+        dto.setApprovedBy(entity.getApprovedBy());
+        dto.setApprovedDate(entity.getApprovedDate());
+        dto.setRejectedBy(entity.getRejectedBy());
+        dto.setRejectedDate(entity.getRejectedDate());
+        dto.setRejectReason(entity.getRejectReason());
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
 
@@ -869,26 +1038,12 @@ public class InvoiceService {
         dto.setRemark(invoiceEntity.getRemark());
         dto.setThaiBahtText(ThaiBahtText.convertBahtText(defaultIfNull(invoiceEntity.getGrandTotal())));
 
-        dto.setCustName(
-                invoiceEntity.getCustomer() != null
-                        ? invoiceEntity.getCustomer().getCustomerName()
-                        : invoiceEntity.getCustomerNameSnapshot()
-        );
-        dto.setCustTaxId(
-                invoiceEntity.getCustomer() != null
-                        ? invoiceEntity.getCustomer().getTaxId()
-                        : invoiceEntity.getCustomerTaxIdSnapshot()
-        );
-        dto.setCustAddress(
-                invoiceEntity.getCustomerAddress() != null
-                        ? buildFullAddress(invoiceEntity.getCustomerAddress())
-                        : invoiceEntity.getCustomerAddressSnapshot()
-        );
-        dto.setCustMobileNo(
-                invoiceEntity.getCustomerContact() != null
-                        ? invoiceEntity.getCustomerContact().getContactNumber()
-                        : invoiceEntity.getCustomerPhoneSnapshot()
-        );
+        QuotationCustomerSnapshotDto customerSnapshot = toCustomerSnapshot(invoiceEntity);
+        dto.setCustName(customerSnapshot.getCustomerName()
+                + (StringUtils.isBlank(customerSnapshot.getBranchCode()) ? "" : " (" + customerSnapshot.getBranchCode() + ")"));
+        dto.setCustTaxId(customerSnapshot.getTaxId());
+        dto.setCustAddress(customerSnapshot.getAddress());
+        dto.setCustMobileNo(customerSnapshot.getContactNumber());
         dto.setSalesId(invoiceEntity.getSales() != null ? invoiceEntity.getSales().getEmployeeId() : null);
         dto.setSalesName(
                 invoiceEntity.getSales() != null

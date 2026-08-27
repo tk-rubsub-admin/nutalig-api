@@ -14,6 +14,8 @@ public class QuotationRequestDto {
     private String customerId;
     private String customerAddressId;
     private String customerContactId;
+    private String customerBranchCode;
+    private QuotationCustomerSnapshotDto customerSnapshot;
     private String salesId;
     private String coSaleId;
     private String remark;

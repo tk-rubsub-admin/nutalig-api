@@ -54,6 +54,14 @@ public class QuotationEntity extends AuditDateEntity {
     @ToString.Exclude
     private CustomerContactEntity customerContact;
 
+    @Column(name = "customer_name_snapshot") private String customerNameSnapshot;
+    @Column(name = "customer_tax_id_snapshot") private String customerTaxIdSnapshot;
+    @Column(name = "customer_branch_code_snapshot") private String customerBranchCodeSnapshot;
+    @Column(name = "customer_branch_name_snapshot") private String customerBranchNameSnapshot;
+    @Column(name = "customer_address_snapshot", length = 2000) private String customerAddressSnapshot;
+    @Column(name = "customer_contact_snapshot") private String customerContactSnapshot;
+    @Column(name = "customer_phone_snapshot") private String customerPhoneSnapshot;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sales_id", referencedColumnName = "employee_id")
     @ToString.Exclude

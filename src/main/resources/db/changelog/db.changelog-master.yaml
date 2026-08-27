@@ -2970,6 +2970,20 @@ databaseChangeLog:
       file: db/changelog/20260825-001-add-plan-to-rfq-detail-tables.yaml
   - include:
       file: db/changelog/20260827-001-add-invoice-payment-attachment-table.yaml
+  - include:
+      file: db/changelog/20260827-002-add-customer-branch-table.yaml
+  - include:
+      file: db/changelog/20260827-004-add-quotation-customer-snapshots.yaml
+  - include:
+      file: db/changelog/20260827-005-add-sales-order-customer-snapshots.yaml
+  - include:
+      file: db/changelog/20260827-006-add-invoice-customer-branch-snapshots.yaml
+  - include:
+      file: db/changelog/20260827-007-add-invoice-customer-payment-term-snapshot.yaml
+  - include:
+      file: db/changelog/20260827-008-rename-invoice-customer-payment-term.yaml
+  - include:
+      file: db/changelog/20260828-001-add-invoice-required-approve-columns.yaml
 
   - changeSet:
       id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier

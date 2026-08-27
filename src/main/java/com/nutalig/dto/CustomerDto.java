@@ -32,6 +32,7 @@ public class CustomerDto {
     private String updatedBy;
     private List<CustomerAddressDto> addresses;
     private List<CustomerContactDto> contacts;
+    private List<CustomerBranchDto> branches;
 
     public CustomerDto(String id, String customerName) {
         this.id = id;

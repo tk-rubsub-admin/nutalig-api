@@ -18,6 +18,7 @@ public class SalesOrderDto {
     private CustomerDto customer;
     private CustomerAddressDto customerAddress;
     private CustomerContactDto customerContact;
+    private QuotationCustomerSnapshotDto customerSnapshot;
     private EmployeeDto saleAccount;
     private String rfqId;
     private String coSaleId;

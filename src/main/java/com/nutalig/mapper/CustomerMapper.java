@@ -4,9 +4,11 @@ import com.nutalig.controller.customer.request.CreateCustomerRequest;
 import com.nutalig.dto.CustomerAddressDto;
 import com.nutalig.dto.CustomerContactDto;
 import com.nutalig.dto.CustomerDto;
+import com.nutalig.dto.CustomerBranchDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
 import com.nutalig.entity.CustomerEntity;
+import com.nutalig.entity.CustomerBranchEntity;
 import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
@@ -29,12 +31,15 @@ public interface CustomerMapper {
     @Mapping(target = "customerSegment", ignore = true)
     @Mapping(target = "customerTier", ignore = true)
     @Mapping(target = "contacts", ignore = true)
+    @Mapping(target = "branches", ignore = true)
     CustomerEntity toEntity(CreateCustomerRequest request);
 
     @Mapping(target = "fullAddress", expression = "java(buildFullAddress(entity))")
     CustomerAddressDto toAddressDto(CustomerAddressEntity entity);
 
     CustomerContactDto toContactDto(CustomerContactEntity entity);
+
+    CustomerBranchDto toBranchDto(CustomerBranchEntity entity);
 
     default String buildFullAddress(CustomerAddressEntity address) {
         if (address == null) {
