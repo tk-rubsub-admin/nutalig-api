@@ -834,7 +834,6 @@ public class ApprovalService {
     private List<UserEntity> findApproversByRole(String roleCode) {
         return userRepository.findByRoleIn(List.of(roleCode)).stream()
                 .filter(user -> Status.ACTIVE.equals(user.getStatus()))
-                .filter(user -> "USER-000001".equals(user.getId()))
                 .toList();
     }
 

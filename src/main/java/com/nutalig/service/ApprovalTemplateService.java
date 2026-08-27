@@ -25,12 +25,17 @@ public class ApprovalTemplateService {
             for (Map.Entry<String, String> entry : placeholders.entrySet()) {
                 rendered = rendered.replace(
                         "${" + entry.getKey() + "}",
-                        StringUtils.defaultString(entry.getValue())
+                        escapeJsonString(StringUtils.defaultString(entry.getValue()))
                 );
             }
         }
 
         return objectMapper.readTree(rendered);
+    }
+
+    private String escapeJsonString(String value) throws Exception {
+        String quoted = objectMapper.writeValueAsString(value);
+        return quoted.length() >= 2 ? quoted.substring(1, quoted.length() - 1) : quoted;
     }
 
     private String loadTemplate(String templateCode) throws Exception {

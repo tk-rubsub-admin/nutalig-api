@@ -293,8 +293,8 @@ public class QuotationService {
         quotationEntity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         quotationEntity.setUpdatedBy(actor);
 
-//        quotationRepository.save(quotationEntity);
-//        recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
+        quotationEntity = quotationRepository.save(quotationEntity);
+        recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
 
         return mapToDto(quotationEntity);
     }
@@ -905,7 +905,7 @@ public class QuotationService {
         List<QuotationItemRequestDto> items = new ArrayList<>();
         for (QuotationDetailEntity detail : entity.getItems()) {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
-            item.setId(detail.getId().toString());
+            item.setId(detail.getId() != null ? detail.getId().toString() : null);
             item.setTierId(detail.getTierId());
             item.setName(detail.getName());
             item.setImagePreview(detail.getImageUrl());

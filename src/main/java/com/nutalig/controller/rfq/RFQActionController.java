@@ -2,10 +2,7 @@ package com.nutalig.controller.rfq;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.controller.response.GeneralResponse;
-import com.nutalig.controller.rfq.request.AddRfqNoteRequest;
-import com.nutalig.controller.rfq.request.CloseRfqRequest;
-import com.nutalig.controller.rfq.request.RejectUrgentRfqRequest;
-import com.nutalig.controller.rfq.request.RequestRfqInformationRequest;
+import com.nutalig.controller.rfq.request.*;
 import com.nutalig.dto.RfqHeaderDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -85,6 +82,22 @@ public class RFQActionController {
 
         log.info("=== End cancel rfq {} ===", id);
 
+        return new GeneralResponse<>(SUCCESS);
+    }
+
+
+
+    @PostMapping("/{id}/request-urgent-approve")
+    public GeneralResponse requestUrgentApprove(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) RequestUrgentRfqApproveRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start request urgent approve for rfq {} by {}", id, userId);
+
+        rfqService.createUrgentRfqApprovalRequest(id, request, userId);
+
+        log.info("=== end request urgent approve for rfq {} ===", id);
         return new GeneralResponse<>(SUCCESS);
     }
 
