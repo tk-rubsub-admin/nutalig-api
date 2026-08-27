@@ -7,6 +7,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 @Data
 public class InvoicePaymentDto {
@@ -20,6 +21,7 @@ public class InvoicePaymentDto {
     private String chequeBranch;
     private String slipFileName;
     private String slipFileUrl;
+    private List<InvoicePaymentSlipFileDto> slipFiles;
     private String receiptNo;
     private InvoicePaymentStatus status;
     private UserDto createdBy;

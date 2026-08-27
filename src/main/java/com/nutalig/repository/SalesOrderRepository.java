@@ -14,6 +14,13 @@ import java.util.Collection;
 @Repository
 public interface SalesOrderRepository extends JpaRepository<SalesOrderEntity, String>, JpaSpecificationExecutor<SalesOrderEntity> {
 
+    @Query(value = """
+        select count(*)
+        from sales_order
+        where customer_address_id = :customerAddressId
+    """, nativeQuery = true)
+    long countByCustomerAddress_Id(@Param("customerAddressId") Long customerAddressId);
+
     @Query("""
         select coalesce(sum(so.grandTotal), 0)
         from SalesOrderEntity so

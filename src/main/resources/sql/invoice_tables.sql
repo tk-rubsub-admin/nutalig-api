@@ -95,3 +95,19 @@ CREATE TABLE IF NOT EXISTS invoice_payment (
     CONSTRAINT fk_invoice_payment_created_by FOREIGN KEY (created_by) REFERENCES user (id),
     CONSTRAINT fk_invoice_payment_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS invoice_payment_attachment (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    invoice_payment_id BIGINT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    original_file_name VARCHAR(255) DEFAULT NULL,
+    file_url VARCHAR(500) NOT NULL,
+    content_type VARCHAR(100) DEFAULT NULL,
+    file_size BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT NULL,
+    created_date DATETIME(6) DEFAULT NULL,
+    updated_date DATETIME(6) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_invoice_payment_attachment_payment (invoice_payment_id),
+    CONSTRAINT fk_invoice_payment_attachment_payment FOREIGN KEY (invoice_payment_id) REFERENCES invoice_payment (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

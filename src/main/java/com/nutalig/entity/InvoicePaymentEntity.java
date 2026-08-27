@@ -10,6 +10,8 @@ import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Objects;
 
 @Getter
@@ -58,6 +60,11 @@ public class InvoicePaymentEntity extends AuditDateEntity {
     @Column(name = "slip_file_url", length = 500)
     private String slipFileUrl;
 
+    @OneToMany(mappedBy = "invoicePayment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder asc, id asc")
+    @ToString.Exclude
+    private Set<InvoicePaymentAttachmentEntity> slipFiles = new LinkedHashSet<>();
+
     @Column(name = "receipt_no", length = 50)
     private String receiptNo;
 
@@ -85,5 +92,11 @@ public class InvoicePaymentEntity extends AuditDateEntity {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    public void addSlipFile(InvoicePaymentAttachmentEntity attachment) {
+        if (attachment == null) return;
+        slipFiles.add(attachment);
+        attachment.setInvoicePayment(this);
     }
 }

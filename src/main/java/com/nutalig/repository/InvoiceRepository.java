@@ -14,6 +14,13 @@ import org.springframework.data.repository.query.Param;
 public interface InvoiceRepository extends JpaRepository<InvoiceEntity, String>, JpaSpecificationExecutor<InvoiceEntity> {
     List<InvoiceEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
 
+    @Query(value = """
+            select count(*)
+            from invoice
+            where customer_address_id = :customerAddressId
+            """, nativeQuery = true)
+    long countByCustomerAddress_Id(@Param("customerAddressId") Long customerAddressId);
+
     @Query("""
             select coalesce(sum(payment.amount), 0)
             from InvoiceEntity invoice

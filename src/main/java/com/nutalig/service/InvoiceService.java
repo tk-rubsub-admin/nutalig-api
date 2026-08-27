@@ -16,6 +16,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.InvoiceDetailDto;
 import com.nutalig.dto.InvoiceDto;
 import com.nutalig.dto.InvoicePaymentDto;
+import com.nutalig.dto.InvoicePaymentSlipFileDto;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.dto.document.InvoiceDocumentDto;
@@ -26,7 +27,6 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.UserMapper;
-import com.nutalig.repository.InvoicePaymentRepository;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
@@ -79,7 +79,6 @@ public class InvoiceService {
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
     private final InvoiceRepository invoiceRepository;
-    private final InvoicePaymentRepository invoicePaymentRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
@@ -364,6 +363,7 @@ public class InvoiceService {
             String chequeNo,
             LocalDate chequeDate,
             String chequeBranch,
+            MultipartFile[] slipFiles,
             MultipartFile slipFile,
             String userId
     ) throws Exception {
@@ -376,8 +376,9 @@ public class InvoiceService {
         if (paymentMethod == null) {
             throw new InvalidRequestException("paymentMethod is required");
         }
-        if (paymentMethod == PaymentMethod.TRANSFER && (slipFile == null || slipFile.isEmpty())) {
-            throw new InvalidRequestException("slipFile is required for transfer payment");
+        List<MultipartFile> uploadFiles = resolveSlipFiles(slipFiles, slipFile);
+        if (paymentMethod == PaymentMethod.TRANSFER && uploadFiles.isEmpty()) {
+            throw new InvalidRequestException("slipFiles is required for transfer payment");
         }
         if (paymentMethod == PaymentMethod.CHEQUE) {
             if (StringUtils.isBlank(chequeBank)) {
@@ -409,11 +410,6 @@ public class InvoiceService {
         InvoiceStatus beforeStatus = invoice.getStatus();
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
-        UploadFileResponse uploadedSlip = null;
-        if (slipFile != null && !slipFile.isEmpty()) {
-            uploadedSlip = fileStorageService.uploadFile(slipFile);
-        }
-
         InvoicePaymentEntity payment = new InvoicePaymentEntity();
         payment.setPaymentDate(paymentDate);
         payment.setAmount(amount);
@@ -422,13 +418,36 @@ public class InvoiceService {
         payment.setChequeNo(StringUtils.trimToNull(chequeNo));
         payment.setChequeDate(chequeDate);
         payment.setChequeBranch(StringUtils.trimToNull(chequeBranch));
-        payment.setSlipFileName(uploadedSlip != null ? uploadedSlip.getFileName() : null);
-        payment.setSlipFileUrl(uploadedSlip != null ? uploadedSlip.getUrl() : null);
         payment.setStatus(InvoicePaymentStatus.PENDING);
         payment.setCreatedBy(user);
         payment.setUpdatedBy(user);
         payment.setCreatedDate(now);
         payment.setUpdatedDate(now);
+
+        List<InvoicePaymentAttachmentEntity> attachments = new ArrayList<>();
+        for (int index = 0; index < uploadFiles.size(); index++) {
+            MultipartFile file = uploadFiles.get(index);
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+
+            UploadFileResponse uploadedSlip = fileStorageService.uploadFile(file);
+            InvoicePaymentAttachmentEntity attachment = new InvoicePaymentAttachmentEntity();
+            attachment.setFileName(uploadedSlip.getFileName());
+            attachment.setOriginalFileName(file.getOriginalFilename());
+            attachment.setFileUrl(uploadedSlip.getUrl());
+            attachment.setContentType(uploadedSlip.getContentType());
+            attachment.setFileSize(file.getSize());
+            attachment.setSortOrder(index);
+            payment.addSlipFile(attachment);
+            attachments.add(attachment);
+        }
+
+        if (!attachments.isEmpty()) {
+            InvoicePaymentAttachmentEntity firstAttachment = attachments.get(0);
+            payment.setSlipFileName(firstAttachment.getFileName());
+            payment.setSlipFileUrl(firstAttachment.getFileUrl());
+        }
 
         BigDecimal nextPaidTotal = beforePaidTotal.add(amount);
         BigDecimal nextOutstandingTotal = defaultIfNull(invoice.getGrandTotal()).subtract(nextPaidTotal);
@@ -443,11 +462,9 @@ public class InvoiceService {
         invoice.setUpdatedDate(now);
         markSalesOrderReadyForProcurementIfDepositPaid(invoice, userId);
 
+        invoice.addPayment(payment);
         InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
-        payment.setInvoice(saved);
-        InvoicePaymentEntity savedPayment = invoicePaymentRepository.saveAndFlush(payment);
-        saved.addPayment(savedPayment);
-        recordReceivePaymentActivity(saved, savedPayment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
+        recordReceivePaymentActivity(saved, payment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
 //        sendAwaitingValidationNotifications(saved, savedPayment);
         return mapToDto(saved);
     }
@@ -815,6 +832,9 @@ public class InvoiceService {
             paymentDto.setChequeBranch(payment.getChequeBranch());
             paymentDto.setSlipFileName(payment.getSlipFileName());
             paymentDto.setSlipFileUrl(payment.getSlipFileUrl());
+            paymentDto.setSlipFiles(payment.getSlipFiles() == null
+                    ? List.of()
+                    : payment.getSlipFiles().stream().map(this::mapToSlipFileDto).toList());
             paymentDto.setReceiptNo(payment.getReceiptNo());
             paymentDto.setStatus(payment.getStatus());
             paymentDto.setCreatedBy(userMapper.toDto(payment.getCreatedBy()));
@@ -979,6 +999,9 @@ public class InvoiceService {
         after.put("chequeBranch", payment.getChequeBranch());
         after.put("slipFileName", payment.getSlipFileName());
         after.put("slipFileUrl", payment.getSlipFileUrl());
+        after.put("slipFiles", payment.getSlipFiles() == null
+                ? List.of()
+                : payment.getSlipFiles().stream().map(this::mapToSlipFileActivity).toList());
 
         detail.put("before", before);
         detail.put("after", after);
@@ -993,6 +1016,47 @@ public class InvoiceService {
                 "รับชำระเงิน Invoice เลขที่ " + invoice.getInvoiceNo(),
                 detail
         );
+    }
+
+    private List<MultipartFile> resolveSlipFiles(MultipartFile[] slipFiles, MultipartFile slipFile) {
+        List<MultipartFile> files = new ArrayList<>();
+        if (slipFiles != null) {
+            for (MultipartFile file : slipFiles) {
+                if (file != null && !file.isEmpty()) {
+                    files.add(file);
+                }
+            }
+        }
+        if (slipFile != null && !slipFile.isEmpty()) {
+            files.add(slipFile);
+        }
+        return files;
+    }
+
+    private InvoicePaymentSlipFileDto mapToSlipFileDto(InvoicePaymentAttachmentEntity attachment) {
+        InvoicePaymentSlipFileDto dto = new InvoicePaymentSlipFileDto();
+        dto.setId(attachment.getId());
+        dto.setFileName(attachment.getFileName());
+        dto.setOriginalFileName(attachment.getOriginalFileName());
+        dto.setFileUrl(attachment.getFileUrl());
+        dto.setContentType(attachment.getContentType());
+        dto.setFileSize(attachment.getFileSize());
+        dto.setSortOrder(attachment.getSortOrder());
+        dto.setCreatedDate(attachment.getCreatedDate());
+        dto.setUpdatedDate(attachment.getUpdatedDate());
+        return dto;
+    }
+
+    private Map<String, Object> mapToSlipFileActivity(InvoicePaymentAttachmentEntity attachment) {
+        Map<String, Object> file = new LinkedHashMap<>();
+        file.put("id", attachment.getId());
+        file.put("fileName", attachment.getFileName());
+        file.put("originalFileName", attachment.getOriginalFileName());
+        file.put("fileUrl", attachment.getFileUrl());
+        file.put("contentType", attachment.getContentType());
+        file.put("fileSize", attachment.getFileSize());
+        file.put("sortOrder", attachment.getSortOrder());
+        return file;
     }
 
     private void sendAwaitingValidationNotifications(InvoiceEntity invoice, InvoicePaymentEntity payment) {

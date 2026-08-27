@@ -18,7 +18,11 @@ import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
+import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.CustomerRepository;
+import com.nutalig.repository.QuotationRepository;
+import com.nutalig.repository.ReceiptRepository;
+import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.SystemConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +51,10 @@ import static com.nutalig.repository.specification.CustomerSpecification.*;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final QuotationRepository quotationRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final ReceiptRepository receiptRepository;
     private final SystemConfigRepository systemConfigRepository;
     private final CustomerMapper customerMapper;
     private final UserProfileService userProfileService;
@@ -408,7 +416,8 @@ public class CustomerService {
     }
 
     @Transactional
-    public CustomerDto deleteCustomerAddress(String customerId, Long addressId) throws DataNotFoundException {
+    public CustomerDto deleteCustomerAddress(String customerId, Long addressId)
+            throws DataNotFoundException, InvalidRequestException {
         log.info("Delete customer address {} from customer {}", addressId, customerId);
 
         CustomerEntity entity = customerRepository.findById(customerId)
@@ -418,7 +427,13 @@ public class CustomerService {
                 .filter(address -> Objects.equals(address.getId(), addressId))
                 .findFirst()
                 .orElse(null);
-        boolean removed = addressToDelete != null && entity.getAddresses().remove(addressToDelete);
+        if (addressToDelete == null) {
+            throw new DataNotFoundException("Customer address " + addressId + " not found.");
+        }
+
+        validateCustomerAddressCanBeDeleted(addressId);
+
+        boolean removed = entity.getAddresses().remove(addressToDelete);
         if (!removed) {
             throw new DataNotFoundException("Customer address " + addressId + " not found.");
         }
@@ -755,6 +770,32 @@ public class CustomerService {
                     summaryPrefix + addressTitle(address),
                     buildEmptyCustomerAddressHistorySnapshot(),
                     buildCustomerAddressHistorySnapshot(address)
+            );
+        }
+    }
+
+    private void validateCustomerAddressCanBeDeleted(Long addressId) throws InvalidRequestException {
+        if (addressId == null) {
+            return;
+        }
+
+        List<String> usedBy = new ArrayList<>();
+        if (quotationRepository.countByCustomerAddress_Id(addressId) > 0) {
+            usedBy.add("ใบเสนอราคา");
+        }
+        if (salesOrderRepository.countByCustomerAddress_Id(addressId) > 0) {
+            usedBy.add("ใบยืนยันสั่งซื้อ");
+        }
+        if (invoiceRepository.countByCustomerAddress_Id(addressId) > 0) {
+            usedBy.add("ใบแจ้งหนี้");
+        }
+        if (receiptRepository.countByCustomerAddress_Id(addressId) > 0) {
+            usedBy.add("ใบเสร็จรับเงิน");
+        }
+
+        if (!usedBy.isEmpty()) {
+            throw new InvalidRequestException(
+                    "ไม่สามารถลบที่อยู่นี้ได้ เนื่องจากถูกใช้งานใน " + String.join(", ", usedBy)
             );
         }
     }

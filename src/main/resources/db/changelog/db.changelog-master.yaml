@@ -2968,6 +2968,8 @@ databaseChangeLog:
       file: db/changelog/20260824-001-add-container-size-to-rfq-tier.yaml
   - include:
       file: db/changelog/20260825-001-add-plan-to-rfq-detail-tables.yaml
+  - include:
+      file: db/changelog/20260827-001-add-invoice-payment-attachment-table.yaml
 
   - changeSet:
       id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier

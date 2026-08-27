@@ -161,7 +161,7 @@ public class CustomerController {
     public GeneralResponse<CustomerDto> deleteCustomerAddress(
             @PathVariable String customerId,
             @PathVariable Long addressId
-    ) throws DataNotFoundException {
+    ) throws DataNotFoundException, InvalidRequestException {
         log.info("=== Start delete customer address {} from customer {} ===", addressId, customerId);
 
         CustomerDto response = customerService.deleteCustomerAddress(customerId, addressId);

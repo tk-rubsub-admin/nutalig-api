@@ -169,6 +169,7 @@ public class InvoiceController {
             @RequestParam(name = "chequeNo", required = false) String chequeNo,
             @RequestParam(name = "chequeDate", required = false) java.time.LocalDate chequeDate,
             @RequestParam(name = "chequeBranch", required = false) String chequeBranch,
+            @RequestPart(name = "slipFiles", required = false) MultipartFile[] slipFiles,
             @RequestPart(name = "slipFile", required = false) MultipartFile slipFile,
             @RequestHeader("userId") String userId
     ) throws Exception {
@@ -183,6 +184,7 @@ public class InvoiceController {
                 chequeNo,
                 chequeDate,
                 chequeBranch,
+                slipFiles,
                 slipFile,
                 userId
         );
