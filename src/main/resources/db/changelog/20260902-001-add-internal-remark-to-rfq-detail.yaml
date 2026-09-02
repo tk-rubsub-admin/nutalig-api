@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260902-001-add-internal-remark-to-rfq-detail
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail
+                columnName: internal_remark
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: internal_remark
+                  type: TEXT
+
+  - changeSet:
+      id: 20260902-002-add-internal-remark-to-rfq-detail-history
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_detail_history
+                columnName: internal_remark
+      changes:
+        - addColumn:
+            tableName: rfq_detail_history
+            columns:
+              - column:
+                  name: internal_remark
+                  type: TEXT

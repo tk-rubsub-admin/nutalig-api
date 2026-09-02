@@ -136,7 +136,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</element>
 			<element kind="textField" uuid="e4391c9e-a069-4e66-8944-7f299e5db855" x="0" y="160" width="555" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["Salesman: " + $P{salesName} + "  Tel: " + $P{salesMobileNo}]]></expression>
+				<expression><![CDATA["Salesman: " + $P{salesName} + "  Tel: " + $P{salesMobileNo} + (($P{coSalesId} != null && !$P{coSalesId}.isBlank()) ? "/Salesman Id : " + $P{coSalesId} : "")]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<property name="com.jaspersoft.studio.unit.y" value="px"/>

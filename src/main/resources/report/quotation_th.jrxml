@@ -98,7 +98,8 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 				<expression><![CDATA["เรียน/Attention: " + $P{custName} + "\n" + 
 "เลขประจำตัวผู้เสียภาษี " + $P{custTaxId} + "\n" + 
-"ที่อยู่/Address: " + $P{custAddress}]]></expression>
+"ที่อยู่/Address: " + $P{custAddress} + "\n" +
+"TEL: " + $P{custMobileNo}]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<box topPadding="3" leftPadding="5">
@@ -134,7 +135,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</element>
 			<element kind="textField" uuid="71b009ef-8538-4f9e-81b5-1266513f2995" x="405" y="140" width="150" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["TEL: " + $P{custMobileNo}]]></expression>
+				<expression><![CDATA[""]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<box topPadding="3" leftPadding="5">
@@ -146,7 +147,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</element>
 			<element kind="textField" uuid="e4391c9e-a069-4e66-8944-7f299e5db855" x="0" y="160" width="555" height="20" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["ผู้ขาย: " + $P{salesName} + "  เบอร์ติดต่อ: " + $P{salesMobileNo}]]></expression>
+				<expression><![CDATA["ผู้ขาย: " + $P{salesName} + "  เบอร์ติดต่อ: " + $P{salesMobileNo} + (($P{coSalesId} != null && !$P{coSalesId}.isBlank()) ? "/รหัสพนักงานขาย : " + $P{coSalesId} : "")]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<property name="com.jaspersoft.studio.unit.y" value="px"/>

@@ -533,6 +533,7 @@ public class RFQService {
         detail.put("after", changedAfterDetail);
         detail.put("note", parseRfqNotes(entity.getNote()));
         detail.put("noteText", StringUtils.trimToNull(request.getNote()));
+        detail.put("noteTo", StringUtils.upperCase(request.getNoteTo()));
 
         String summary = "เพิ่มโน้ตของคำขอราคาเลขที่ " + entity.getId();
         if (StringUtils.isNotBlank(request.getNote())) {
@@ -548,6 +549,13 @@ public class RFQService {
                 ActivitySource.API,
                 summary,
                 detail
+        );
+
+        sendNoteNotification(
+                entity,
+                updatedBy,
+                StringUtils.trimToEmpty(request.getNote()),
+                request.getNoteTo()
         );
 
         return mapToDto(entity);
@@ -598,6 +606,7 @@ public class RFQService {
 
     @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto createRFQ(CreateRequestPriceHeaderRequest request, String userId) throws Exception {
+        request.setRequestedMoqs(normalizeRequestedMoqs(request.getRequestedMoqs()));
         RfqHeaderEntity entity = requestPriceHeaderMapper.toEntity(request);
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         String actor = userProfileService.getNameFromId(userId);
@@ -1176,6 +1185,7 @@ public class RFQService {
         detailEntity.setSpec(updatedDetail.getSpec());
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
         detailEntity.setRemark(updatedDetail.getRemark());
+        detailEntity.setInternalRemark(updatedDetail.getInternalRemark());
         detailEntity.setRecommend(updatedDetail.getRecommend());
         detailEntity.setCommission(scaleMoney(updatedDetail.getCommission()));
         detailEntity.setPackageDimension(updatedDetail.getPackageDimension());
@@ -1532,22 +1542,81 @@ public class RFQService {
         String actor = userProfileService.getNameFromId(userId);
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
 
-        if (request == null || request.getTargetPrice() == null) {
-            throw new InvalidRequestException("targetPrice is required.");
+        if (request == null || CollectionUtils.isEmpty(request.getTiers())) {
+            throw new InvalidRequestException("At least one tier target price is required.");
         }
 
         if (!RfqStatus.QUOTED.equals(entity.getStatus())) {
             throw new InvalidRequestException("Only RFQ with QUOTED status can request special price review.");
         }
 
-        entity.setTargetPrice(scaleMoney(request.getTargetPrice()));
+        Map<Long, RfqTierEntity> tiersById = entity.getDetails().stream()
+                .flatMap(detail -> detail.getTiers().stream())
+                .collect(java.util.stream.Collectors.toMap(
+                        RfqTierEntity::getId,
+                        java.util.function.Function.identity()
+        ));
+        Map<Long, BigDecimal> targetPricesByTierId = new LinkedHashMap<>();
+        Map<BigDecimal, BigDecimal> targetPricesByMoq = new LinkedHashMap<>();
+        Map<BigDecimal, BigDecimal> moqsByKey = new LinkedHashMap<>();
+        for (RequestSpecialPriceRequest.TierTargetPriceRequest tierRequest : request.getTiers()) {
+            if (tierRequest == null || tierRequest.getTierId() == null || tierRequest.getTargetPrice() == null) {
+                throw new InvalidRequestException("tierId and targetPrice are required.");
+            }
+            RfqTierEntity tier = tiersById.get(tierRequest.getTierId());
+            if (tier == null) {
+                throw new InvalidRequestException("RFQ tier does not belong to this RFQ.");
+            }
+            BigDecimal targetPrice = scaleMoney(tierRequest.getTargetPrice());
+            BigDecimal moq = tier.getQuantity().stripTrailingZeros();
+            BigDecimal existingMoqTargetPrice = targetPricesByMoq.putIfAbsent(moq, targetPrice);
+            if (existingMoqTargetPrice != null && existingMoqTargetPrice.compareTo(targetPrice) != 0) {
+                throw new InvalidRequestException("Target price must be the same for tiers with the same MOQ.");
+            }
+            moqsByKey.putIfAbsent(moq, tier.getQuantity());
+            tier.setTargetPrice(targetPrice);
+            targetPricesByTierId.put(tier.getId(), targetPrice);
+        }
+        List<RequestedMoqDto> requestedMoqs = parseRequestedMoq(entity.getRequestedMoq());
+        boolean requestedMoqChanged = false;
+        for (RequestedMoqDto requestedMoq : requestedMoqs) {
+            if (requestedMoq == null || requestedMoq.getMoq() == null) {
+                continue;
+            }
+            BigDecimal targetPrice = targetPricesByMoq.get(requestedMoq.getMoq().stripTrailingZeros());
+            if (targetPrice != null && (requestedMoq.getTargetPrice() == null
+                    || requestedMoq.getTargetPrice().compareTo(targetPrice) != 0)) {
+                requestedMoq.setTargetPrice(targetPrice);
+                requestedMoqChanged = true;
+            }
+        }
+        Set<BigDecimal> requestedMoqKeys = requestedMoqs.stream()
+                .filter(Objects::nonNull)
+                .map(RequestedMoqDto::getMoq)
+                .filter(Objects::nonNull)
+                .map(BigDecimal::stripTrailingZeros)
+                .collect(java.util.stream.Collectors.toSet());
+        for (Map.Entry<BigDecimal, BigDecimal> entry : targetPricesByMoq.entrySet()) {
+            if (requestedMoqKeys.contains(entry.getKey())) {
+                continue;
+            }
+            RequestedMoqDto requestedMoq = new RequestedMoqDto();
+            requestedMoq.setMoq(moqsByKey.get(entry.getKey()));
+            requestedMoq.setTargetPrice(entry.getValue());
+            requestedMoqs.add(requestedMoq);
+            requestedMoqChanged = true;
+        }
+        if (requestedMoqChanged) {
+            entity.setRequestedMoq(requestPriceHeaderMapper.mapRequestedMoqs(requestedMoqs));
+        }
         entity.setStatus(RfqStatus.SPECIAL_PRICE_REVIEW);
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         entity = requestPriceHeaderRepository.save(entity);
 
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("targetPrice", request.getTargetPrice());
+        detail.put("targetPrices", targetPricesByTierId);
+        detail.put("requestedMoqs", requestedMoqs);
 
         activityHistoryService.record(
                 ActivityEntityType.RFQ,
@@ -1706,15 +1775,8 @@ public class RFQService {
             entity.setCapacity(request.getCapacity());
             editFields.add("ความจุ");
         }
-        BigDecimal requestTargetPrice = scaleMoney(request.getTargetPrice());
-        if (!Objects.equals(requestTargetPrice, entity.getTargetPrice())) {
-            entity.setTargetPrice(requestTargetPrice);
-            editFields.add("Target Price");
-        }
-        List<BigDecimal> requestRequestedMoqs = request.getRequestedMoqs() == null
-                ? new ArrayList<>()
-                : request.getRequestedMoqs().stream().filter(Objects::nonNull).toList();
-        List<BigDecimal> currentRequestedMoqs = parseRequestedMoq(entity.getRequestedMoq());
+        List<RequestedMoqDto> requestRequestedMoqs = normalizeRequestedMoqs(request.getRequestedMoqs());
+        List<RequestedMoqDto> currentRequestedMoqs = parseRequestedMoq(entity.getRequestedMoq());
         if (!Objects.equals(requestRequestedMoqs, currentRequestedMoqs)) {
             entity.setRequestedMoq(requestPriceHeaderMapper.mapRequestedMoqs(requestRequestedMoqs));
             editFields.add("MOQ ที่ต้องการ");
@@ -1797,11 +1859,11 @@ public class RFQService {
 //        variables.put("spec", rfq.getDetails().getFirst().getSpec());
 //        variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
 
-        if (!rfq.getDetails().isEmpty() && rfq.getDetails().getFirst().getRemark() != null && !rfq.getDetails().getFirst().getRemark().isEmpty()) {
-            variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
-        } else {
-            variables.put("remarkSection", "");
-        }
+//        if (!rfq.getDetails().isEmpty() && rfq.getDetails().getFirst().getRemark() != null && !rfq.getDetails().getFirst().getRemark().isEmpty()) {
+//            variables.put("remarkSection", rfq.getDetails().getFirst().getRemark().replaceAll("หมายเหตุ", ""));
+//        } else {
+//            variables.put("remarkSection", "");
+//        }
         variables.put("recommend", rfq.getDetails().getFirst().getRecommend());
         return promptTemplateEngine.render(template, variables).trim();
     }
@@ -1824,7 +1886,8 @@ public class RFQService {
     }
 
 
-    private boolean hasRFQUpdateChanges(RfqHeaderEntity entity, UpdateRequestPriceHeaderRequest request) {
+    private boolean hasRFQUpdateChanges(RfqHeaderEntity entity, UpdateRequestPriceHeaderRequest request)
+            throws InvalidRequestException {
         if (entity == null || request == null) {
             return false;
         }
@@ -1843,9 +1906,7 @@ public class RFQService {
         String requestSystemMechanic = normalizeRequestValue(request.getSystemMechanic());
         String requestMaterial = normalizeRequestValue(request.getMaterial());
         String requestCapacity = normalizeRequestValue(request.getCapacity());
-        List<BigDecimal> requestRequestedMoqs = request.getRequestedMoqs() == null
-                ? new ArrayList<>()
-                : request.getRequestedMoqs().stream().filter(Objects::nonNull).toList();
+        List<RequestedMoqDto> requestRequestedMoqs = normalizeRequestedMoqs(request.getRequestedMoqs());
         String requestDescription = normalizeRequestValue(request.getDescription());
 
         return !StringUtils.equals(requestContactName, normalizeRequestValue(entity.getContactName()))
@@ -1884,7 +1945,6 @@ public class RFQService {
                 entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null
         ) || !StringUtils.equals(requestMaterial, entity.getMaterialCode())
                 || !StringUtils.equals(requestCapacity, entity.getCapacity())
-                || !Objects.equals(request.getTargetPrice(), entity.getTargetPrice())
                 || !Objects.equals(requestRequestedMoqs, parseRequestedMoq(entity.getRequestedMoq()))
                 || !StringUtils.equals(requestDescription, entity.getDescription());
     }
@@ -2378,6 +2438,7 @@ public class RFQService {
         dto.setSpec(entity.getSpec());
         dto.setSortOrder(entity.getSortOrder());
         dto.setRemark(entity.getRemark());
+        dto.setInternalRemark(entity.getInternalRemark());
         dto.setRecommend(entity.getRecommend());
         dto.setSnapshot(parseRfqDetailHistorySnapshot(entity));
         dto.setArchivedBy(entity.getArchivedBy());
@@ -2421,7 +2482,6 @@ public class RFQService {
         detail.put("systemMechanic", entity.getSystemMechanic() != null ? entity.getSystemMechanic().getCode() : null);
         detail.put("material", entity.getMaterialCode());
         detail.put("capacity", entity.getCapacity());
-        detail.put("targetPrice", entity.getTargetPrice());
         detail.put("requestedMoqs", parseRequestedMoq(entity.getRequestedMoq()));
         detail.put("requestSample", entity.getRequestSample());
         detail.put("urgentRequest", entity.getUrgentRequest());
@@ -2460,7 +2520,6 @@ public class RFQService {
         detail.put("systemMechanic", request.getSystemMechanic());
         detail.put("material", request.getMaterial());
         detail.put("capacity", request.getCapacity());
-        detail.put("targetPrice", request.getTargetPrice());
         detail.put("requestedMoqs", request.getRequestedMoqs());
         detail.put("requestSample", request.getRequestSample());
         detail.put("urgentRequest", request.getUrgentRequest());
@@ -2858,18 +2917,31 @@ public class RFQService {
         }
     }
 
-    private List<BigDecimal> parseRequestedMoq(String requestedMoqJson) {
-        if (StringUtils.isBlank(requestedMoqJson)) {
-            return new ArrayList<>();
+    private List<RequestedMoqDto> parseRequestedMoq(String requestedMoqJson) {
+        return requestPriceHeaderMapper.mapRequestedMoq(requestedMoqJson);
+    }
+
+    private List<RequestedMoqDto> normalizeRequestedMoqs(List<RequestedMoqDto> requestedMoqs)
+            throws InvalidRequestException {
+        List<RequestedMoqDto> normalized = new ArrayList<>();
+        if (requestedMoqs == null || requestedMoqs.isEmpty()) {
+            throw new InvalidRequestException("At least one requested MOQ is required.");
         }
 
-        try {
-            BigDecimal[] values = objectMapper.readValue(requestedMoqJson, BigDecimal[].class);
-            return new ArrayList<>(Arrays.asList(values));
-        } catch (Exception exception) {
-            log.warn("Cannot parse requested moq json", exception);
-            return new ArrayList<>();
+        for (RequestedMoqDto item : requestedMoqs) {
+            if (item == null || item.getMoq() == null || item.getMoq().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidRequestException("requested MOQ must be greater than zero.");
+            }
+            if (item.getTargetPrice() != null && item.getTargetPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidRequestException("requested MOQ target price must be greater than zero.");
+            }
+
+            RequestedMoqDto normalizedItem = new RequestedMoqDto();
+            normalizedItem.setMoq(item.getMoq());
+            normalizedItem.setTargetPrice(scaleMoney(item.getTargetPrice()));
+            normalized.add(normalizedItem);
         }
+        return normalized;
     }
 
     private void enrichAndFilterCreatedPurchaseOrders(List<RfqHeaderDto> rfqs) {
@@ -2943,6 +3015,7 @@ public class RFQService {
         detailEntity.setSpec(request.getSpec().trim());
         detailEntity.setSortOrder(request.getSortOrder());
         detailEntity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        detailEntity.setInternalRemark(StringUtils.trimToNull(request.getInternalRemark()));
         detailEntity.setRecommend(StringUtils.trimToNull(request.getRecommend()));
         detailEntity.setCommission(scaleMoney(request.getCommission()));
         detailEntity.setPackageDimension(StringUtils.trimToNull(request.getPackageDimension()));
@@ -3075,6 +3148,7 @@ public class RFQService {
         historyEntity.setSpec(detail.getSpec());
         historyEntity.setSortOrder(detail.getSortOrder());
         historyEntity.setRemark(detail.getRemark());
+        historyEntity.setInternalRemark(detail.getInternalRemark());
         historyEntity.setRecommend(detail.getRecommend());
         historyEntity.setCommission(detail.getCommission());
         historyEntity.setPackageDimension(detail.getPackageDimension());
@@ -3103,6 +3177,7 @@ public class RFQService {
         snapshot.put("spec", detail.getSpec());
         snapshot.put("sortOrder", detail.getSortOrder());
         snapshot.put("remark", detail.getRemark());
+        snapshot.put("internalRemark", detail.getInternalRemark());
         snapshot.put("recommend", detail.getRecommend());
         snapshot.put("commission", detail.getCommission());
         snapshot.put("packageDimension", detail.getPackageDimension());
@@ -3898,6 +3973,51 @@ public class RFQService {
             }
         } catch (Exception exception) {
             log.warn("Cannot send sales-updated-information notification for rfq {}", entity.getId(), exception);
+        }
+    }
+
+    private void sendNoteNotification(
+            RfqHeaderEntity entity,
+            String notedBy,
+            String noteText,
+            String noteTo
+    ) {
+        try {
+            String recipientType = StringUtils.defaultIfBlank(StringUtils.upperCase(noteTo), "PROCUREMENT");
+            EmployeeEntity owner = switch (recipientType) {
+                case "SALES" -> entity.getSales();
+                case "PROCUREMENT" -> entity.getProcurement();
+                default -> null;
+            };
+            if (owner == null || StringUtils.isBlank(owner.getEmployeeId())) {
+                log.warn("No {} owner found for note notification on rfq {}", recipientType, entity.getId());
+                return;
+            }
+
+            Optional<UserEntity> userEntityOptional =
+                    userRepository.findByEmployeeEntity_EmployeeId(owner.getEmployeeId());
+            if (userEntityOptional.isEmpty() || StringUtils.isBlank(userEntityOptional.get().getLineUserId())) {
+                log.warn("No LINE-bound {} owner found for note notification on rfq {}", recipientType, entity.getId());
+                return;
+            }
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("altText", "RFQ " + entity.getId() + " มีโน้ตใหม่");
+            placeholders.put("title", "RFQ มีโน้ตใหม่");
+            placeholders.put(
+                    "detail",
+                    String.format(
+                            "RFQ %s มีโน้ตใหม่จาก %s",
+                            StringUtils.defaultString(entity.getId(), "-"),
+                            StringUtils.defaultIfBlank(notedBy, "-")
+                    )
+            );
+            placeholders.put("detailUrl", buildRfqDetailUrl(entity.getId()));
+
+            JsonNode message = renderNotificationTemplate(placeholders);
+            lineMessageService.sendFlexMessage(userEntityOptional.get().getLineUserId(), message);
+        } catch (Exception exception) {
+            log.warn("Cannot send note notification for rfq {}", entity.getId(), exception);
         }
     }
 

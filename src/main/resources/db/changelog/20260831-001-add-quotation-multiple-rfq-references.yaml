@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260831-001-add-quotation-multiple-rfq-references
+      author: codex
+      changes:
+        - createTable:
+            tableName: quotation_rfq_reference
+            columns:
+              - column:
+                  name: quotation_no
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rfq_id
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: quotation_rfq_reference
+            columnNames: quotation_no, rfq_id
+            constraintName: pk_quotation_rfq_reference
+        - addForeignKeyConstraint:
+            baseTableName: quotation_rfq_reference
+            baseColumnNames: quotation_no
+            referencedTableName: quotations
+            referencedColumnNames: quotation_no
+            constraintName: fk_quotation_rfq_reference_quotation
+            onDelete: CASCADE
+        - addColumn:
+            tableName: quotation_detail
+            columns:
+              - column:
+                  name: source_rfq_id
+                  type: VARCHAR(50)
+        - createIndex:
+            tableName: quotation_detail
+            indexName: idx_quotation_detail_source_rfq_id
+            columns:
+              - column:
+                  name: source_rfq_id

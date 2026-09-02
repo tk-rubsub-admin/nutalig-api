@@ -4,11 +4,10 @@ import com.nutalig.controller.rfq.request.CreateRequestPriceHeaderRequest;
 import com.nutalig.controller.rfq.request.UpdateRequestPriceHeaderRequest;
 import com.nutalig.dto.*;
 import com.nutalig.entity.*;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.mapstruct.*;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -128,13 +127,13 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "productSubType2", source = "systemMechanic")
     RfqReferenceDto toReferenceDto(RfqHeaderEntity entity);
 
-    default String mapRequestedMoqs(List<BigDecimal> requestedMoqs) {
+    default String mapRequestedMoqs(List<RequestedMoqDto> requestedMoqs) {
         if (requestedMoqs == null || requestedMoqs.isEmpty()) {
             return null;
         }
 
-        List<BigDecimal> filtered = requestedMoqs.stream()
-                .filter(value -> value != null)
+        List<RequestedMoqDto> filtered = requestedMoqs.stream()
+                .filter(value -> value != null && value.getMoq() != null)
                 .toList();
 
         if (filtered.isEmpty()) {
@@ -148,14 +147,33 @@ public interface RequestPriceHeaderMapper {
         }
     }
 
-    default List<BigDecimal> mapRequestedMoq(String requestedMoq) {
+    default List<RequestedMoqDto> mapRequestedMoq(String requestedMoq) {
         if (requestedMoq == null || requestedMoq.isBlank()) {
             return new ArrayList<>();
         }
 
         try {
-            return MOQ_OBJECT_MAPPER.readValue(requestedMoq, new TypeReference<List<BigDecimal>>() {
-            });
+            JsonNode values = MOQ_OBJECT_MAPPER.readTree(requestedMoq);
+            if (!values.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<RequestedMoqDto> result = new ArrayList<>();
+            for (JsonNode value : values) {
+                RequestedMoqDto item = new RequestedMoqDto();
+                if (value.isNumber()) {
+                    item.setMoq(value.decimalValue());
+                } else if (value.isObject() && value.hasNonNull("moq")) {
+                    item.setMoq(value.get("moq").decimalValue());
+                    if (value.hasNonNull("targetPrice")) {
+                        item.setTargetPrice(value.get("targetPrice").decimalValue());
+                    }
+                }
+                if (item.getMoq() != null) {
+                    result.add(item);
+                }
+            }
+            return result;
         } catch (Exception exception) {
             return new ArrayList<>();
         }

@@ -14,6 +14,7 @@ public class CreateRequestPriceDetailRequest {
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String internalRemark;
     private String recommend;
     private BigDecimal commission;
     private String packageDimension;

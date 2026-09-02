@@ -6,4 +6,5 @@ import lombok.Data;
 public class AddRfqNoteRequest {
 
     private String note;
+    private String noteTo;
 }

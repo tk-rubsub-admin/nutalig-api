@@ -36,6 +36,16 @@ public class FreelanceSaleService {
         validateCreateRequest(request);
 
         FreelanceSaleEntity entity = new FreelanceSaleEntity();
+        String requestedId = StringUtils.trimToNull(request.getId());
+        if (requestedId != null) {
+            if (requestedId.length() > 50) {
+                throw new InvalidRequestException("ID must not exceed 50 characters.");
+            }
+            if (freelanceSaleRepository.existsById(requestedId)) {
+                throw new InvalidRequestException("Freelance sale ID " + requestedId + " already exists.");
+            }
+            entity.setId(requestedId);
+        }
         entity.setName(request.getName().trim());
         entity.setContactNumber(StringUtils.trimToNull(request.getContactNumber()));
         entity.setSaleCoverage(StringUtils.trimToNull(request.getSaleCoverage()));

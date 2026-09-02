@@ -1,9 +1,9 @@
 package com.nutalig.controller.rfq.request;
 
 import lombok.Data;
+import com.nutalig.dto.RequestedMoqDto;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -24,8 +24,7 @@ public class CreateRequestPriceHeaderRequest {
     private String systemMechanic;
     private String material;
     private String capacity;
-    private BigDecimal targetPrice;
-    private List<BigDecimal> requestedMoqs;
+    private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
     private Boolean urgentRequest;
     private String urgentRequestReason;

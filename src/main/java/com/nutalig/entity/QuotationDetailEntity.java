@@ -63,6 +63,9 @@ public class QuotationDetailEntity {
     @Column(name = "tier_id")
     private String tierId;
 
+    @Column(name = "source_rfq_id", length = 50)
+    private String sourceRfqId;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

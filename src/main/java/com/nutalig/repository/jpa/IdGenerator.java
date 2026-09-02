@@ -12,6 +12,7 @@ import org.hibernate.type.Type;
 
 import java.io.Serializable;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class IdGenerator implements IdentifierGenerator,Configurable {
@@ -22,14 +23,23 @@ public class IdGenerator implements IdentifierGenerator,Configurable {
     public Serializable generate(SharedSessionContractImplementor session, Object obj)
             throws HibernateException {
 
+        var entityPersister = session.getEntityPersister(obj.getClass().getName(), obj);
+        Object assignedId = entityPersister.getIdentifier(obj, session);
+        if (assignedId != null) {
+            return (Serializable) assignedId;
+        }
+
         String query = String.format("select %s from %s",
-                session.getEntityPersister(obj.getClass().getName(), obj)
-                        .getIdentifierPropertyName(),
+                entityPersister.getIdentifierPropertyName(),
                 obj.getClass().getAnnotation(Entity.class).name());
 
+        Pattern generatedIdPattern = Pattern.compile("^" + Pattern.quote(idPrefix) + "-(\\d+)$");
         Stream<String> ids = session.createQuery(query).stream();
 
-        Long max = ids.map(o -> o.replace(idPrefix + "-", ""))
+        Long max = ids
+                .map(generatedIdPattern::matcher)
+                .filter(java.util.regex.Matcher::matches)
+                .map(matcher -> matcher.group(1))
                 .mapToLong(Long::parseLong)
                 .max()
                 .orElse(0L);

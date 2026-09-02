@@ -49,6 +49,9 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "product_price", precision = 18, scale = 4, nullable = false)
     private BigDecimal productPrice;
 
+    @Column(name = "target_price", precision = 18, scale = 4)
+    private BigDecimal targetPrice;
+
     @Column(name = "commission", precision = 18, scale = 4)
     private BigDecimal commission;
 

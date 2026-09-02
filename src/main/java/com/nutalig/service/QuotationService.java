@@ -170,15 +170,22 @@ public class QuotationService {
         applyCustomerSnapshot(quotationEntity, customerEntity, customerAddressEntity, customerContactEntity,
                 requestDto.getCustomerBranchCode(), requestDto.getCustomerSnapshot());
         quotationEntity.setSales(saleEntity);
-        quotationEntity.setRfqId(StringUtils.trimToNull(requestDto.getRfqId()));
+        List<String> rfqIds = normalizeRfqIds(requestDto);
+        for (String rfqId : rfqIds) {
+            if (!requestPriceHeaderRepository.existsById(rfqId)) {
+                throw new DataNotFoundException("RFQ " + rfqId + " not found.");
+            }
+        }
+        quotationEntity.setRfqId(rfqIds.isEmpty() ? null : rfqIds.get(0));
+        quotationEntity.getRfqIds().addAll(rfqIds);
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
         quotationEntity.setRevNo(1);
         quotationEntity.setShipping(requestDto.getShipping());
 
-        if (StringUtils.isNotBlank(requestDto.getRfqId())) {
-            RfqHeaderEntity rfqEntity = requestPriceHeaderRepository.findById(requestDto.getRfqId().trim())
-                    .orElseThrow(() -> new DataNotFoundException("RFQ " + requestDto.getRfqId() + " not found."));
+        if (StringUtils.isNotBlank(quotationEntity.getRfqId())) {
+            RfqHeaderEntity rfqEntity = requestPriceHeaderRepository.findById(quotationEntity.getRfqId())
+                    .orElseThrow(() -> new DataNotFoundException("RFQ " + quotationEntity.getRfqId() + " not found."));
             quotationEntity.setRfq(rfqEntity);
             quotationEntity.setReferenceRfqId(StringUtils.trimToNull(rfqEntity.getReferenceRfqId()));
             quotationEntity.setReferenceRfq(rfqEntity.getReferenceRfq());
@@ -204,6 +211,7 @@ public class QuotationService {
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
             detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
             BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
@@ -227,7 +235,9 @@ public class QuotationService {
         quotationEntity.setUpdatedBy(actor);
 
         quotationRepository.save(quotationEntity);
-        updateRfqQuotationNo(requestDto.getRfqId(), docId, createdBy);
+        for (String rfqId : rfqIds) {
+            updateRfqQuotationNo(rfqId, docId, createdBy);
+        }
         recordCreateQuotationActivity(quotationEntity, requestDto, createdBy);
 
         userTodoService.buildUserTodoEntity(
@@ -269,6 +279,9 @@ public class QuotationService {
         }
         if (requestDto.getIsVat() != null) {
             quotationEntity.setVatRate(Boolean.TRUE.equals(requestDto.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
+        }
+        if (requestDto.getCoSaleId() != null) {
+            quotationEntity.setCoSalesId(StringUtils.trimToNull(requestDto.getCoSaleId()));
         }
         if (requestDto.getItems() != null) {
             replaceQuotationItems(quotationEntity, requestDto.getItems());
@@ -394,6 +407,8 @@ public class QuotationService {
             detailEntity.setCapacity(itemRequest.getCapacity());
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
+            detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
             BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
@@ -423,6 +438,8 @@ public class QuotationService {
             item.setQuantity(detail.getQuantity());
             item.setAmount(detail.getAmount());
             item.setImagePreview(detail.getImageUrl());
+            item.setTierId(detail.getTierId());
+            item.setSourceRfqId(detail.getSourceRfqId());
             itemRequests.add(item);
         }
         return itemRequests;
@@ -430,6 +447,18 @@ public class QuotationService {
 
     private int defaultRevNo(Integer revNo) {
         return revNo == null ? 0 : revNo;
+    }
+
+    private List<String> normalizeRfqIds(QuotationRequestDto requestDto) {
+        LinkedHashSet<String> rfqIds = new LinkedHashSet<>();
+        if (requestDto.getRfqIds() != null) {
+            requestDto.getRfqIds().stream().map(StringUtils::trimToNull).filter(Objects::nonNull).forEach(rfqIds::add);
+        }
+        String legacyRfqId = StringUtils.trimToNull(requestDto.getRfqId());
+        if (legacyRfqId != null) {
+            rfqIds.add(legacyRfqId);
+        }
+        return new ArrayList<>(rfqIds);
     }
 
     private void updateRfqQuotationNo(String rfqId, String quotationNo, String updatedBy) throws DataNotFoundException {
@@ -952,6 +981,9 @@ public class QuotationService {
 
         QuotationDto dto = new QuotationDto();
         dto.setRfqId(entity.getRfqId());
+        dto.setRfqIds(entity.getRfqIds() == null || entity.getRfqIds().isEmpty()
+                ? (entity.getRfqId() == null ? List.of() : List.of(entity.getRfqId()))
+                : new ArrayList<>(entity.getRfqIds()));
         dto.setReferenceRfqId(entity.getReferenceRfqId());
         dto.setReferenceRfq(requestPriceHeaderMapper.toReferenceDto(entity.getReferenceRfq()));
         dto.setDocDate(entity.getDocDate().format(DateUtil.DD_MM_YY));
@@ -979,6 +1011,7 @@ public class QuotationService {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
             item.setId(detail.getId() != null ? detail.getId().toString() : null);
             item.setTierId(detail.getTierId());
+            item.setSourceRfqId(detail.getSourceRfqId());
             item.setName(detail.getName());
             item.setImagePreview(detail.getImageUrl());
             item.setSpec(detail.getSpec());

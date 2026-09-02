@@ -542,8 +542,7 @@ public class SalesOrderService {
         dto.setRemark(salesOrderEntity.getRemark());
         dto.setThaiBahtText(ThaiBahtText.convertBahtText(salesOrderEntity.getGrandTotal()));
         QuotationCustomerSnapshotDto customerSnapshot = toCustomerSnapshot(salesOrderEntity);
-        dto.setCustName(customerSnapshot.getCustomerName()
-                + (StringUtils.isBlank(customerSnapshot.getBranchCode()) ? "" : " (" + customerSnapshot.getBranchCode() + ")"));
+        dto.setCustName(customerSnapshot.getCustomerName());
         dto.setCustTaxId(customerSnapshot.getTaxId());
         dto.setCustAddress(customerSnapshot.getAddress());
         dto.setCustMobileNo(customerSnapshot.getContactNumber());

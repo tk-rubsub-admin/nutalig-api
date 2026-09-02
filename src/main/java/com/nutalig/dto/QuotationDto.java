@@ -10,6 +10,7 @@ import java.util.List;
 public class QuotationDto {
     private String quotationNo;
     private String rfqId;
+    private List<String> rfqIds;
     private String referenceRfqId;
     private RfqReferenceDto referenceRfq;
     private String docDate;

@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 public class QuotationRequestDto {
     private String rfqId;
+    private List<String> rfqIds;
     private LocalDate docDate;
     private LocalDate effectiveDate;
     private String customerId;

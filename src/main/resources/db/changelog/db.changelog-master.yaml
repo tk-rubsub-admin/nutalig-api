@@ -2984,6 +2984,12 @@ databaseChangeLog:
       file: db/changelog/20260827-008-rename-invoice-customer-payment-term.yaml
   - include:
       file: db/changelog/20260828-001-add-invoice-required-approve-columns.yaml
+  - include:
+      file: db/changelog/20260831-001-add-quotation-multiple-rfq-references.yaml
+  - include:
+      file: db/changelog/20260902-001-add-internal-remark-to-rfq-detail.yaml
+  - include:
+      file: db/changelog/20260902-002-add-target-price-to-rfq-tier.yaml
 
   - changeSet:
       id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier

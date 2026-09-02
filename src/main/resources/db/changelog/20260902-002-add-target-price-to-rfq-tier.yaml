@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260902-003-add-target-price-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: target_price
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: target_price
+                  type: DECIMAL(18,4)

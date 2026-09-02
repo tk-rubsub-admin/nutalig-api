@@ -15,6 +15,7 @@ public class RfqDetailHistoryDto {
     private String spec;
     private Integer sortOrder;
     private String remark;
+    private String internalRemark;
     private String recommend;
     private RfqDetailHistorySnapshotDto snapshot;
     private String archivedBy;

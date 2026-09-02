@@ -52,6 +52,9 @@ public class RfqDetailHistoryEntity extends AuditDateEntity {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
+    @Column(name = "internal_remark", columnDefinition = "TEXT")
+    private String internalRemark;
+
     @Column(name = "recommend", columnDefinition = "TEXT")
     private String recommend;
 

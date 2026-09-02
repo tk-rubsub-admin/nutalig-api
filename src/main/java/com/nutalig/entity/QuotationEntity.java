@@ -70,6 +70,12 @@ public class QuotationEntity extends AuditDateEntity {
     @Column(name = "rfq_id", length = 50)
     private String rfqId;
 
+    /** RFQs consolidated into this quotation. rfqId remains the primary legacy reference. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "quotation_rfq_reference", joinColumns = @JoinColumn(name = "quotation_no"))
+    @Column(name = "rfq_id", nullable = false, length = 50)
+    private Set<String> rfqIds = new LinkedHashSet<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rfq_id", referencedColumnName = "id", insertable = false, updatable = false)
     @ToString.Exclude

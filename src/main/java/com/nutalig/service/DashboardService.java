@@ -165,7 +165,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.new.subtitle",
                         null,
                         "warning",
-                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.NEW.name(), "isAccept", "false")),
+                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.NEW.name(), "isAccept", "false")),
                         PROCUREMENT_VISIBLE_TO
                 ),
                 metric(
@@ -175,7 +175,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.inProgress.subtitle",
                         null,
                         "info",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.IN_PROGRESS.name())),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.IN_PROGRESS.name())),
                         PROCUREMENT_VISIBLE_TO
                 ),
                 metric(
@@ -185,7 +185,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.supplierQuoted.subtitle",
                         null,
                         "neutral",
-                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.SUPPLIER_QUOTED.name())),
+                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.SUPPLIER_QUOTED.name())),
                         SALES_VISIBLE_TO
                 ),
                 metric(
@@ -195,7 +195,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.quoted.subtitle",
                         null,
                         "neutral",
-                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.QUOTED.name())),
+                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.QUOTED.name())),
                         SALES_VISIBLE_TO
                 ),
                 metric(
@@ -205,7 +205,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.specialPrice.subtitle",
                         null,
                         "warning",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.SPECIAL_PRICE_REVIEW.name())),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.SPECIAL_PRICE_REVIEW.name())),
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
@@ -215,7 +215,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.completed.subtitle",
                         null,
                         "success",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.COMPLETED.name())),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.COMPLETED.name())),
                         PROCUREMENT_VISIBLE_TO
                 ),
                 metric(
@@ -225,7 +225,7 @@ public class DashboardService {
                         "dashboard.rfq.metrics.rejected.subtitle",
                         null,
                         "error",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.REJECTED.name())),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.REJECTED.name())),
                         PROCUREMENT_VISIBLE_TO
                 ),
                 metric(
@@ -235,7 +235,15 @@ public class DashboardService {
                         "dashboard.rfq.metrics.other.subtitle",
                         null,
                         "warning",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("status", RfqStatus.REJECTED.name())),
+                        buildPriceInquiryManagementHref(
+                                startDate,
+                                endDate,
+                                selectedFilters,
+                                Map.of("statuses", String.join(",",
+                                        RfqStatus.CANCELED.name(),
+                                        RfqStatus.REQUESTED_INFO.name(),
+                                        RfqStatus.CLOSED.name()))
+                        ),
                         PROCUREMENT_VISIBLE_TO
                 )
         );

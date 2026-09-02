@@ -5,7 +5,6 @@ import com.nutalig.constant.RequestInfoTo;
 import com.nutalig.constant.UrgentRequestStatus;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -32,8 +31,7 @@ public class RfqHeaderDto {
     private ProductSubtype2Dto productSubType2;
     private ProductMaterialDto material;
     private String capacity;
-    private BigDecimal targetPrice;
-    private List<BigDecimal> requestedMoqs;
+    private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
     private Boolean urgentRequest;
     private String urgentRequestReason;
