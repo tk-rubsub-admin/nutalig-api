@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260903-005-add-confirmed-supplier-quote-id-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: confirmed_supplier_quote_id
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: confirmed_supplier_quote_id
+                  type: VARCHAR(255)
+                  remarks: Supplier quote selected when confirming the RFQ price
+        - addForeignKeyConstraint:
+            baseTableName: rfq_header
+            baseColumnNames: confirmed_supplier_quote_id
+            constraintName: fk_rfq_header_confirmed_supplier_quote
+            referencedTableName: rfq_supplier_quote
+            referencedColumnNames: id
+            onDelete: SET NULL

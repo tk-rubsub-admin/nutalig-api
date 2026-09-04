@@ -29,4 +29,14 @@ public interface RfqSupplierQuoteRepository extends JpaRepository<RfqSupplierQuo
               and q.supplier.id = :supplierId
             """)
     Integer findMaxRevisionNoByRequestPriceHeader_IdAndSupplier_Id(String rfqId, String supplierId);
+
+    @Query("""
+            select quote.id
+            from RfqSupplierQuoteTier tier
+            join tier.quoteDetail detail
+            join detail.supplierQuote quote
+            where tier.id = :supplierQuoteTierId
+              and quote.requestPriceHeader.id = :rfqId
+            """)
+    Optional<String> findIdBySupplierQuoteTierIdAndRfqId(Long supplierQuoteTierId, String rfqId);
 }

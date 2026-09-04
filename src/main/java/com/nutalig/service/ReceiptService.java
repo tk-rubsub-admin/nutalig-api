@@ -113,7 +113,7 @@ public class ReceiptService {
         entity.setSlipFileName(invoicePayment.getSlipFileName());
         entity.setSlipFileUrl(invoicePayment.getSlipFileUrl());
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
-        entity.setRevNo(1);
+        entity.setRevNo(0);
         entity.setCustomerNameSnapshot(invoice.getCustomerNameSnapshot());
         entity.setCustomerTaxIdSnapshot(invoice.getCustomerTaxIdSnapshot());
         entity.setCustomerAddressSnapshot(invoice.getCustomerAddressSnapshot());

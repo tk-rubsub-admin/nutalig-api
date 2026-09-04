@@ -1057,6 +1057,7 @@ public class RFQService {
         entity.setSaleOrderId(request.getSaleOrderId().trim());
         entity.setConfirmedDetailId(primarySelection.getDetail().getId());
         entity.setConfirmedTierId(primarySelection.getTier().getId());
+        entity.setConfirmedSupplierQuoteId(resolveConfirmedSupplierQuoteId(entity.getId(), primarySelection.getTier()));
         entity.setConfirmedShippingMethod(primarySelection.getShippingMethod());
         entity.setConfirmedPrice(scaleMoney(primarySelection.getConfirmedPrice()));
         entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -1069,6 +1070,7 @@ public class RFQService {
         activityDetail.put("saleOrderId", entity.getSaleOrderId());
         activityDetail.put("detailId", entity.getConfirmedDetailId());
         activityDetail.put("tierId", entity.getConfirmedTierId());
+        activityDetail.put("supplierQuoteId", entity.getConfirmedSupplierQuoteId());
         activityDetail.put("shippingMethod", entity.getConfirmedShippingMethod());
         activityDetail.put("price", entity.getConfirmedPrice());
         activityDetail.put("selectedCount", selections.size());
@@ -1136,25 +1138,31 @@ public class RFQService {
                     .findFirst()
                     .orElseThrow(() -> new DataNotFoundException("Tier " + selection.getTierId() + " not found."));
 
-            String shippingMethod = StringUtils.trimToNull(selection.getShippingMethod());
-            if (!"LAND".equalsIgnoreCase(shippingMethod) && !"SEA".equalsIgnoreCase(shippingMethod)) {
-                throw new InvalidRequestException("shippingMethod must be LAND or SEA");
-            }
+            String shippingMethod = normalizeTierShippingMethod(selection.getShippingMethod());
 
             BigDecimal confirmedPrice = selection.getPrice();
             if (confirmedPrice == null) {
-                confirmedPrice = "SEA".equalsIgnoreCase(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
+                confirmedPrice = isSeaShippingMethod(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
             }
 
             resolvedSelections.add(new ResolvedLinkSelection(
                     detail,
                     tier,
-                    shippingMethod.toUpperCase(Locale.ROOT),
+                    shippingMethod,
                     confirmedPrice
             ));
         }
 
         return resolvedSelections;
+    }
+
+    private String resolveConfirmedSupplierQuoteId(String rfqId, RfqTierEntity tier) {
+        if (tier.getSupplierQuoteTierId() == null) {
+            return null;
+        }
+        return rfqSupplierQuoteRepository
+                .findIdBySupplierQuoteTierIdAndRfqId(tier.getSupplierQuoteTierId(), rfqId)
+                .orElse(null);
     }
 
     @Data
@@ -1275,12 +1283,9 @@ public class RFQService {
         tierEntity.setProductPrice(scaleMoney(request.getProductPrice()));
         tierEntity.setCommission(scaleMoney(request.getCommission()));
         tierEntity.setCurrency(request.getCurrency());
-        tierEntity.setContainerSize(StringUtils.trimToNull(request.getContainerSize()));
+        applyTierShippingMethod(tierEntity, request.getShippingMethod(), request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
         tierEntity.setLandFreightCost(scaleMoney(request.getLandFreightCost()));
         tierEntity.setSeaFreightCost(scaleMoney(request.getSeaFreightCost()));
-        boolean isShareFcl = Boolean.TRUE.equals(request.getIsShareFCL());
-        tierEntity.setIsShareFCL(isShareFcl);
-        tierEntity.setIsFcl(Boolean.TRUE.equals(request.getIsFcl()) || isShareFcl);
         tierEntity.setLandTotalPrice(scaleMoney(request.getLandTotalPrice()));
         tierEntity.setSeaTotalPrice(scaleMoney(request.getSeaTotalPrice()));
         tierEntity.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
@@ -3044,12 +3049,9 @@ public class RFQService {
                 tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
                 tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
                 tierEntity.setCurrency(tierRequest.getCurrency());
-                tierEntity.setContainerSize(StringUtils.trimToNull(tierRequest.getContainerSize()));
+                applyTierShippingMethod(tierEntity, tierRequest.getShippingMethod(), tierRequest.getContainerSize(), tierRequest.getIsFcl(), tierRequest.getIsShareFCL());
                 tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
                 tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
-                boolean isShareFcl = Boolean.TRUE.equals(tierRequest.getIsShareFCL());
-                tierEntity.setIsShareFCL(isShareFcl);
-                tierEntity.setIsFcl(Boolean.TRUE.equals(tierRequest.getIsFcl()) || isShareFcl);
                 tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
                 tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
                 tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
@@ -3079,14 +3081,11 @@ public class RFQService {
                 tierSplitEntity.setSellPrice(scaleMoney(tierSplitRequest.getSellPrice()));
                 tierSplitEntity.setCommission(scaleMoney(tierSplitRequest.getCommission()));
                 tierSplitEntity.setCurrency(tierSplitRequest.getCurrency());
-                tierSplitEntity.setContainerSize(StringUtils.trimToNull(tierSplitRequest.getContainerSize()));
+                applyTierSplitShippingMethod(tierSplitEntity, tierSplitRequest.getShippingMethod(), tierSplitRequest.getContainerSize(), tierSplitRequest.getIsFcl(), tierSplitRequest.getIsShareFCL());
                 tierSplitEntity.setLandFreightCost(scaleMoney(tierSplitRequest.getLandFreightCost()));
                 tierSplitEntity.setLandFreightQty(scaleMoney(tierSplitRequest.getLandFreightQty()));
                 tierSplitEntity.setSeaFreightQty(scaleMoney(tierSplitRequest.getSeaFreightQty()));
                 tierSplitEntity.setSeaFreightCost(scaleMoney(tierSplitRequest.getSeaFreightCost()));
-                boolean isShareFcl = Boolean.TRUE.equals(tierSplitRequest.getIsShareFCL());
-                tierSplitEntity.setIsShareFCL(isShareFcl);
-                tierSplitEntity.setIsFcl(Boolean.TRUE.equals(tierSplitRequest.getIsFcl()) || isShareFcl);
                 detailEntity.addTierSplit(tierSplitEntity);
             }
         }
@@ -3201,6 +3200,7 @@ public class RFQService {
         snapshot.put("productPrice", tier.getProductPrice());
         snapshot.put("commission", tier.getCommission());
         snapshot.put("currency", tier.getCurrency() == null ? null : tier.getCurrency().name());
+        snapshot.put("shippingMethod", resolveTierShippingMethod(tier.getShippingMethod(), tier.getContainerSize(), tier.getIsFcl(), tier.getIsShareFCL()));
         snapshot.put("containerSize", tier.getContainerSize());
         snapshot.put("landFreightCost", tier.getLandFreightCost());
         snapshot.put("seaFreightCost", tier.getSeaFreightCost());
@@ -3221,6 +3221,7 @@ public class RFQService {
         snapshot.put("sellPrice", tierSplit.getSellPrice());
         snapshot.put("commission", tierSplit.getCommission());
         snapshot.put("currency", tierSplit.getCurrency() == null ? null : tierSplit.getCurrency().name());
+        snapshot.put("shippingMethod", resolveTierShippingMethod(tierSplit.getShippingMethod(), tierSplit.getContainerSize(), tierSplit.getIsFcl(), tierSplit.getIsShareFCL()));
         snapshot.put("containerSize", tierSplit.getContainerSize());
         snapshot.put("landFreightCost", tierSplit.getLandFreightCost());
         snapshot.put("landFreightQty", tierSplit.getLandFreightQty());
@@ -3463,6 +3464,71 @@ public class RFQService {
             throw new InvalidRequestException("shippingMethod must be ALL, LAND, or SEA");
         }
         return normalized;
+    }
+
+    private String normalizeTierShippingMethod(String shippingMethod) throws InvalidRequestException {
+        String normalized = StringUtils.trimToNull(shippingMethod);
+        if (normalized == null) {
+            throw new InvalidRequestException("shippingMethod is required");
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if (List.of("LAND", "AIR", "SEA").contains(normalized)
+                || normalized.matches("SEA_(FCL|SHARE_FCL)_[A-Z0-9]+")) {
+            return normalized;
+        }
+        throw new InvalidRequestException("shippingMethod must be LAND, AIR, SEA, SEA_FCL_<SIZE>, or SEA_SHARE_FCL_<SIZE>");
+    }
+
+    private boolean isSeaShippingMethod(String shippingMethod) {
+        return shippingMethod != null && shippingMethod.startsWith("SEA");
+    }
+
+    private String resolveTierShippingMethod(String shippingMethod, String containerSize, Boolean isFcl, Boolean isShareFcl) {
+        if (StringUtils.isNotBlank(shippingMethod)) {
+            return shippingMethod.toUpperCase(Locale.ROOT);
+        }
+        String normalizedContainerSize = StringUtils.trimToNull(containerSize);
+        if (normalizedContainerSize != null && Boolean.TRUE.equals(isShareFcl)) {
+            return "SEA_SHARE_FCL_" + normalizedContainerSize.toUpperCase(Locale.ROOT);
+        }
+        if (normalizedContainerSize != null && Boolean.TRUE.equals(isFcl)) {
+            return "SEA_FCL_" + normalizedContainerSize.toUpperCase(Locale.ROOT);
+        }
+        return "SEA";
+    }
+
+    private void applyTierShippingMethod(RfqTierEntity tier, String shippingMethod, String containerSize, Boolean isFcl, Boolean isShareFcl) throws InvalidRequestException {
+        String resolved = StringUtils.isNotBlank(shippingMethod)
+                ? normalizeTierShippingMethod(shippingMethod)
+                : resolveTierShippingMethod(null, containerSize, isFcl, isShareFcl);
+        tier.setShippingMethod(resolved);
+        applyLegacyTierShippingFields(tier::setContainerSize, tier::setIsFcl, tier::setIsShareFCL, resolved);
+    }
+
+    private void applyTierSplitShippingMethod(RfqTierSplitEntity tier, String shippingMethod, String containerSize, Boolean isFcl, Boolean isShareFcl) throws InvalidRequestException {
+        String resolved = StringUtils.isNotBlank(shippingMethod)
+                ? normalizeTierShippingMethod(shippingMethod)
+                : resolveTierShippingMethod(null, containerSize, isFcl, isShareFcl);
+        tier.setShippingMethod(resolved);
+        applyLegacyTierShippingFields(tier::setContainerSize, tier::setIsFcl, tier::setIsShareFCL, resolved);
+    }
+
+    private void applyLegacyTierShippingFields(
+            java.util.function.Consumer<String> setContainerSize,
+            java.util.function.Consumer<Boolean> setIsFcl,
+            java.util.function.Consumer<Boolean> setIsShareFcl,
+            String shippingMethod
+    ) {
+        boolean isShareFcl = shippingMethod.startsWith("SEA_SHARE_FCL_");
+        boolean isFcl = isShareFcl || shippingMethod.startsWith("SEA_FCL_");
+        String containerSize = isFcl
+                ? shippingMethod.substring(shippingMethod.lastIndexOf('_') + 1)
+                : null;
+        // These are derived compatibility fields for older report/UI consumers;
+        // shipping_method is the persisted source of truth going forward.
+        setContainerSize.accept(containerSize);
+        setIsFcl.accept(isFcl);
+        setIsShareFcl.accept(isShareFcl);
     }
 
     private SystemConfigEntity resolveCostType(String costTypeCode) throws DataNotFoundException {

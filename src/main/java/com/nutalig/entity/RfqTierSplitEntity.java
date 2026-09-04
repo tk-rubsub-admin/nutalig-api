@@ -59,6 +59,9 @@ public class RfqTierSplitEntity extends AuditDateEntity {
     @Column(name = "container_size", length = 20)
     private String containerSize;
 
+    @Column(name = "shipping_method", length = 50)
+    private String shippingMethod;
+
     @Column(name = "land_freight_cost", precision = 18, scale = 4)
     private BigDecimal landFreightCost;
 

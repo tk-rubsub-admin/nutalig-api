@@ -137,7 +137,7 @@ public class InvoiceService {
         entity.setPaidTotal(BigDecimal.ZERO);
         entity.setOutstandingTotal(defaultIfNull(salesOrder.getGrandTotal()));
         entity.setRemark(StringUtils.defaultIfBlank(request.getRemark(), salesOrder.getRemark()));
-        entity.setRevNo(1);
+        entity.setRevNo(0);
         applyCustomerSnapshot(entity, salesOrder, request.getCustomerSnapshot());
         entity.setCustomerPaymentTerm(resolveCustomerPaymentTerm(StringUtils.defaultIfBlank(request.getCustomerPaymentTerm(),
                 salesOrder.getCustomer() != null && salesOrder.getCustomer().getCustomerPaymentTerm() != null

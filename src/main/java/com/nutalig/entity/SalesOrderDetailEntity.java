@@ -71,7 +71,7 @@ public class SalesOrderDetailEntity {
     @Column(name = "quotation_detail_id")
     private Long quotationDetailId;
 
-    @Column(name = "shipping_method", length = 10)
+    @Column(name = "shipping_method", length = 50)
     private String shippingMethod;
 
     @Enumerated(EnumType.STRING)

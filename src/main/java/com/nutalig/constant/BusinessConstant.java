@@ -12,7 +12,7 @@ public class BusinessConstant {
         public static final String SALES_ORDER_PREFIX = "NTL-SO";
         public static final String QUOTATION_PREFIX = "NTL-QT";
         public static final String INVOICE_PREFIX = "NTL-INV";
-        public static final String PURCHASE_ORDER_PREFIX = "NTL-P`O";
+        public static final String PURCHASE_ORDER_PREFIX = "NTL-PO";
         public static final String APPROVAL_REQUEST_PREFIX = "NTL-APR";
         public static final String RECEIPT_PREFIX = "NTL-RE";
         public static final String DEPOSIT_RECEIPT_PREFIX = "NTL-DR";

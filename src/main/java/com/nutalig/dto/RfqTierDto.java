@@ -16,6 +16,7 @@ public class RfqTierDto {
     private BigDecimal targetPrice;
     private BigDecimal commission;
     private Currency currency;
+    private String shippingMethod;
     private String containerSize;
     private BigDecimal landFreightCost;
     private BigDecimal seaFreightCost;

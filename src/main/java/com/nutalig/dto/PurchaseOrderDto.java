@@ -19,6 +19,7 @@ public class PurchaseOrderDto {
     private Currency currency;
     private SupplierDto supplier;
     private SupplierShippingDto supplierShipping;
+    private SystemConfigDto paymentTerm;
     private BigDecimal subTotal;
     private BigDecimal subTotalThb;
     private BigDecimal grandTotal;
@@ -29,6 +30,9 @@ public class PurchaseOrderDto {
     private String supplierAddressSnapshot;
     private String supplierContactSnapshot;
     private String supplierPhoneSnapshot;
+    private String supplierContactNoSnapshot;
+    private String shippingMethodSnapshot;
+    private String containerSizeSnapshot;
     private UserDto createdBy;
     private UserDto updatedBy;
     private List<PurchaseOrderAttachmentDto> attachments;

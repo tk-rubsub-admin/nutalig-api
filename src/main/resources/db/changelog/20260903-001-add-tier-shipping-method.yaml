@@ -1,0 +1,73 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260903-001-add-shipping-method-to-rfq-tier
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier
+                columnName: shipping_method
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column:
+                  name: shipping_method
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 20260903-002-add-shipping-method-to-rfq-tier-split
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier_split
+                columnName: shipping_method
+      changes:
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: shipping_method
+                  type: VARCHAR(50)
+
+  - changeSet:
+      id: 20260903-003-backfill-tier-shipping-method
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              UPDATE rfq_tier
+              SET shipping_method = CASE
+                WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL
+                  THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL
+                  THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size)))
+                ELSE 'SEA'
+              END
+              WHERE shipping_method IS NULL OR TRIM(shipping_method) = '';
+              UPDATE rfq_tier_split
+              SET shipping_method = CASE
+                WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL
+                  THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL
+                  THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size)))
+                ELSE 'SEA'
+              END
+              WHERE shipping_method IS NULL OR TRIM(shipping_method) = '';
+
+  - changeSet:
+      id: 20260903-004-widen-confirmed-and-sales-order-shipping-method
+      author: codex
+      changes:
+        - modifyDataType:
+            tableName: rfq_header
+            columnName: confirmed_shipping_method
+            newDataType: VARCHAR(50)
+        - modifyDataType:
+            tableName: sales_order_detail
+            columnName: shipping_method
+            newDataType: VARCHAR(50)

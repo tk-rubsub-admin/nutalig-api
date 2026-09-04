@@ -6,6 +6,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JoinColumnOrFormula;
+import org.hibernate.annotations.JoinColumnsOrFormulas;
+import org.hibernate.annotations.JoinFormula;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,6 +42,14 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @JoinColumn(name = "supplier_shipping_id", referencedColumnName = "id")
     @ToString.Exclude
     private SupplierShippingEntity supplierShipping;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula = @JoinFormula(value = "'SUPPLIER_PAYMENT_TERM'", referencedColumnName = "group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "payment_term", referencedColumnName = "code"))
+    })
+    @ToString.Exclude
+    private SystemConfigEntity paymentTerm;
 
     @Column(name = "doc_date", nullable = false)
     private LocalDate docDate;
@@ -86,6 +97,15 @@ public class PurchaseOrderEntity extends AuditDateEntity {
 
     @Column(name = "supplier_phone_snapshot", length = 100)
     private String supplierPhoneSnapshot;
+
+    @Column(name = "supplier_contact_no_snapshot", length = 100)
+    private String supplierContactNoSnapshot;
+
+    @Column(name = "shipping_method_snapshot", length = 50)
+    private String shippingMethodSnapshot;
+
+    @Column(name = "container_size_snapshot", length = 255)
+    private String containerSizeSnapshot;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")

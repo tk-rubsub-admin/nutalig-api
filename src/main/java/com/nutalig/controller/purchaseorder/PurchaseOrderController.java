@@ -46,7 +46,7 @@ public class PurchaseOrderController {
     @PostMapping
     public GeneralResponse<CreatePurchaseOrderResponse> createPurchaseOrder(
             @ModelAttribute CreatePurchaseOrderRequest request,
-            @RequestPart("attachments") List<MultipartFile> attachments,
+            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             @RequestHeader("userId") String userId
     ) throws Exception {
         PurchaseOrderEntity entity = purchaseOrderService.createPurchaseOrder(request, attachments, userId);

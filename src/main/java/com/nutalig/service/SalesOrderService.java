@@ -137,7 +137,7 @@ public class SalesOrderService {
         entity.setPaidTotal(BigDecimal.ZERO);
         entity.setOutstandingTotal(BigDecimal.ZERO);
         entity.setRemark(request.getRemark());
-        entity.setRevNo(1);
+        entity.setRevNo(0);
         entity.setCreatedDate(now);
         entity.setCreatedBy(user);
         entity.setUpdatedDate(now);

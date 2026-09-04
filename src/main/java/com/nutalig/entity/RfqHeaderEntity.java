@@ -252,7 +252,10 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "confirmed_tier_id")
     private Long confirmedTierId;
 
-    @Column(name = "confirmed_shipping_method", length = 20)
+    @Column(name = "confirmed_supplier_quote_id", length = 255)
+    private String confirmedSupplierQuoteId;
+
+    @Column(name = "confirmed_shipping_method", length = 50)
     private String confirmedShippingMethod;
 
     @Column(name = "confirmed_price", precision = 18, scale = 4)

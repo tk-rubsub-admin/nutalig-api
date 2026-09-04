@@ -65,6 +65,7 @@ public class RfqHeaderDto {
     private List<RfqStatusTimelineDto> rfqStatusTimeline;
     private Long confirmedDetailId;
     private Long confirmedTierId;
+    private String confirmedSupplierQuoteId;
     private String confirmedShippingMethod;
     private java.math.BigDecimal confirmedPrice;
     private ZonedDateTime confirmedDate;

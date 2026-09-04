@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260904-003-add-purchase-order-payment-term
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: purchase_order
+                columnName: payment_term
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: payment_term
+                  type: VARCHAR(100)
+                  remarks: Supplier payment-term System Config code

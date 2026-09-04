@@ -91,11 +91,11 @@ public class DashboardService {
         }
 
         Specification<RfqHeaderEntity> specification = Specification.where(requestedDateBetween(startDate, endDate));
-        if (StringUtils.equals(roleCode, "SALES") && employeeId != null) {
-            specification = specification.and(salesIdEqual(employeeId));
-        } else if (StringUtils.equals(roleCode, "PROCUREMENT") && employeeId != null) {
-            specification = specification.and(procurementIdEqual(employeeId));
-        }
+//        if (StringUtils.equals(roleCode, "SALES") && employeeId != null) {
+//            specification = specification.and(salesIdEqual(employeeId));
+//        } else if (StringUtils.equals(roleCode, "PROCUREMENT") && employeeId != null) {
+//            specification = specification.and(procurementIdEqual(employeeId));
+//        }
         if (filterSalesId != null) {
             specification = specification.and(salesIdEqual(filterSalesId));
         }

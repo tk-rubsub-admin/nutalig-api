@@ -30,6 +30,7 @@ public class CreateRequestPriceDetailRequest {
         private BigDecimal productPrice;
         private BigDecimal commission;
         private Currency currency;
+        private String shippingMethod;
         private String containerSize;
         private BigDecimal landFreightCost;
         private BigDecimal seaFreightCost;
@@ -48,6 +49,7 @@ public class CreateRequestPriceDetailRequest {
         private BigDecimal sellPrice;
         private BigDecimal commission;
         private Currency currency;
+        private String shippingMethod;
         private String containerSize;
         private BigDecimal landFreightCost;
         private BigDecimal landFreightQty;

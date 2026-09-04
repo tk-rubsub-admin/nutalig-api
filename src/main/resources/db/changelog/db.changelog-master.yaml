@@ -2990,6 +2990,16 @@ databaseChangeLog:
       file: db/changelog/20260902-001-add-internal-remark-to-rfq-detail.yaml
   - include:
       file: db/changelog/20260902-002-add-target-price-to-rfq-tier.yaml
+  - include:
+      file: db/changelog/20260903-001-add-tier-shipping-method.yaml
+  - include:
+      file: db/changelog/20260903-002-add-confirmed-supplier-quote-id.yaml
+  - include:
+      file: db/changelog/20260904-001-add-purchase-order-shipping-snapshots.yaml
+  - include:
+      file: db/changelog/20260904-002-add-purchase-order-supplier-contact-no-snapshot.yaml
+  - include:
+      file: db/changelog/20260904-003-add-purchase-order-payment-term.yaml
 
   - changeSet:
       id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier

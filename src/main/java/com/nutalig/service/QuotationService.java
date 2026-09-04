@@ -180,7 +180,7 @@ public class QuotationService {
         quotationEntity.getRfqIds().addAll(rfqIds);
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
-        quotationEntity.setRevNo(1);
+        quotationEntity.setRevNo(0);
         quotationEntity.setShipping(requestDto.getShipping());
 
         if (StringUtils.isNotBlank(quotationEntity.getRfqId())) {
@@ -283,6 +283,9 @@ public class QuotationService {
         if (requestDto.getCoSaleId() != null) {
             quotationEntity.setCoSalesId(StringUtils.trimToNull(requestDto.getCoSaleId()));
         }
+        if (requestDto.getShipping() != null) {
+            quotationEntity.setShipping(normalizeShipping(requestDto.getShipping()));
+        }
         if (requestDto.getItems() != null) {
             replaceQuotationItems(quotationEntity, requestDto.getItems());
         }
@@ -314,6 +317,18 @@ public class QuotationService {
         recordUpdateQuotationActivity(quotationEntity, requestDto, userId, oldRevNo);
 
         return mapToDto(quotationEntity);
+    }
+
+    private String normalizeShipping(String shipping) {
+        String normalized = StringUtils.trimToNull(shipping);
+        if (normalized == null) {
+            return null;
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if (!List.of("ALL", "LAND", "SEA").contains(normalized)) {
+            throw new IllegalArgumentException("shipping must be ALL, LAND, or SEA");
+        }
+        return normalized;
     }
 
     @Transactional(rollbackFor = Exception.class)

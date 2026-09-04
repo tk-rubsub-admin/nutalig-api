@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260904-001-add-purchase-order-shipping-snapshots
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: purchase_order
+                columnName: shipping_method_snapshot
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: shipping_method_snapshot
+                  type: VARCHAR(50)
+                  remarks: Shipping method captured when the purchase order is created
+
+  - changeSet:
+      id: 20260904-002-add-purchase-order-container-size-snapshot
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: purchase_order
+                columnName: container_size_snapshot
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: container_size_snapshot
+                  type: VARCHAR(255)
+                  remarks: Container size or sizes captured when the purchase order is created

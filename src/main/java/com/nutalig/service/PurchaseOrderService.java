@@ -19,6 +19,7 @@ import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.SupplierMapper;
+import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
@@ -60,6 +61,7 @@ public class PurchaseOrderService {
     private final SupplierShippingRepository supplierShippingRepository;
     private final UserRepository userRepository;
     private final SupplierMapper supplierMapper;
+    private final SystemConfigMapper systemConfigMapper;
     private final UserMapper userMapper;
     private final ActivityHistoryService activityHistoryService;
     private final SystemConfigService systemConfigService;
@@ -82,19 +84,10 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
-        if (salesOrder.getProcurementStatus() != ProcurementStatus.READY_FOR_PO) {
+        if (salesOrder.getProcurementStatus() != ProcurementStatus.READY_FOR_PO
+                && salesOrder.getProcurementStatus() != ProcurementStatus.READY_FOR_PO_OVERRIDE
+                && salesOrder.getProcurementStatus() != ProcurementStatus.PO_CREATED) {
             throw new InvalidRequestException("Sales order is not ready for purchase order creation");
-        }
-
-        List<PurchaseOrderEntity> existingOrders = purchaseOrderRepository
-                .findBySalesOrderSalesOrderNoAndSupplierShippingIdOrderByCreatedDateDesc(
-                        salesOrder.getSalesOrderNo(),
-                        supplierShipping.getId()
-                );
-        boolean hasActiveOrder = existingOrders.stream()
-                .anyMatch(item -> item.getStatus() != PurchaseOrderStatus.CANCELLED);
-        if (hasActiveOrder) {
-            throw new InvalidRequestException("Purchase order already exists for this sales order and supplier shipping");
         }
 
         List<SalesOrderDetailEntity> sourceItems = salesOrder.getItems().stream()
@@ -102,20 +95,39 @@ public class PurchaseOrderService {
                 .filter(item -> StringUtils.equalsIgnoreCase(item.getShippingMethod(), supplierShipping.getShippingMethod().name()))
                 .sorted(Comparator.comparing(item -> Optional.ofNullable(item.getLineNo()).orElse(0)))
                 .toList();
-        if (sourceItems.isEmpty()) {
+        List<CreatePurchaseOrderRequest.Item> manualItems = getManualCreateItems(request.getItems());
+        if (sourceItems.isEmpty() && manualItems.isEmpty()) {
             throw new InvalidRequestException("No sales order items found for selected supplier shipping");
         }
 
+        Map<Long, CreatePurchaseOrderRequest.Item> requestedItemsBySalesOrderDetailId =
+                getRequestedCreateItems(sourceItems, request.getItems());
+
         Currency currency = null;
         for (SalesOrderDetailEntity item : sourceItems) {
-            if (item.getSupplierCurrency() == null || item.getSupplierUnitPrice() == null
+            CreatePurchaseOrderRequest.Item requestedItem = requestedItemsBySalesOrderDetailId.get(item.getId());
+            Currency itemCurrency = requestedItem == null || requestedItem.getSupplierCurrency() == null
+                    ? item.getSupplierCurrency()
+                    : requestedItem.getSupplierCurrency();
+            if (itemCurrency == null || item.getSupplierUnitPrice() == null
                     || item.getSupplierTotalUnitCost() == null) {
                 throw new InvalidRequestException("Sales order detail " + item.getId() + " is missing supplier cost snapshot");
             }
 
             if (currency == null) {
-                currency = item.getSupplierCurrency();
-            } else if (currency != item.getSupplierCurrency()) {
+                currency = itemCurrency;
+            } else if (currency != itemCurrency) {
+                throw new InvalidRequestException("All selected items must use the same supplier currency");
+            }
+        }
+        for (CreatePurchaseOrderRequest.Item item : manualItems) {
+            Currency itemCurrency = item.getSupplierCurrency() == null ? currency : item.getSupplierCurrency();
+            if (itemCurrency == null) {
+                throw new InvalidRequestException("item.supplierCurrency is required");
+            }
+            if (currency == null) {
+                currency = itemCurrency;
+            } else if (currency != itemCurrency) {
                 throw new InvalidRequestException("All selected items must use the same supplier currency");
             }
         }
@@ -130,17 +142,31 @@ public class PurchaseOrderService {
         entity.setSalesOrder(salesOrder);
         entity.setSupplier(supplier);
         entity.setSupplierShipping(supplierShipping);
+        entity.setPaymentTerm(resolveSupplierPaymentTerm(request.getPaymentTerm()));
         entity.setDocDate(docDate);
         entity.setProductionLeadTimeDay(request.getProductionLeadTimeDay());
         entity.setShippingLeadTimeDay(request.getShippingLeadTimeDay());
         entity.setStatus(PurchaseOrderStatus.CREATED);
         entity.setCurrency(currency);
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
-        entity.setRevNo(1);
+        entity.setRevNo(0);
         entity.setSupplierNameSnapshot(supplier.getSupplierName());
-        entity.setSupplierAddressSnapshot(resolveSupplierAddressSnapshot(supplier));
-        entity.setSupplierContactSnapshot(resolveSupplierContactName(supplier));
-        entity.setSupplierPhoneSnapshot(resolveSupplierContactNumber(supplier));
+        String supplierContactNumber = resolveSupplierContactNumber(supplier);
+        entity.setSupplierAddressSnapshot(snapshotOrDefault(
+                request.getSupplierAddressSnapshot(),
+                resolveSupplierAddressSnapshot(supplier)
+        ));
+        entity.setSupplierContactSnapshot(snapshotOrDefault(
+                request.getSupplierContactSnapshot(),
+                resolveSupplierContactName(supplier)
+        ));
+        entity.setSupplierPhoneSnapshot(snapshotOrDefault(request.getSupplierContactNoSnapshot(), supplierContactNumber));
+        entity.setSupplierContactNoSnapshot(snapshotOrDefault(request.getSupplierContactNoSnapshot(), supplierContactNumber));
+        entity.setShippingMethodSnapshot(StringUtils.defaultIfBlank(
+                StringUtils.trimToNull(request.getShippingMethodSnapshot()),
+                supplierShipping.getShippingMethod().name()
+        ));
+        entity.setContainerSizeSnapshot(StringUtils.trimToNull(request.getContainerSizeSnapshot()));
         entity.setCreatedBy(user);
         entity.setUpdatedBy(user);
         entity.setCreatedDate(now);
@@ -150,19 +176,28 @@ public class PurchaseOrderService {
         BigDecimal subTotalThb = BigDecimal.ZERO;
         int lineNo = 1;
         for (SalesOrderDetailEntity sourceItem : sourceItems) {
+            CreatePurchaseOrderRequest.Item requestedItem = requestedItemsBySalesOrderDetailId.get(sourceItem.getId());
             PurchaseOrderDetailEntity detail = new PurchaseOrderDetailEntity();
             detail.setSalesOrderDetail(sourceItem);
             detail.setLineNo(lineNo++);
-            detail.setName(sourceItem.getName());
+            detail.setName(StringUtils.defaultIfBlank(requestedItem == null ? null : requestedItem.getName(), sourceItem.getName()));
             detail.setType(sourceItem.getType());
             detail.setCapacity(sourceItem.getCapacity());
             detail.setSize(sourceItem.getSize());
-            detail.setSpec(sourceItem.getSpec());
-            detail.setQuantity(defaultIfNull(sourceItem.getQuantity()));
-            detail.setSupplierCurrency(sourceItem.getSupplierCurrency());
-            detail.setSupplierUnitPrice(defaultIfNull(sourceItem.getSupplierUnitPrice()));
-            detail.setSupplierShippingCost(defaultIfNull(sourceItem.getSupplierShippingCost()));
-            detail.setSupplierTotalUnitCost(defaultIfNull(sourceItem.getSupplierTotalUnitCost()));
+            detail.setSpec(StringUtils.defaultIfBlank(requestedItem == null ? null : requestedItem.getSpec(), sourceItem.getSpec()));
+            detail.setQuantity(requestedItem == null || requestedItem.getQuantity() == null
+                    ? defaultIfNull(sourceItem.getQuantity())
+                    : requestedItem.getQuantity());
+            detail.setSupplierCurrency(requestedItem == null || requestedItem.getSupplierCurrency() == null
+                    ? sourceItem.getSupplierCurrency()
+                    : requestedItem.getSupplierCurrency());
+            detail.setSupplierUnitPrice(requestedItem == null || requestedItem.getSupplierUnitPrice() == null
+                    ? defaultIfNull(sourceItem.getSupplierUnitPrice())
+                    : requestedItem.getSupplierUnitPrice());
+            detail.setSupplierShippingCost(requestedItem == null || requestedItem.getSupplierShippingCost() == null
+                    ? defaultIfNull(sourceItem.getSupplierShippingCost())
+                    : requestedItem.getSupplierShippingCost());
+            detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
@@ -182,6 +217,28 @@ public class PurchaseOrderService {
             subTotal = subTotal.add(amountSupplierCurrency);
             subTotalThb = subTotalThb.add(amountThb);
         }
+        for (CreatePurchaseOrderRequest.Item requestedItem : manualItems) {
+            PurchaseOrderDetailEntity detail = new PurchaseOrderDetailEntity();
+            detail.setLineNo(lineNo++);
+            detail.setName(StringUtils.trimToEmpty(requestedItem.getName()));
+            detail.setSpec(StringUtils.trimToEmpty(requestedItem.getSpec()));
+            detail.setQuantity(defaultIfNull(requestedItem.getQuantity()));
+            detail.setSupplierCurrency(requestedItem.getSupplierCurrency() == null ? currency : requestedItem.getSupplierCurrency());
+            detail.setSupplierUnitPrice(defaultIfNull(requestedItem.getSupplierUnitPrice()));
+            detail.setSupplierShippingCost(defaultIfNull(requestedItem.getSupplierShippingCost()));
+            detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
+
+            BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
+                    .multiply(detail.getQuantity())
+                    .setScale(2, RoundingMode.HALF_UP);
+            detail.setAmountSupplierCurrency(amountSupplierCurrency);
+            detail.setAmountThb(amountSupplierCurrency);
+            detail.setShippingMethod(supplierShipping.getShippingMethod().name());
+            entity.addItem(detail);
+
+            subTotal = subTotal.add(amountSupplierCurrency);
+            subTotalThb = subTotalThb.add(amountSupplierCurrency);
+        }
 
         entity.setSubTotal(subTotal.setScale(2, RoundingMode.HALF_UP));
         entity.setSubTotalThb(subTotalThb.setScale(2, RoundingMode.HALF_UP));
@@ -189,13 +246,25 @@ public class PurchaseOrderService {
         entity.setGrandTotalThb(entity.getSubTotalThb());
         attachFiles(entity, attachments, user, now);
 
+        purchaseOrderRepository.save(entity);
+        recordCreatePurchaseOrderActivity(entity, userId);
+
+        PurchaseOrderStatus createdStatus = entity.getStatus();
+        entity.setStatus(PurchaseOrderStatus.AWAITING_PAYMENT);
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+        purchaseOrderRepository.save(entity);
+        recordPurchaseOrderStatusChangeActivity(
+                entity,
+                userId,
+                createdStatus,
+                PurchaseOrderStatus.AWAITING_PAYMENT,
+                "เปลี่ยนสถานะใบสั่งซื้อเลขที่ " + entity.getPurchaseOrderNo() + " เป็นรอชำระเงิน"
+        );
+
         salesOrder.setProcurementStatus(ProcurementStatus.PO_CREATED);
         salesOrder.setUpdatedBy(user);
         salesOrder.setUpdatedDate(now);
-
-        purchaseOrderRepository.save(entity);
-
-        recordCreatePurchaseOrderActivity(entity, userId);
         recordSalesOrderProcurementCreatedActivity(salesOrder, entity, userId);
 
         return entity;
@@ -509,8 +578,65 @@ public class PurchaseOrderService {
         if (request.getSupplierShippingId() == null) {
             throw new InvalidRequestException("supplierShippingId is required");
         }
-        if (attachments == null || attachments.stream().noneMatch(item -> item != null && !item.isEmpty())) {
-            throw new InvalidRequestException("At least one attachment is required");
+    }
+
+    private Map<Long, CreatePurchaseOrderRequest.Item> getRequestedCreateItems(
+            List<SalesOrderDetailEntity> sourceItems,
+            List<CreatePurchaseOrderRequest.Item> requestedItems
+    ) throws InvalidRequestException {
+        if (requestedItems == null || requestedItems.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<Long> sourceItemIds = sourceItems.stream()
+                .map(SalesOrderDetailEntity::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, CreatePurchaseOrderRequest.Item> requestedById = new HashMap<>();
+        for (CreatePurchaseOrderRequest.Item item : requestedItems) {
+            if (item == null) {
+                throw new InvalidRequestException("Invalid purchase order item.");
+            }
+            if (item.getSalesOrderDetailId() == null) {
+                continue;
+            }
+            if (!sourceItemIds.contains(item.getSalesOrderDetailId())) {
+                throw new InvalidRequestException("Invalid purchase order item.");
+            }
+            if (requestedById.put(item.getSalesOrderDetailId(), item) != null) {
+                throw new InvalidRequestException("Duplicate purchase order item.");
+            }
+            validateNonNegative(item.getQuantity(), "item.quantity");
+            validateNonNegative(item.getSupplierUnitPrice(), "item.supplierUnitPrice");
+            validateNonNegative(item.getSupplierShippingCost(), "item.supplierShippingCost");
+        }
+        return requestedById;
+    }
+
+    private List<CreatePurchaseOrderRequest.Item> getManualCreateItems(
+            List<CreatePurchaseOrderRequest.Item> requestedItems
+    ) throws InvalidRequestException {
+        if (requestedItems == null || requestedItems.isEmpty()) {
+            return List.of();
+        }
+        List<CreatePurchaseOrderRequest.Item> manualItems = new ArrayList<>();
+        for (CreatePurchaseOrderRequest.Item item : requestedItems) {
+            if (item == null || item.getSalesOrderDetailId() != null) {
+                continue;
+            }
+            if (StringUtils.isBlank(item.getName())) {
+                throw new InvalidRequestException("item.name is required for a new purchase order item.");
+            }
+            validateNonNegative(item.getQuantity(), "item.quantity");
+            validateNonNegative(item.getSupplierUnitPrice(), "item.supplierUnitPrice");
+            validateNonNegative(item.getSupplierShippingCost(), "item.supplierShippingCost");
+            manualItems.add(item);
+        }
+        return manualItems;
+    }
+
+    private void validateNonNegative(BigDecimal value, String fieldName) throws InvalidRequestException {
+        if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException(fieldName + " must not be negative.");
         }
     }
 
@@ -572,6 +698,9 @@ public class PurchaseOrderService {
             UserEntity user,
             ZonedDateTime now
     ) throws Exception {
+        if (attachments == null || attachments.isEmpty()) {
+            return;
+        }
         int nextSortOrder = entity.getAttachments().stream()
                 .filter(item -> Boolean.TRUE.equals(item.getActive()))
                 .map(PurchaseOrderAttachmentEntity::getSortOrder)
@@ -717,6 +846,25 @@ public class PurchaseOrderService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private String snapshotOrDefault(String snapshot, String defaultValue) {
+        return snapshot == null ? defaultValue : StringUtils.trimToNull(snapshot);
+    }
+
+    private SystemConfigEntity resolveSupplierPaymentTerm(String paymentTerm) throws InvalidRequestException {
+        String paymentTermCode = StringUtils.trimToNull(paymentTerm);
+        if (paymentTermCode == null) {
+            return null;
+        }
+        SystemConfigEntity config = systemConfigService.getConfigEntity(
+                SystemConstant.SUPPLIER_PAYMENT_TERM,
+                paymentTermCode
+        );
+        if (config == null) {
+            throw new InvalidRequestException("Supplier payment term " + paymentTermCode + " not found.");
+        }
+        return config;
+    }
+
     private List<PurchaseOrderItemDocumentDto> getPurchaseOrderItemDocumentDtos(PurchaseOrderEntity purchaseOrderEntity) {
         List<PurchaseOrderItemDocumentDto> itemDocuments = new ArrayList<>();
         for (PurchaseOrderDetailEntity detail : purchaseOrderEntity.getItems()) {
@@ -840,6 +988,7 @@ public class PurchaseOrderService {
         dto.setCurrency(entity.getCurrency());
         dto.setSupplier(supplierMapper.toDto(entity.getSupplier()));
         dto.setSupplierShipping(buildSupplierShippingDto(entity.getSupplierShipping()));
+        dto.setPaymentTerm(systemConfigMapper.toDto(entity.getPaymentTerm()));
         dto.setSubTotal(entity.getSubTotal());
         dto.setSubTotalThb(entity.getSubTotalThb());
         dto.setGrandTotal(entity.getGrandTotal());
@@ -850,6 +999,9 @@ public class PurchaseOrderService {
         dto.setSupplierAddressSnapshot(entity.getSupplierAddressSnapshot());
         dto.setSupplierContactSnapshot(entity.getSupplierContactSnapshot());
         dto.setSupplierPhoneSnapshot(entity.getSupplierPhoneSnapshot());
+        dto.setSupplierContactNoSnapshot(entity.getSupplierContactNoSnapshot());
+        dto.setShippingMethodSnapshot(entity.getShippingMethodSnapshot());
+        dto.setContainerSizeSnapshot(entity.getContainerSizeSnapshot());
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
 

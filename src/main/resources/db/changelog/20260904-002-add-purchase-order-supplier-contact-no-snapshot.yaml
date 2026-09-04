@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260904-002-add-purchase-order-supplier-contact-no-snapshot
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: purchase_order
+                columnName: supplier_contact_no_snapshot
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: supplier_contact_no_snapshot
+                  type: VARCHAR(100)
+                  remarks: Supplier contact number captured when the purchase order is created
