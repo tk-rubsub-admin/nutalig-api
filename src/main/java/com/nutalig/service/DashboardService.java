@@ -415,6 +415,14 @@ public class DashboardService {
         ));
 
         charts.add(distributionChart(
+                "rfq-by-subtype1",
+                "dashboard.rfq.charts.subtype1.title",
+                "dashboard.rfq.charts.subtype1.subtitle",
+                buildBreakdown(rfqs, this::getProductSubtype1Label, 6),
+                ALL_RFQ_VISIBLE_TO
+        ));
+
+        charts.add(distributionChart(
                 "rfq-by-channel",
                 "dashboard.rfq.charts.channel.title",
                 "dashboard.rfq.charts.channel.subtitle",
@@ -439,14 +447,6 @@ public class DashboardService {
                         8
                 ),
                 procurementView ? PROCUREMENT_VISIBLE_TO : SALES_VISIBLE_TO
-        ));
-
-        charts.add(distributionChart(
-                "rfq-sla-status",
-                "dashboard.rfq.charts.sla.title",
-                "dashboard.rfq.charts.sla.subtitle",
-                buildSlaBreakdown(rfqs),
-                PROCUREMENT_VISIBLE_TO
         ));
 
         return charts;
@@ -788,41 +788,6 @@ public class DashboardService {
         return items;
     }
 
-    private List<DashboardDistributionItemDto> buildSlaBreakdown(List<RfqHeaderEntity> rfqs) {
-        LocalDate today = LocalDate.now(DateUtil.getTimeZone());
-        long overdue = 0;
-        long dueToday = 0;
-        long onTrack = 0;
-
-        for (RfqHeaderEntity rfq : rfqs) {
-            if (!(rfq.getStatus() == RfqStatus.NEW || rfq.getStatus() == RfqStatus.IN_PROGRESS) || rfq.getSlaDate() == null) {
-                continue;
-            }
-            LocalDate slaDate = rfq.getSlaDate().withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate();
-            if (slaDate.isBefore(today)) {
-                overdue++;
-            } else if (slaDate.isEqual(today)) {
-                dueToday++;
-            } else {
-                onTrack++;
-            }
-        }
-
-        List<DashboardDistributionItemDto> items = new ArrayList<>();
-        items.add(distributionItem("Overdue", overdue, "#eb5757"));
-        items.add(distributionItem("Due Today", dueToday, "#f2994a"));
-        items.add(distributionItem("On Track", onTrack, "#27ae60"));
-        return items;
-    }
-
-    private DashboardDistributionItemDto distributionItem(String label, long value, String color) {
-        DashboardDistributionItemDto item = new DashboardDistributionItemDto();
-        item.setLabel(label);
-        item.setValue(value);
-        item.setColor(color);
-        return item;
-    }
-
     private String distributionPaletteColor(int index) {
         return DISTRIBUTION_PALETTE.get(Math.floorMod(index, DISTRIBUTION_PALETTE.size()));
     }
@@ -854,6 +819,13 @@ public class DashboardService {
             return StringUtils.defaultIfBlank(rfq.getProductFamilyEntity().getNameTh(), rfq.getProductFamilyEntity().getNameEn());
         }
         return StringUtils.defaultIfBlank(rfq.getProductFamily(), "-");
+    }
+
+    private String getProductSubtype1Label(RfqHeaderEntity rfq) {
+        if (rfq.getProductUsage() != null) {
+            return StringUtils.defaultIfBlank(rfq.getProductUsage().getNameTh(), rfq.getProductUsage().getNameEn());
+        }
+        return "-";
     }
 
     private String getEmployeeLabel(EmployeeEntity employee) {
