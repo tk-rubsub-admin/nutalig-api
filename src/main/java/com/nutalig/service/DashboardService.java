@@ -229,21 +229,33 @@ public class DashboardService {
                         PROCUREMENT_VISIBLE_TO
                 ),
                 metric(
-                        "rfq-other",
-                        "dashboard.rfq.metrics.other.title",
-                        countByStatus(rfqs, RfqStatus.CANCELED) + countByStatus(rfqs, RfqStatus.REQUESTED_INFO) + countByStatus(rfqs, RfqStatus.CLOSED),
-                        "dashboard.rfq.metrics.other.subtitle",
+                        "rfq-requested-info",
+                        "dashboard.rfq.metrics.requestedInfo.title",
+                        countByStatus(rfqs, RfqStatus.REQUESTED_INFO),
+                        "dashboard.rfq.metrics.requestedInfo.subtitle",
                         null,
                         "warning",
-                        buildPriceInquiryManagementHref(
-                                startDate,
-                                endDate,
-                                selectedFilters,
-                                Map.of("statuses", String.join(",",
-                                        RfqStatus.CANCELED.name(),
-                                        RfqStatus.REQUESTED_INFO.name(),
-                                        RfqStatus.CLOSED.name()))
-                        ),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.REQUESTED_INFO.name())),
+                        PROCUREMENT_VISIBLE_TO
+                ),
+                metric(
+                        "rfq-canceled",
+                        "dashboard.rfq.metrics.canceled.title",
+                        countByStatus(rfqs, RfqStatus.CANCELED),
+                        "dashboard.rfq.metrics.canceled.subtitle",
+                        null,
+                        "error",
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.CANCELED.name())),
+                        PROCUREMENT_VISIBLE_TO
+                ),
+                metric(
+                        "rfq-closed",
+                        "dashboard.rfq.metrics.closed.title",
+                        countByStatus(rfqs, RfqStatus.CLOSED),
+                        "dashboard.rfq.metrics.closed.subtitle",
+                        null,
+                        "neutral",
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.CLOSED.name())),
                         PROCUREMENT_VISIBLE_TO
                 )
         );
