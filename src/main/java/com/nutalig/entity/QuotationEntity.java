@@ -135,6 +135,24 @@ public class QuotationEntity extends AuditDateEntity {
     @Column(name = "shipping")
     private String shipping;
 
+    @Column(name = "project")
+    private String project;
+
+    @Column(name = "sample_lead_time")
+    private String sampleLeadTime;
+
+    @Column(name = "production_lead_time")
+    private String productionLeadTime;
+
+    @Column(name = "shipping_lead_time")
+    private String shippingLeadTime;
+
+    @Column(name = "mold_lead_time")
+    private String moldLeadTime;
+
+    @Column(name = "product_qty_tolerance")
+    private String productQtyTolerance;
+
     public void addItem(QuotationDetailEntity item) {
         if (item == null) return;
         items.add(item);

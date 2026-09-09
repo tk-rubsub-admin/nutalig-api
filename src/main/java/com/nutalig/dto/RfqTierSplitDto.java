@@ -17,10 +17,8 @@ public class RfqTierSplitDto {
     private Currency currency;
     private String shippingMethod;
     private String containerSize;
-    private BigDecimal landFreightCost;
-    private BigDecimal landFreightQty;
-    private BigDecimal seaFreightQty;
-    private BigDecimal seaFreightCost;
+    private BigDecimal shippingCost;
+    private BigDecimal totalPrice;
     private Boolean isFcl;
     private Boolean isShareFCL;
     private ZonedDateTime createdDate;

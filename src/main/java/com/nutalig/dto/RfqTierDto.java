@@ -18,12 +18,10 @@ public class RfqTierDto {
     private Currency currency;
     private String shippingMethod;
     private String containerSize;
-    private BigDecimal landFreightCost;
-    private BigDecimal seaFreightCost;
+    private BigDecimal shippingCost;
     private Boolean isFcl;
     private Boolean isShareFCL;
-    private BigDecimal landTotalPrice;
-    private BigDecimal seaTotalPrice;
+    private BigDecimal totalPrice;
     private Long supplierQuoteTierId;
     private Integer sortOrder;
     private ZonedDateTime createdDate;

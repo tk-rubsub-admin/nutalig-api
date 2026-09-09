@@ -17,6 +17,11 @@ public class AppProperties {
 
     @Getter
     @Setter
+    public static class Report {
+        private Integer version;
+    }
+    @Getter
+    @Setter
     public static class Upload {
         private String dir;
         private String publicBaseUrl;

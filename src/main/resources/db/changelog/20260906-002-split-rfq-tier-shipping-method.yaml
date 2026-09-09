@@ -1,0 +1,97 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260906-002-expand-rfq-tier-shipping-prices
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_tier
+            columns:
+              - column: { name: shipping_cost, type: "DECIMAL(18,4)" }
+              - column: { name: total_price, type: "DECIMAL(18,4)" }
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column: { name: shipping_cost, type: "DECIMAL(18,4)" }
+              - column: { name: total_price, type: "DECIMAL(18,4)" }
+
+  - changeSet:
+      id: 20260906-003-migrate-rfq-tier-shipping-prices
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE rfq_tier DROP INDEX uk_rfq_tier_detail_qty;
+              ALTER TABLE rfq_tier_split DROP INDEX uk_rfq_tier_detail_qty;
+
+              UPDATE rfq_tier
+              SET shipping_method = CASE WHEN COALESCE(land_total_price, 0) > 0 THEN 'LAND'
+                    WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                    WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size)))
+                    ELSE 'SEA' END,
+                  shipping_cost = CASE WHEN COALESCE(land_total_price, 0) > 0 THEN land_freight_cost ELSE sea_freight_cost END,
+                  total_price = CASE WHEN COALESCE(land_total_price, 0) > 0 THEN land_total_price ELSE sea_total_price END;
+
+              INSERT INTO rfq_tier (rfq_detail_id, supplier_id, quantity, product_price, target_price, commission, currency, container_size, shipping_method, shipping_cost, total_price, is_fcl, is_share_fcl, supplier_quote_tier_id, sort_order, is_archived, archived_by, archived_at, created_date, updated_date)
+              SELECT rfq_detail_id, supplier_id, quantity, product_price, target_price, commission, currency, container_size,
+                     CASE WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                          WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size))) ELSE 'SEA' END,
+                     sea_freight_cost, sea_total_price, is_fcl, is_share_fcl, supplier_quote_tier_id, sort_order, is_archived, archived_by, archived_at, created_date, updated_date
+              FROM rfq_tier WHERE COALESCE(land_total_price, 0) > 0 AND COALESCE(sea_total_price, 0) > 0;
+
+              UPDATE rfq_tier_split
+              SET shipping_method = CASE WHEN COALESCE(land_freight_cost, 0) > 0 THEN 'LAND'
+                    WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                    WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size))) ELSE 'SEA' END,
+                  shipping_cost = CASE WHEN COALESCE(land_freight_cost, 0) > 0 THEN land_freight_cost ELSE sea_freight_cost END,
+                  total_price = sell_price + CASE WHEN COALESCE(land_freight_cost, 0) > 0 THEN land_freight_cost ELSE sea_freight_cost END;
+
+              INSERT INTO rfq_tier_split (rfq_detail_id, supplier_id, quantity, sell_price, commission, currency, container_size, shipping_method, shipping_cost, total_price, is_fcl, is_share_fcl, is_archived, archived_by, archived_at, created_date, updated_date)
+              SELECT rfq_detail_id, supplier_id, quantity, sell_price, commission, currency, container_size,
+                     CASE WHEN is_share_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_SHARE_FCL_', UPPER(TRIM(container_size)))
+                          WHEN is_fcl = 1 AND NULLIF(TRIM(container_size), '') IS NOT NULL THEN CONCAT('SEA_FCL_', UPPER(TRIM(container_size))) ELSE 'SEA' END,
+                     sea_freight_cost, sell_price + sea_freight_cost, is_fcl, is_share_fcl, is_archived, archived_by, archived_at, created_date, updated_date
+              FROM rfq_tier_split WHERE COALESCE(land_freight_cost, 0) > 0 AND COALESCE(sea_freight_cost, 0) > 0;
+
+              UPDATE sales_order_detail sod
+              JOIN rfq_tier land_tier ON land_tier.id = sod.rfq_tier_id
+              JOIN rfq_tier sea_tier ON sea_tier.rfq_detail_id = land_tier.rfq_detail_id
+                                  AND sea_tier.quantity = land_tier.quantity
+                                  AND sea_tier.shipping_method LIKE 'SEA%'
+              SET sod.rfq_tier_id = sea_tier.id
+              WHERE sod.shipping_method LIKE 'SEA%' AND land_tier.shipping_method = 'LAND';
+
+              UPDATE purchase_order_detail pod
+              JOIN rfq_tier land_tier ON land_tier.id = pod.rfq_tier_id
+              JOIN rfq_tier sea_tier ON sea_tier.rfq_detail_id = land_tier.rfq_detail_id
+                                  AND sea_tier.quantity = land_tier.quantity
+                                  AND sea_tier.shipping_method LIKE 'SEA%'
+              SET pod.rfq_tier_id = sea_tier.id
+              WHERE pod.shipping_method LIKE 'SEA%' AND land_tier.shipping_method = 'LAND';
+
+              UPDATE quotation_detail qd
+              JOIN rfq_tier land_tier ON land_tier.id = CAST(qd.tier_id AS UNSIGNED)
+              JOIN rfq_tier sea_tier ON sea_tier.rfq_detail_id = land_tier.rfq_detail_id
+                                  AND sea_tier.quantity = land_tier.quantity
+                                  AND sea_tier.shipping_method LIKE 'SEA%'
+              SET qd.tier_id = CAST(sea_tier.id AS CHAR)
+              WHERE land_tier.shipping_method = 'LAND' AND qd.unit_price = sea_tier.total_price;
+
+              DELETE FROM rfq_tier WHERE COALESCE(total_price, 0) <= 0;
+              DELETE FROM rfq_tier_split WHERE COALESCE(total_price, 0) <= 0;
+
+              ALTER TABLE rfq_tier ADD CONSTRAINT uk_rfq_tier_detail_qty_shipping_method UNIQUE (rfq_detail_id, quantity, shipping_method);
+              ALTER TABLE rfq_tier_split ADD CONSTRAINT uk_rfq_tier_split_detail_qty_shipping_method UNIQUE (rfq_detail_id, quantity, shipping_method);
+
+  - changeSet:
+      id: 20260906-004-contract-rfq-tier-shipping-prices
+      author: codex
+      changes:
+        - dropColumn: { tableName: rfq_tier, columnName: land_freight_cost }
+        - dropColumn: { tableName: rfq_tier, columnName: sea_freight_cost }
+        - dropColumn: { tableName: rfq_tier, columnName: land_total_price }
+        - dropColumn: { tableName: rfq_tier, columnName: sea_total_price }
+        - dropColumn: { tableName: rfq_tier_split, columnName: land_freight_cost }
+        - dropColumn: { tableName: rfq_tier_split, columnName: land_freight_qty }
+        - dropColumn: { tableName: rfq_tier_split, columnName: sea_freight_qty }
+        - dropColumn: { tableName: rfq_tier_split, columnName: sea_freight_cost }

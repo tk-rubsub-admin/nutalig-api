@@ -219,16 +219,6 @@ public class DashboardService {
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
-                        "rfq-rejected",
-                        "dashboard.rfq.metrics.rejected.title",
-                        countByStatus(rfqs, RfqStatus.REJECTED),
-                        "dashboard.rfq.metrics.rejected.subtitle",
-                        null,
-                        "error",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.REJECTED.name())),
-                        ALL_RFQ_VISIBLE_TO
-                ),
-                metric(
                         "rfq-requested-info",
                         "dashboard.rfq.metrics.requestedInfo.title",
                         countByStatus(rfqs, RfqStatus.REQUESTED_INFO),
@@ -236,16 +226,6 @@ public class DashboardService {
                         null,
                         "warning",
                         buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.REQUESTED_INFO.name())),
-                        ALL_RFQ_VISIBLE_TO
-                ),
-                metric(
-                        "rfq-canceled",
-                        "dashboard.rfq.metrics.canceled.title",
-                        countByStatus(rfqs, RfqStatus.CANCELED),
-                        "dashboard.rfq.metrics.canceled.subtitle",
-                        null,
-                        "error",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.CANCELED.name())),
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
@@ -897,8 +877,6 @@ public class DashboardService {
             case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case SPECIAL_PRICE_REVIEW -> "รอทบทวนราคาพิเศษ";
             case QUOTED -> "เสนอราคาแล้ว";
-            case CANCELED -> "ยกเลิก";
-            case REJECTED -> "ปฏิเสธ";
             case CLOSED -> "ปิดงาน";
             case COMPLETED -> "เสร็จสิ้น";
         };

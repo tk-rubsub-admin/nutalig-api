@@ -197,6 +197,10 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "description")
     private String description;
 
+    @ToString.Include
+    @Column(name = "project")
+    private String project;
+
     @Column(name = "created_by")
     @ToString.Include
     private String createdBy;
@@ -245,6 +249,18 @@ public class RfqHeaderEntity extends AuditDateEntity {
 
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula = @JoinFormula(value = "'RFQ_CLOSE_REASON'", referencedColumnName = "group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "close_reason", referencedColumnName = "code"))
+    })
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private SystemConfigEntity closeReason;
+
+    @Column(name = "close_remark", columnDefinition = "TEXT")
+    private String closeRemark;
 
     @Column(name = "confirmed_detail_id")
     private Long confirmedDetailId;

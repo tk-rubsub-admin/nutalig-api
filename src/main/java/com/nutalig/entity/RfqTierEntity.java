@@ -19,8 +19,8 @@ import java.time.ZonedDateTime;
         name = "rfq_tier",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_rfq_tier_detail_qty",
-                        columnNames = {"rfq_detail_id", "quantity"}
+                        name = "uk_rfq_tier_detail_qty_shipping_method",
+                        columnNames = {"rfq_detail_id", "quantity", "shipping_method"}
                 )
         }
 )
@@ -65,11 +65,8 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "shipping_method", length = 50)
     private String shippingMethod;
 
-    @Column(name = "land_freight_cost", precision = 18, scale = 4)
-    private BigDecimal landFreightCost;
-
-    @Column(name = "sea_freight_cost", precision = 18, scale = 4)
-    private BigDecimal seaFreightCost;
+    @Column(name = "shipping_cost", precision = 18, scale = 4)
+    private BigDecimal shippingCost;
 
     @Column(name = "is_fcl")
     private Boolean isFcl;
@@ -77,11 +74,8 @@ public class RfqTierEntity extends AuditDateEntity {
     @Column(name = "is_share_fcl")
     private Boolean isShareFCL;
 
-    @Column(name = "land_total_price", precision = 18, scale = 4)
-    private BigDecimal landTotalPrice;
-
-    @Column(name = "sea_total_price", precision = 18, scale = 4)
-    private BigDecimal seaTotalPrice;
+    @Column(name = "total_price", precision = 18, scale = 4)
+    private BigDecimal totalPrice;
 
     @Column(name = "supplier_quote_tier_id")
     private Long supplierQuoteTierId;

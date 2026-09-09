@@ -34,4 +34,10 @@ public class QuotationDto {
     private Integer revNo;
     private Boolean isShowSummary;
     private String shipping;
+    private String project;
+    private String sampleLeadTime;
+    private String productionLeadTime;
+    private String shippingLeadTime;
+    private String moldLeadTime;
+    private String productQtyTolerance;
 }

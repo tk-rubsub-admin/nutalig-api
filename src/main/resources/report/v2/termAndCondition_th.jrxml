@@ -1,0 +1,176 @@
+<!-- Created with Jaspersoft Studio version 7.0.1.final using JasperReports Library version 7.0.1-573496633c2b4074e32f433154b543003f7d2498  -->
+<jasperReport name="quaotation" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="8cac0898-3832-4fc4-bbd4-71035cbfc057">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="salesName" class="java.lang.String"/>
+	<parameter name="accountName" class="java.lang.String"/>
+	<parameter name="bankName" class="java.lang.String"/>
+	<parameter name="accountNo" class="java.lang.String"/>
+	<parameter name="signature" class="java.io.InputStream"/>
+	<parameter name="stamp" class="java.io.InputStream"/>
+	<parameter name="branchName" class="java.lang.String"/>
+	<field name="no" class="java.lang.Integer">
+		<description><![CDATA[no]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
+	</field>
+	<field name="type" class="java.lang.String">
+		<description><![CDATA[type]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="type"/>
+	</field>
+	<field name="capacity" class="java.lang.String">
+		<description><![CDATA[capacity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="capacity"/>
+	</field>
+	<field name="spec" class="java.lang.String">
+		<description><![CDATA[spec]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="spec"/>
+	</field>
+	<field name="size" class="java.lang.String">
+		<description><![CDATA[size]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="size"/>
+	</field>
+	<field name="price" class="java.math.BigDecimal">
+		<description><![CDATA[price]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="price"/>
+	</field>
+	<field name="quantity" class="java.math.BigDecimal">
+		<description><![CDATA[quantity]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="quantity"/>
+	</field>
+	<field name="amount" class="java.math.BigDecimal">
+		<description><![CDATA[amount]]></description>
+		<property name="net.sf.jasperreports.json.field.expression" value="amount"/>
+	</field>
+	<field name="image" class="java.io.InputStream"/>
+	<field name="name" class="java.lang.String"/>
+	<title height="220">
+		<element kind="textField" uuid="0f5d2541-616b-4a70-926e-b7ca1c9ef941" stretchType="ElementGroupHeight" x="0" y="19" width="554" height="30" fontName="TH SarabunPSK" fontSize="10.0" textAdjust="StretchHeight" blankWhenNull="true">
+			<expression><![CDATA["NUTALIG Standard Terms & Conditions\n" +
+"ข้อกำหนดและเงื่อนไขการเสนอราคาและการซื้อขายสินค้า\n\n" +
+"1. ราคาและภาษี / Price & Tax\n" +
+"ราคาสินค้า ค่าบริการ ค่าขนส่ง และค่าใช้จ่ายอื่นให้เป็นไปตามที่ระบุในใบเสนอราคา ภาษีมูลค่าเพิ่มและภาษีอื่น ๆ ให้เป็นไปตามสถานะทางภาษีที่ระบุในเอกสารนั้น หากไม่ได้ระบุเป็นอย่างอื่น ราคาและเงื่อนไขที่เสนอมีผลเฉพาะภายในระยะเวลาที่ระบุในใบเสนอราคา\n\n" +
+"2. อายุใบเสนอราคา / Quotation Validity\n" +
+"ใบเสนอราคามีอายุตามระยะเวลาที่ระบุในเอกสาร โดยค่าเริ่มต้นสามารถกำหนดเป็น 60 วัน เว้นแต่ระบุเป็นอย่างอื่น หลังพ้นกำหนด บริษัทสงวนสิทธิ์ทบทวนราคา อัตราแลกเปลี่ยน ต้นทุนวัตถุดิบ ค่าขนส่ง และเงื่อนไขการผลิตใหม่ก่อนรับคำสั่งซื้อ\n\n" +
+"3. ประเภทสินค้า / Product Supply Type\n" +
+"3.1 In-stock Thailand / สินค้าพร้อมส่งในประเทศไทย: สินค้าที่อยู่ในสต็อกของบริษัทหรือพร้อมจัดส่งภายในประเทศไทย\n" +
+"3.2 Ready-to-Ship Overseas / สินค้าพร้อมส่งจากต่างประเทศ: สินค้าที่มีอยู่กับผู้ผลิตหรือแหล่งสินค้าในต่างประเทศ แต่ยังต้องผ่านกระบวนการจัดเตรียม ขนส่งระหว่างประเทศ นำเข้า และตรวจรับก่อนส่งมอบ\n" +
+"3.3 Made-to-Order / Pre-order / สินค้าสั่งผลิต: สินค้าที่ต้องผลิตหรือปรับแต่งตาม Spec, Artwork หรือข้อกำหนดของลูกค้า\n\n" +
+"4. การยืนยันคำสั่งซื้อ / Order Confirmation\n" +
+"คำสั่งซื้อจะถือว่าได้รับการยืนยันเมื่อ Sales Order ได้รับการยืนยัน เงินมัดจำได้รับชำระตามเงื่อนไข Product Specification ที่จำเป็นได้รับการยืนยัน Artwork / Sample / Proof ได้รับการอนุมัติตามที่งานนั้นต้องใช้ และข้อกำหนดพิเศษได้รับการยืนยัน การชำระมัดจำถือเป็นการยืนยันคำสั่งซื้อภายใต้เอกสารและ Revision ที่อ้างอิงใน Sales Order ณ เวลานั้น\n\n" +
+"5. การชำระเงิน / Payment Terms\n" +
+"ลูกค้าชำระเงินตามเงื่อนไขที่ระบุในใบเสนอราคาหรือ Sales Order สำหรับงานที่กำหนดมัดจำ 50% ลูกค้าชำระมัดจำเพื่อยืนยันคำสั่งซื้อ และชำระยอดคงเหลือก่อนส่งมอบ เว้นแต่มี Credit Term หรือเงื่อนไขอื่นที่บริษัทอนุมัติไว้เป็นลายลักษณ์อักษร บริษัทอาจระงับการผลิต การจัดส่ง หรือการปล่อยสินค้า หากมีจำนวนเงินถึงกำหนดชำระแต่ยังไม่ได้รับชำระ\n\n" +
+"6. ข้อกำหนดสินค้าและเอกสารอ้างอิง / Product Specification & References\n" +
+"การผลิตและการตรวจรับสินค้าให้ยึดเอกสารที่ได้รับอนุมัติของแต่ละงาน เช่น Product Specification, Approved Artwork, Approved Sample, Approved Proof, Color Standard, Boundary Sample และ Project-specific QC Requirement หากข้อมูลระหว่างเอกสารไม่ตรงกัน ให้ยึด Revision ล่าสุดที่ได้รับการอนุมัติและอ้างอิงอยู่ใน Sales Order หรือ Production Reference ของงานนั้น\n\n" +
+"7. ปริมาณการผลิต / Production Quantity Tolerance\n" +
+"สำหรับสินค้าสั่งผลิต ปริมาณผลิตจริงอาจสูงหรือต่ำกว่าจำนวนที่สั่งได้ตามข้อจำกัดของกระบวนการผลิต โดยค่ามาตรฐานทั่วไปไม่เกิน ±10% เว้นแต่ใบเสนอราคา Sales Order หรือ Specification ระบุเป็นอย่างอื่น ลูกค้าชำระเงินตามจำนวนสินค้าที่ส่งมอบจริง\n\n" +
+"8. สินค้าตัวอย่างและงานปรู๊ฟ / Sample & Proof\n" +
+"การจัดทำสินค้าตัวอย่างหรืองานปรู๊ฟ รวมถึงประเภท จำนวนครั้ง จำนวนชิ้น ค่าใช้จ่าย และระยะเวลาดำเนินการ ให้เป็นไปตามที่ระบุในใบเสนอราคาหรือ Sales Order ของแต่ละงาน สินค้าบางประเภทอาจไม่สามารถจัดทำตัวอย่างก่อนการผลิตจริงได้ หรืออาจใช้ตัวอย่างวัสดุ ตัวอย่างสี ตัวอย่างงานพิมพ์ ภาพถ่าย วิดีโอ หรือ Production Proof เป็นวิธีการยืนยันแทน การอนุมัติตัวอย่างหรือปรู๊ฟใช้เป็น Reference สำหรับการผลิต แต่ไม่ถือว่างาน Mass Production ต้องเหมือนตัวอย่างทุกจุด 100% หากความแตกต่างนั้นอยู่ภายในขอบเขตการผลิตเชิงพาณิชย์และเกณฑ์ยอมรับที่ตกลงไว้\n\n" +
+"9. Artwork และการอนุมัติแบบ / Artwork Approval\n" +
+"ลูกค้ารับผิดชอบในการตรวจสอบและอนุมัติข้อความ การสะกด โลโก้ Barcode / QR Code Layout ตำแหน่ง ขนาด และ Revision ของ Artwork ก่อนการผลิต การอนุมัติ Artwork ผ่านระบบ อีเมล LINE หรือช่องทางที่สามารถตรวจสอบย้อนหลังได้ ถือเป็นหลักฐานการอนุมัติของ Revision นั้น สีบนหน้าจอ ภาพ Mockup หรือภาพ Digital อาจไม่ตรงกับสีงานผลิตจริง 100% หากต้องการควบคุมสีเฉพาะต้องมี Pantone / Physical Sample / Approved Color Reference ที่ตกลงไว้\n\n" +
+"10. การเปลี่ยนแปลงหลังอนุมัติ / Change Control\n" +
+"หลัง Product Specification, Artwork, Sample หรือ Proof ได้รับการอนุมัติแล้ว การแก้ไขอาจส่งผลต่อราคา ค่าแม่พิมพ์ / plate / cylinder / block Lead Time MOQ วัตถุดิบ และสินค้าที่เริ่มผลิตแล้ว บริษัทจะประเมินผลกระทบก่อนดำเนินการ การเปลี่ยนแปลงที่ได้รับอนุมัติต้องออกเป็น Revision ใหม่และไม่แก้ทับ Revision ที่เคยอนุมัติ\n\n" +
+"11. ระยะเวลาผลิตและกำหนดส่ง / Lead Time & Delivery Schedule\n" +
+"ระยะเวลาผลิตและขนส่งเป็นระยะเวลาประมาณการ เว้นแต่บริษัทจะยืนยันวันส่งมอบที่แน่นอนเป็นลายลักษณ์อักษร Lead Time จะเริ่มนับเมื่อได้รับเงินมัดจำ Final Specification Final Artwork Sample / Proof Approval และวัตถุดิบหรือข้อมูลที่ลูกค้าต้องจัดส่งครบถ้วน\n\n" +
+"12. การล่าช้าจากเหตุที่อยู่นอกเหนือการควบคุม / Delay & Force Majeure\n" +
+"ระยะเวลาผลิตและขนส่งอาจปรับตามผลกระทบจากเหตุการณ์ที่อยู่นอกเหนือการควบคุมตามสมควรของบริษัท เช่น การหยุดหรือความล่าช้าของโรงงาน ศุลกากรตรวจสินค้า ท่าเรือหรือด่านขนส่งแออัด ระบบขนส่งหยุดชะงัก ภัยธรรมชาติ มาตรการของรัฐ เหตุการณ์ระหว่างประเทศ การขาดแคลนวัตถุดิบในวงกว้าง หรือเหตุสุดวิสัยอื่น บริษัทจะแจ้งลูกค้าหากทราบว่าเหตุการณ์ดังกล่าวอาจมีผลกระทบอย่างมีนัยสำคัญ และจะใช้ความพยายามตามสมควรเพื่อลดผลกระทบและดำเนินการให้แล้วเสร็จโดยเร็ว\n\n" +
+"13. มาตรฐานการตรวจคุณภาพ / Quality & Inspection Basis\n" +
+"สินค้าอยู่ภายใต้มาตรฐาน QC ของ NUTALIG ฉบับที่อ้างอิงใน Quotation / Sales Order เว้นแต่มี Project-specific QC Requirement ที่ได้รับการตกลงไว้ โดยทั่วไปใช้หลัก Commercial Mass Production Standard ซึ่งยอมรับความคลาดเคลื่อนตามธรรมชาติของการผลิตจำนวนมากเมื่อไม่กระทบความปลอดภัย โครงสร้าง การประกอบ ความถูกต้อง การใช้งานตามที่กำหนด ภาพลักษณ์เชิงพาณิชย์ และความพร้อมในการส่งมอบ\n\n" +
+"14. การตรวจพิเศษ / Special Inspection & Testing\n" +
+"การตรวจหรือทดสอบเพิ่มเติม เช่น 100% Screening, Leak Test, Pump / Spray Test, Functional Test, Fit / Assembly Test, Adhesion / Rub Test, Dimensional Measurement, Weight Check และ Tightened Acceptance Criteria จะดำเนินการเมื่อระบุไว้ใน Inspection Plan, Quotation, Sales Order หรือข้อกำหนดเฉพาะของงาน หากลูกค้าต้องการมาตรฐานหรือการตรวจที่เกินกว่าฐานที่เสนอราคา บริษัทอาจต้องประเมินราคาและ Lead Time เพิ่มเติมก่อนยืนยัน\n\n" +
+"15. การตรวจรับสินค้าและการแจ้งเคลม / Receipt Inspection & Claims\n" +
+"ลูกค้าควรตรวจสอบสินค้าภายใน 14 วัน นับจากวันที่ได้รับสินค้า หากพบความผิดปกติหรือข้อบกพร่อง ให้แจ้งบริษัทเป็นลายลักษณ์อักษร พร้อม SO / Delivery Reference, Lot หรือรายการสินค้าที่เกี่ยวข้อง, จำนวนที่ตรวจ, จำนวนที่พบปัญหา, ลักษณะปัญหา และภาพถ่าย / Video บริษัทอาจขอข้อมูลหรือ Sample เพิ่มเติมเพื่อวิเคราะห์ ลูกค้าควรเก็บสินค้าที่เกี่ยวข้องไว้ในสภาพที่สามารถตรวจสอบได้ และไม่ควรทำลาย แก้ไข หรือดำเนินการที่ทำให้ไม่สามารถวิเคราะห์สาเหตุได้จนกว่าบริษัทจะได้รับข้อมูลเพียงพอ เว้นแต่มีเหตุจำเป็นหรือมีการตกลงเป็นอย่างอื่น กรณีความเสียหายจากการขนส่งให้แจ้งภายใน 48 ชั่วโมง\n\n" +
+"16. การจำแนกข้อบกพร่อง / Defect Classification\n" +
+"Critical Defect / ข้อบกพร่องร้ายแรง: ข้อบกพร่องที่มีหรืออาจมีผลร้ายแรงต่อความปลอดภัย โครงสร้าง หรือความถูกต้องสำคัญ\n" +
+"Major Defect / ข้อบกพร่องสำคัญ: ข้อบกพร่องที่มีผลอย่างมีนัยสำคัญต่อความถูกต้อง การประกอบ โครงสร้าง การใช้งาน งานตกแต่ง ภาพลักษณ์เชิงพาณิชย์ หรือความพร้อมในการส่งมอบ\n" +
+"Minor Defect / ข้อบกพร่องเล็กน้อย: ข้อบกพร่องที่เกินข้อกำหนดหรือขอบเขตยอมรับ แต่มีผลจำกัดต่อรูปลักษณ์และไม่กระทบความปลอดภัย โครงสร้าง หรือการใช้งาน\n" +
+"Natural Manufacturing Variation / ความคลาดเคลื่อนตามธรรมชาติของการผลิต: ความแตกต่างที่ยังอยู่ภายในเกณฑ์ยอมรับ ไม่ถือเป็น Defect\n\n" +
+"17. แนวทางการแก้ไขกรณีพบข้อบกพร่อง / Defect Resolution\n" +
+"เมื่อบริษัทตรวจสอบแล้วพบว่าเป็นข้อบกพร่องที่อยู่ในความรับผิดชอบ บริษัทอาจดำเนินการตามความเหมาะสม เช่น Rework / แก้ไข, Sort / Screen / คัดแยก, Replacement / เปลี่ยนสินค้า, Reproduction / ผลิตทดแทน, Credit / ชดเชยตามที่ตกลง หรือวิธีอื่นที่ทั้งสองฝ่ายเห็นชอบ การเลือกแนวทางพิจารณาจากลักษณะปัญหา ปริมาณ ผลกระทบ และความเหมาะสมทางเทคนิคและเชิงพาณิชย์\n\n" +
+"18. การทำความสะอาดและสภาพสินค้า / Product Cleanliness\n" +
+"บริษัทตรวจสอบความเรียบร้อยของบรรจุภัณฑ์ตามมาตรฐานที่กำหนดก่อนส่งมอบ บรรจุภัณฑ์เชิงอุตสาหกรรมอาจมีฝุ่นหรือเศษวัสดุในระดับที่เกิดขึ้นตามกระบวนการผลิตและการขนส่ง เว้นแต่มีข้อกำหนดหรือบริการเฉพาะที่ตกลงไว้ การทำความสะอาด การเป่าฝุ่น การฆ่าเชื้อ หรือการเตรียมบรรจุภัณฑ์ก่อนเข้าสู่กระบวนการบรรจุผลิตภัณฑ์สำเร็จรูป เป็นความรับผิดชอบของผู้บรรจุหรือผู้ผลิตผลิตภัณฑ์\n\n" +
+"19. ขอบเขตความรับผิด / Limitation of Liability\n" +
+"บริษัทรับผิดชอบต่อสินค้าและบริการภายในขอบเขตที่ NUTALIG จัดหาและข้อกำหนดที่ได้รับการตกลง เว้นแต่เกิดจากการกระทำหรือความรับผิดที่กฎหมายกำหนดเป็นอย่างอื่น บริษัทไม่รับผิดชอบต่อความเสียหายที่เกิดจากสูตรผลิตภัณฑ์ Compatibility ที่ไม่ได้มีการกำหนดหรือทดสอบ กระบวนการบรรจุ เครื่องจักรบรรจุ การจัดเก็บที่ไม่เหมาะสม การใช้งานผิดวัตถุประสงค์ หรือการขนส่งและการจัดการหลังส่งมอบ\n\n" +
+"20. Mold / Tooling / Plate / Cylinder\n" +
+"กรณีมีการจัดทำ Mold, Tooling, Plate, Printing Cylinder หรืออุปกรณ์เฉพาะงาน ค่าใช้จ่าย สิทธิ์ความเป็นเจ้าของ การเก็บรักษา อายุการใช้งาน การบำรุงรักษา และเงื่อนไขการส่งมอบให้เป็นไปตามที่ระบุใน Quotation, Sales Order หรือ Tooling Agreement ของงานนั้น\n\n" +
+"21. การยกเลิกคำสั่งซื้อ / Cancellation\n" +
+"เมื่อมีการเริ่มดำเนินการผลิต สั่งวัตถุดิบ จัดทำแม่พิมพ์ งานพิมพ์ หรือเกิดต้นทุนผูกพันแล้ว ลูกค้าไม่สามารถยกเลิกหรือเปลี่ยนแปลงคำสั่งซื้อโดยไม่มีค่าใช้จ่าย เงินมัดจำและค่าใช้จ่ายที่เกิดขึ้นแล้วอาจไม่สามารถคืนได้ตามขอบเขตของต้นทุนที่เกิดขึ้นจริงและเงื่อนไขของงาน\n\n" +
+"22. การส่งมอบ ความเสี่ยง การรับสินค้า และการจัดเก็บ / Delivery, Risk & Storage\n" +
+"วิธีขนส่งและสถานที่ส่งมอบเป็นไปตาม Quotation หรือ Sales Order ความเสี่ยงระหว่างการขนส่งให้เป็นไปตามรูปแบบการจัดส่งที่ตกลง หากบริษัทเป็นผู้จัดการขนส่งให้ลูกค้า ลูกค้าต้องตรวจสอบสภาพสินค้าเมื่อได้รับและแจ้งความเสียหายจากขนส่งภายใน 48 ชั่วโมง เมื่อบริษัทแจ้งว่าสินค้าพร้อมรับ ลูกค้าควรรับสินค้าภายใน 7 วัน หากลูกค้าขอเลื่อนรับสินค้า บริษัทอาจเรียกเก็บค่าใช้พื้นที่ ค่าจัดเก็บ หรือค่าใช้จ่ายที่เกิดขึ้นตามอัตราที่แจ้งหรือที่ตกลง\n\n" +
+"23. ทรัพย์สินทางปัญญา / Intellectual Property\n" +
+"ลูกค้ารับรองว่า Artwork, Trademark, Logo, ข้อความ ภาพ หรือทรัพย์สินทางปัญญาที่ส่งให้บริษัทเพื่อผลิตสินค้าสามารถนำมาใช้ได้อย่างถูกต้องและไม่ละเมิดสิทธิของบุคคลอื่น หาก NUTALIG เป็นผู้สร้าง Design หรือ Artwork ให้ลูกค้าเอง เรื่องสิทธิในผลงานให้เป็นไปตามเงื่อนไขของ Design Service หรือ Agreement ที่เกี่ยวข้อง\n\n" +
+"24. กฎหมายที่ใช้บังคับ / Governing Law\n" +
+"ข้อเสนอ คำสั่งซื้อ และการซื้อขายอยู่ภายใต้กฎหมายไทย ข้อพิพาทที่ไม่สามารถตกลงกันได้ให้ดำเนินการตามกระบวนการและเขตอำนาจศาลที่กฎหมายกำหนด\n\n" +
+"25. การยอมรับเงื่อนไข / Acceptance\n" +
+"การลงนาม การยืนยัน Sales Order การชำระมัดจำ หรือการยืนยันคำสั่งซื้อผ่านช่องทางที่บริษัทกำหนด ถือเป็นการยอมรับ Sales Order, Product Specification, Approved Artwork / Sample / Proof ที่อ้างอิง, Customer QC Standard, Standard Terms & Conditions และ Project-specific requirement ตาม Revision ที่มีผลกับคำสั่งซื้อนั้น"]]></expression>
+			<box topPadding="5" leftPadding="5" bottomPadding="5" rightPadding="5">
+				<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="image" uuid="d59f20b7-4d3a-468d-96ae-10da6dd872a9" positionType="Float" mode="Transparent" x="290" y="39" width="170" height="161" hImageAlign="Center" vImageAlign="Bottom">
+			<expression><![CDATA[$P{stamp}]]></expression>
+		</element>
+		<element kind="frame" uuid="a57d22f2-25ad-4008-a732-a1a80365c23f" positionType="Float" x="0" y="49" width="555" height="108">
+			<element kind="staticText" uuid="b1d47070-39e0-402f-b5ce-23a48f08289c" positionType="Float" x="0" y="0" width="160" height="27" fontName="TH SarabunPSK" fontSize="12.0" vTextAlign="Middle">
+				<text><![CDATA[Bank Account :]]></text>
+				<box topPadding="0" leftPadding="5" bottomPadding="0" rightPadding="0">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="2d4feb62-3e32-47e1-acea-5c617caedb4c" positionType="Float" x="0" y="27" width="160" height="69" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+				<expression><![CDATA["ชื่อบัญชี:  " + $P{accountName} + "\n" +
+"ธนาคาร:  " + $P{bankName} + "\n" + 
+"สาขา:" + $P{branchName} + "\n" +
+"เลขบัญชี:  " + $P{accountNo} + "\n"]]></expression>
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="textField" uuid="8d12dfc1-e9d6-40de-b64f-df643cadb49b" positionType="Float" x="160" y="0" width="214" height="96" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+				<expression><![CDATA["ข้าพเจ้ารับรองว่า จะส่งมอบของดังกล่าวข้างต้นได้ภายในกำหนด" + "\n" + 
+"ผู้เสนอราคา  " + $P{salesName} + "\n\n\n" +
+"ผู้สั่งซื้อ ....................................................................... " + "\n" + 
+"หมายเหตุ : ราคานี้ ตกลงตามเงื่อนไขภายใน 60 วัน"]]></expression>
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
+				<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<box topPadding="3" leftPadding="5">
+					<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="staticText" uuid="a43f469d-2a04-49c2-b179-abd13e244626" positionType="Float" x="373" y="0" width="181" height="96" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Center" vTextAlign="Bottom">
+				<text><![CDATA[ผู้อนุมัติ .......................................................................
+ณัฐทเดช เตชศิโรดม
+Managing Director
+]]></text>
+				<box topPadding="3" leftPadding="5">
+					<pen lineWidth="0.5"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+			</element>
+			<element kind="image" uuid="0415d240-2726-4db5-9316-14dba8f468dd" x="420" y="3" width="100" height="58" hImageAlign="Center" vImageAlign="Bottom">
+				<expression><![CDATA[$P{signature}]]></expression>
+			</element>
+		</element>
+		<element kind="staticText" uuid="da627a17-a6b5-4b55-b887-2777e7703a24" x="402" y="4" width="152" height="19" fontName="TH SarabunPSK" fontSize="10.0" hTextAlign="Right" vTextAlign="Middle">
+			<text><![CDATA[เอกสารเลขที่ NTL-TC-SALES-001 Rev.01]]></text>
+		</element>
+	</title>
+</jasperReport>

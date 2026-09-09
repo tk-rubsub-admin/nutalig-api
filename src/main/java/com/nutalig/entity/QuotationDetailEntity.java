@@ -63,6 +63,9 @@ public class QuotationDetailEntity {
     @Column(name = "tier_id")
     private String tierId;
 
+    @Column(name = "rfq_detail_id")
+    private Long rfqDetailId;
+
     @Column(name = "source_rfq_id", length = 50)
     private String sourceRfqId;
 

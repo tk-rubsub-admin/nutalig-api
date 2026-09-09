@@ -13,5 +13,6 @@ public class RequestSpecialPriceRequest {
     public static class TierTargetPriceRequest {
         private Long tierId;
         private BigDecimal targetPrice;
+        private String shippingMethod;
     }
 }

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260908-002-add-project-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: project
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: project
+                  type: VARCHAR(255)
+                  remarks: Project name for the RFQ

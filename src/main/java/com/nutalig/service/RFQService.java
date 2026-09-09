@@ -54,6 +54,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_NOT_FOUND_TH;
 import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.RFQ_TRACKING_STATUS_TH;
@@ -566,8 +568,18 @@ public class RFQService {
         if (request == null || StringUtils.isBlank(request.getRfqId())) {
             throw new InvalidRequestException("rfqId is required.");
         }
+        if (StringUtils.isBlank(request.getCloseReason())) {
+            throw new InvalidRequestException("closeReason is required.");
+        }
 
         RfqHeaderEntity entity = getEntityById(request.getRfqId().trim());
+        SystemConfigEntity closeReason = systemConfigService.getConfigEntity(
+                SystemConstant.RFQ_CLOSE_REASON,
+                request.getCloseReason().trim()
+        );
+        if (closeReason == null) {
+            throw new DataNotFoundException("RFQ close reason " + request.getCloseReason().trim() + " not found.");
+        }
         java.util.Map<String, Object> beforeDetail = buildActivityDetail(entity);
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
@@ -576,7 +588,8 @@ public class RFQService {
         entity.setStatus(RfqStatus.CLOSED);
         entity.setUpdatedBy(updatedBy);
         entity.setUpdatedDate(now);
-        entity.setRemark(request.getRemark());
+        entity.setCloseReason(closeReason);
+        entity.setCloseRemark(StringUtils.trimToNull(request.getCloseRemark()));
         entity = requestPriceHeaderRepository.save(entity);
 
         java.util.Map<String, Object> afterDetail = buildActivityDetail(entity);
@@ -1014,6 +1027,83 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto syncRFQAdditionalCosts(
+            String rfqId,
+            List<SyncRequestPriceAdditionalCostRequest> requests,
+            String userId
+    ) throws Exception {
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        List<SyncRequestPriceAdditionalCostRequest> requestedCosts =
+                requests == null ? List.of() : requests;
+        Map<Long, RfqAdditionalCostEntity> existingCosts = entity.getAdditionalCosts().stream()
+                .collect(Collectors.toMap(RfqAdditionalCostEntity::getId, Function.identity()));
+        Set<Long> retainedCostIds = new HashSet<>();
+        int createdCount = 0;
+        int updatedCount = 0;
+
+        for (int index = 0; index < requestedCosts.size(); index++) {
+            SyncRequestPriceAdditionalCostRequest request = requestedCosts.get(index);
+            if (request == null) {
+                throw new InvalidRequestException("additionalCost is required");
+            }
+
+            RfqAdditionalCostEntity validatedCost = buildRequestPriceAdditionalCostEntity(request);
+            validatedCost.setSortOrder(request.getSortOrder() == null ? index + 1 : request.getSortOrder());
+
+            if (request.getId() == null) {
+                entity.addAdditionalCost(validatedCost);
+                createdCount++;
+                continue;
+            }
+
+            if (!retainedCostIds.add(request.getId())) {
+                throw new InvalidRequestException("duplicate additionalCost.id " + request.getId());
+            }
+
+            RfqAdditionalCostEntity existingCost = existingCosts.get(request.getId());
+            if (existingCost == null) {
+                throw new DataNotFoundException(
+                        "Additional cost " + request.getId() + " not found in RFQ " + entity.getId()
+                );
+            }
+
+            existingCost.setDescription(validatedCost.getDescription());
+            existingCost.setUnit(validatedCost.getUnit());
+            existingCost.setValue(validatedCost.getValue());
+            existingCost.setSortOrder(validatedCost.getSortOrder());
+            updatedCount++;
+        }
+
+        List<RfqAdditionalCostEntity> removedCosts = existingCosts.entrySet().stream()
+                .filter(entry -> !retainedCostIds.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        removedCosts.forEach(entity::removeAdditionalCost);
+
+        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("createdCount", createdCount);
+        detail.put("updatedCount", updatedCount);
+        detail.put("deletedCount", removedCosts.size());
+        detail.put("count", requestedCosts.size());
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "ปรับปรุงค่าใช้จ่ายเพิ่มเติมของคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateCustomer(
         String rfqId,
         String customerId,
@@ -1142,7 +1232,7 @@ public class RFQService {
 
             BigDecimal confirmedPrice = selection.getPrice();
             if (confirmedPrice == null) {
-                confirmedPrice = isSeaShippingMethod(shippingMethod) ? tier.getSeaTotalPrice() : tier.getLandTotalPrice();
+                confirmedPrice = tier.getTotalPrice();
             }
 
             resolvedSelections.add(new ResolvedLinkSelection(
@@ -1261,12 +1351,15 @@ public class RFQService {
             throw new InvalidRequestException("productPrice is required");
         }
 
+        String shippingMethod = normalizeTierShippingMethod(request.getShippingMethod());
         boolean quantityExists = detailEntity.getTiers().stream()
                 .filter(item -> !Objects.equals(item.getId(), tierEntity.getId()))
-                .anyMatch(item -> item.getQuantity() != null && item.getQuantity().compareTo(request.getQuantity()) == 0);
+                .anyMatch(item -> item.getQuantity() != null
+                        && item.getQuantity().compareTo(request.getQuantity()) == 0
+                        && Objects.equals(item.getShippingMethod(), shippingMethod));
         if (quantityExists) {
             throw new InvalidRequestException(
-                    "quantity " + request.getQuantity() + " already exists in detail " + detailId
+                    "quantity and shippingMethod already exist in detail " + detailId
             );
         }
 
@@ -1283,11 +1376,10 @@ public class RFQService {
         tierEntity.setProductPrice(scaleMoney(request.getProductPrice()));
         tierEntity.setCommission(scaleMoney(request.getCommission()));
         tierEntity.setCurrency(request.getCurrency());
-        applyTierShippingMethod(tierEntity, request.getShippingMethod(), request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
-        tierEntity.setLandFreightCost(scaleMoney(request.getLandFreightCost()));
-        tierEntity.setSeaFreightCost(scaleMoney(request.getSeaFreightCost()));
-        tierEntity.setLandTotalPrice(scaleMoney(request.getLandTotalPrice()));
-        tierEntity.setSeaTotalPrice(scaleMoney(request.getSeaTotalPrice()));
+        applyTierShippingMethod(tierEntity, shippingMethod, request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
+        boolean seaShipping = isSeaShippingMethod(shippingMethod);
+        tierEntity.setShippingCost(scaleMoney(seaShipping ? request.getSeaFreightCost() : request.getLandFreightCost()));
+        tierEntity.setTotalPrice(scaleMoney(seaShipping ? request.getSeaTotalPrice() : request.getLandTotalPrice()));
         tierEntity.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
         tierEntity.setSortOrder(request.getSortOrder());
 
@@ -1428,53 +1520,53 @@ public class RFQService {
         return mapToDto(entity);
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void updateRFQStatus(String id, RfqStatus status, String userId) throws Exception {
-        RfqHeaderEntity entity = getEntityById(id);
-        String actor = userProfileService.getNameFromId(userId);
-        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
-
-        log.info("Update RFQ {} with new status {} by {}", id, status, actor);
-        entity.setStatus(status);
-        entity.setUpdatedBy(actor);
-        entity.setUpdatedDate(now);
-
-        requestPriceHeaderRepository.save(entity);
-
-        activityHistoryService.record(
-                ActivityEntityType.RFQ,
-                entity.getId(),
-                userId,
-                ActivityActorType.USER,
-                ActivityAction.UPDATE,
-                ActivitySource.API,
-                "ลูกค้าปฏิเสธคำขอราคาเลขที่ " + entity.getId(),
-                null
-        );
-
-        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(entity.getId());
-        if (RfqStatus.REJECTED.equals(status) && !quotationEntities.isEmpty()) {
-            log.info("Update Quotation(s) for RFQ {} with status {}", entity.getId(), status);
-
-            for (QuotationEntity quotationEntity : quotationEntities) {
-                quotationEntity.setStatus(QuotationStatus.REJECTED);
-                quotationEntity.setUpdatedDate(now);
-                quotationEntity.setUpdatedBy(actor);
-
-                activityHistoryService.record(
-                        ActivityEntityType.QUOTATION,
-                        quotationEntity.getQuotationNo(),
-                        userId,
-                        ActivityActorType.USER,
-                        ActivityAction.CREATE,
-                        ActivitySource.API,
-                        "ลูกค้าปฏิเสธใบเสนอราคาเลขที่ " + quotationEntity.getQuotationNo(),
-                        null
-                );
-            }
-            quotationRepository.saveAll(quotationEntities);
-        }
-    }
+//    @Transactional(rollbackFor = Exception.class)
+//    public void updateRFQStatus(String id, RfqStatus status, String userId) throws Exception {
+//        RfqHeaderEntity entity = getEntityById(id);
+//        String actor = userProfileService.getNameFromId(userId);
+//        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+//
+//        log.info("Update RFQ {} with new status {} by {}", id, status, actor);
+//        entity.setStatus(status);
+//        entity.setUpdatedBy(actor);
+//        entity.setUpdatedDate(now);
+//
+//        requestPriceHeaderRepository.save(entity);
+//
+//        activityHistoryService.record(
+//                ActivityEntityType.RFQ,
+//                entity.getId(),
+//                userId,
+//                ActivityActorType.USER,
+//                ActivityAction.UPDATE,
+//                ActivitySource.API,
+//                "ลูกค้าปฏิเสธคำขอราคาเลขที่ " + entity.getId(),
+//                null
+//        );
+//
+//        List<QuotationEntity> quotationEntities = quotationRepository.findAllByRfqIdOrderByCreatedDateDesc(entity.getId());
+//        if (RfqStatus.REJECTED.equals(status) && !quotationEntities.isEmpty()) {
+//            log.info("Update Quotation(s) for RFQ {} with status {}", entity.getId(), status);
+//
+//            for (QuotationEntity quotationEntity : quotationEntities) {
+//                quotationEntity.setStatus(QuotationStatus.REJECTED);
+//                quotationEntity.setUpdatedDate(now);
+//                quotationEntity.setUpdatedBy(actor);
+//
+//                activityHistoryService.record(
+//                        ActivityEntityType.QUOTATION,
+//                        quotationEntity.getQuotationNo(),
+//                        userId,
+//                        ActivityActorType.USER,
+//                        ActivityAction.CREATE,
+//                        ActivitySource.API,
+//                        "ลูกค้าปฏิเสธใบเสนอราคาเลขที่ " + quotationEntity.getQuotationNo(),
+//                        null
+//                );
+//            }
+//            quotationRepository.saveAll(quotationEntities);
+//        }
+//    }
 
     @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto acceptRFQ(String id, String userId) throws DataNotFoundException, InvalidRequestException {
@@ -1564,6 +1656,7 @@ public class RFQService {
         Map<Long, BigDecimal> targetPricesByTierId = new LinkedHashMap<>();
         Map<BigDecimal, BigDecimal> targetPricesByMoq = new LinkedHashMap<>();
         Map<BigDecimal, BigDecimal> moqsByKey = new LinkedHashMap<>();
+        Map<BigDecimal, String> shippingMethodsByMoq = new LinkedHashMap<>();
         for (RequestSpecialPriceRequest.TierTargetPriceRequest tierRequest : request.getTiers()) {
             if (tierRequest == null || tierRequest.getTierId() == null || tierRequest.getTargetPrice() == null) {
                 throw new InvalidRequestException("tierId and targetPrice are required.");
@@ -1574,9 +1667,26 @@ public class RFQService {
             }
             BigDecimal targetPrice = scaleMoney(tierRequest.getTargetPrice());
             BigDecimal moq = tier.getQuantity().stripTrailingZeros();
+            String shippingMethod = StringUtils.upperCase(StringUtils.trimToNull(tierRequest.getShippingMethod()));
+            if (!"LAND".equals(shippingMethod) && !"SEA".equals(shippingMethod)) {
+                throw new InvalidRequestException("shippingMethod must be LAND or SEA.");
+            }
+            boolean selectedShippingMethodExists = tiersById.values().stream().anyMatch(candidateTier ->
+                    candidateTier.getQuantity().stripTrailingZeros().compareTo(moq) == 0
+                            && ("SEA".equals(shippingMethod)
+                            ? candidateTier.getShippingMethod() != null && candidateTier.getShippingMethod().startsWith("SEA")
+                            : "LAND".equals(candidateTier.getShippingMethod()))
+            );
+            if (!selectedShippingMethodExists) {
+                throw new InvalidRequestException("Selected shippingMethod does not exist for MOQ " + tier.getQuantity());
+            }
             BigDecimal existingMoqTargetPrice = targetPricesByMoq.putIfAbsent(moq, targetPrice);
             if (existingMoqTargetPrice != null && existingMoqTargetPrice.compareTo(targetPrice) != 0) {
                 throw new InvalidRequestException("Target price must be the same for tiers with the same MOQ.");
+            }
+            String existingMoqShippingMethod = shippingMethodsByMoq.putIfAbsent(moq, shippingMethod);
+            if (existingMoqShippingMethod != null && !existingMoqShippingMethod.equals(shippingMethod)) {
+                throw new InvalidRequestException("shippingMethod must be the same for tiers with the same MOQ.");
             }
             moqsByKey.putIfAbsent(moq, tier.getQuantity());
             tier.setTargetPrice(targetPrice);
@@ -1621,6 +1731,7 @@ public class RFQService {
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("targetPrices", targetPricesByTierId);
+        detail.put("shippingMethodsByMoq", shippingMethodsByMoq);
         detail.put("requestedMoqs", requestedMoqs);
 
         activityHistoryService.record(
@@ -1861,6 +1972,7 @@ public class RFQService {
         variables.put("material", displayProductMaterial(rfq));
         variables.put("capacity", safeValue(rfq.getCapacity()));
         variables.put("detailSection", buildCustomerDetailSection(rfq));
+        variables.put("leadTimeSection", buildLeadTimeSection(rfq));
 //        variables.put("spec", rfq.getDetails().getFirst().getSpec());
 //        variables.put("tiersSection", buildCustomerQuotedTiers(rfq));
 
@@ -1871,6 +1983,60 @@ public class RFQService {
 //        }
         variables.put("recommend", rfq.getDetails().getFirst().getRecommend());
         return promptTemplateEngine.render(template, variables).trim();
+    }
+
+    private String buildLeadTimeSection(RfqHeaderEntity rfq) {
+        if (rfq == null || StringUtils.isBlank(rfq.getId())) {
+            return "";
+        }
+
+        RfqSupplierQuoteEntity supplierQuote = null;
+        if (StringUtils.isNotBlank(rfq.getConfirmedSupplierQuoteId())) {
+            supplierQuote = rfqSupplierQuoteRepository
+                    .findByIdAndRequestPriceHeader_Id(rfq.getConfirmedSupplierQuoteId(), rfq.getId())
+                    .filter(quote -> quote.getStatus() != RfqSupplierQuoteStatus.CANCELLED)
+                    .orElse(null);
+        }
+
+        if (supplierQuote == null) {
+            supplierQuote = rfqSupplierQuoteRepository
+                    .findAllByRequestPriceHeader_IdOrderByUpdatedDateDesc(rfq.getId())
+                    .stream()
+                    .filter(quote -> quote.getStatus() != RfqSupplierQuoteStatus.CANCELLED)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (supplierQuote == null || CollectionUtils.isEmpty(supplierQuote.getLeadTimes())) {
+            return "";
+        }
+
+        List<String> lines = new ArrayList<>();
+        lines.add("ระยะเวลาโดยประมาณ");
+        supplierQuote.getLeadTimes().stream()
+                .sorted(Comparator.comparing(
+                        RfqSupplierQuoteLeadTimeEntity::getSortOrder,
+                        Comparator.nullsLast(Integer::compareTo)
+                ))
+                .forEach(leadTime -> {
+                    String label = leadTime.getLeadTimeConfig() == null
+                            ? ""
+                            : StringUtils.firstNonBlank(
+                            leadTime.getLeadTimeConfig().getNameTh(),
+                            leadTime.getLeadTimeConfig().getNameEn(),
+                            leadTime.getLeadTimeConfig().getCode()
+                    );
+                    String duration = Objects.equals(leadTime.getLeadTimeDayMin(), leadTime.getLeadTimeDayMax())
+                            ? Objects.toString(leadTime.getLeadTimeDayMin(), "-") + " วัน"
+                            : Objects.toString(leadTime.getLeadTimeDayMin(), "-") + "-"
+                            + Objects.toString(leadTime.getLeadTimeDayMax(), "-") + " วัน";
+                    String remark = StringUtils.trimToNull(leadTime.getRemark());
+
+                    lines.add("- " + safeValue(label) + ": " + duration
+                            + (remark == null ? "" : " (" + remark + ")"));
+                });
+
+        return String.join("\n", lines);
     }
 
     private String buildFinalQuoteInquiryCustomerLabel(RfqHeaderEntity rfq) {
@@ -2500,6 +2666,8 @@ public class RFQService {
         detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
         detail.put("urgentRejectReason", entity.getUrgentRejectReason());
         detail.put("description", entity.getDescription());
+        detail.put("closeReasonCode", entity.getCloseReason() != null ? entity.getCloseReason().getId().getCode() : null);
+        detail.put("closeRemark", entity.getCloseRemark());
         detail.put("pictureCount", entity.getPictures() != null ? entity.getPictures().size() : 0);
         return detail;
     }
@@ -3043,22 +3211,10 @@ public class RFQService {
                     throw new InvalidRequestException("tier.productPrice is required");
                 }
 
-                RfqTierEntity tierEntity = new RfqTierEntity();
-                tierEntity.setSupplier(supplier);
-                tierEntity.setQuantity(tierRequest.getQuantity());
-                tierEntity.setProductPrice(scaleMoney(tierRequest.getProductPrice()));
-                tierEntity.setCommission(scaleMoney(tierRequest.getCommission()));
-                tierEntity.setCurrency(tierRequest.getCurrency());
-                applyTierShippingMethod(tierEntity, tierRequest.getShippingMethod(), tierRequest.getContainerSize(), tierRequest.getIsFcl(), tierRequest.getIsShareFCL());
-                tierEntity.setLandFreightCost(scaleMoney(tierRequest.getLandFreightCost()));
-                tierEntity.setSeaFreightCost(scaleMoney(tierRequest.getSeaFreightCost()));
-                tierEntity.setLandTotalPrice(scaleMoney(tierRequest.getLandTotalPrice()));
-                tierEntity.setSeaTotalPrice(scaleMoney(tierRequest.getSeaTotalPrice()));
-                tierEntity.setSupplierQuoteTierId(tierRequest.getSupplierQuoteTierId());
-                tierEntity.setSortOrder(
-                        tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder++
-                );
-                detailEntity.addTier(tierEntity);
+                int sortOrder = tierRequest.getSortOrder() != null ? tierRequest.getSortOrder() : nextSortOrder;
+                List<RfqTierEntity> expandedTiers = expandTierByShippingMethod(tierRequest, supplier, sortOrder);
+                expandedTiers.forEach(detailEntity::addTier);
+                nextSortOrder += expandedTiers.size();
             }
         }
 
@@ -3071,26 +3227,95 @@ public class RFQService {
                     throw new InvalidRequestException("tierSplit.sellPrice is required");
                 }
 
-                RfqTierSplitEntity tierSplitEntity = new RfqTierSplitEntity();
                 SupplierEntity tierSplitSupplier = supplier;
                 if (StringUtils.isNotBlank(tierSplitRequest.getSupplierId())) {
                     tierSplitSupplier = getSupplierEntity(tierSplitRequest.getSupplierId().trim());
                 }
-                tierSplitEntity.setSupplier(tierSplitSupplier);
-                tierSplitEntity.setQuantity(tierSplitRequest.getQuantity());
-                tierSplitEntity.setSellPrice(scaleMoney(tierSplitRequest.getSellPrice()));
-                tierSplitEntity.setCommission(scaleMoney(tierSplitRequest.getCommission()));
-                tierSplitEntity.setCurrency(tierSplitRequest.getCurrency());
-                applyTierSplitShippingMethod(tierSplitEntity, tierSplitRequest.getShippingMethod(), tierSplitRequest.getContainerSize(), tierSplitRequest.getIsFcl(), tierSplitRequest.getIsShareFCL());
-                tierSplitEntity.setLandFreightCost(scaleMoney(tierSplitRequest.getLandFreightCost()));
-                tierSplitEntity.setLandFreightQty(scaleMoney(tierSplitRequest.getLandFreightQty()));
-                tierSplitEntity.setSeaFreightQty(scaleMoney(tierSplitRequest.getSeaFreightQty()));
-                tierSplitEntity.setSeaFreightCost(scaleMoney(tierSplitRequest.getSeaFreightCost()));
-                detailEntity.addTierSplit(tierSplitEntity);
+                expandTierSplitByShippingMethod(tierSplitRequest, tierSplitSupplier)
+                        .forEach(detailEntity::addTierSplit);
             }
         }
 
         return detailEntity;
+    }
+
+    private List<RfqTierEntity> expandTierByShippingMethod(
+            CreateRequestPriceDetailRequest.CreateRequestPriceTierRequest request,
+            SupplierEntity supplier,
+            int sortOrder
+    ) throws InvalidRequestException {
+        List<RfqTierEntity> tiers = new ArrayList<>();
+        if (isPositive(request.getLandTotalPrice())) {
+            tiers.add(buildTierForShippingMethod(request, supplier, "LAND", request.getLandFreightCost(), request.getLandTotalPrice(), sortOrder));
+        }
+        if (isPositive(request.getSeaTotalPrice())) {
+            tiers.add(buildTierForShippingMethod(request, supplier, request.getShippingMethod(), request.getSeaFreightCost(), request.getSeaTotalPrice(), sortOrder + tiers.size()));
+        }
+        if (tiers.isEmpty()) {
+            throw new InvalidRequestException("tier requires a land or sea totalPrice greater than zero");
+        }
+        return tiers;
+    }
+
+    private RfqTierEntity buildTierForShippingMethod(
+            CreateRequestPriceDetailRequest.CreateRequestPriceTierRequest request,
+            SupplierEntity supplier,
+            String shippingMethod,
+            BigDecimal shippingCost,
+            BigDecimal totalPrice,
+            int sortOrder
+    ) throws InvalidRequestException {
+        RfqTierEntity tier = new RfqTierEntity();
+        tier.setSupplier(supplier);
+        tier.setQuantity(request.getQuantity());
+        tier.setProductPrice(scaleMoney(request.getProductPrice()));
+        tier.setCommission(scaleMoney(request.getCommission()));
+        tier.setCurrency(request.getCurrency());
+        applyTierShippingMethod(tier, shippingMethod, request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
+        tier.setShippingCost(scaleMoney(shippingCost));
+        tier.setTotalPrice(scaleMoney(totalPrice));
+        tier.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
+        tier.setSortOrder(sortOrder);
+        return tier;
+    }
+
+    private List<RfqTierSplitEntity> expandTierSplitByShippingMethod(
+            CreateRequestPriceDetailRequest.CreateRequestPriceTierSplitRequest request,
+            SupplierEntity supplier
+    ) throws InvalidRequestException {
+        List<RfqTierSplitEntity> tiers = new ArrayList<>();
+        if (isPositive(request.getLandFreightCost())) {
+            tiers.add(buildTierSplitForShippingMethod(request, supplier, "LAND", request.getLandFreightCost()));
+        }
+        if (isPositive(request.getSeaFreightCost())) {
+            tiers.add(buildTierSplitForShippingMethod(request, supplier, request.getShippingMethod(), request.getSeaFreightCost()));
+        }
+        if (tiers.isEmpty()) {
+            throw new InvalidRequestException("tierSplit requires a land or sea shipping cost greater than zero");
+        }
+        return tiers;
+    }
+
+    private RfqTierSplitEntity buildTierSplitForShippingMethod(
+            CreateRequestPriceDetailRequest.CreateRequestPriceTierSplitRequest request,
+            SupplierEntity supplier,
+            String shippingMethod,
+            BigDecimal shippingCost
+    ) throws InvalidRequestException {
+        RfqTierSplitEntity tier = new RfqTierSplitEntity();
+        tier.setSupplier(supplier);
+        tier.setQuantity(request.getQuantity());
+        tier.setSellPrice(scaleMoney(request.getSellPrice()));
+        tier.setCommission(scaleMoney(request.getCommission()));
+        tier.setCurrency(request.getCurrency());
+        applyTierSplitShippingMethod(tier, shippingMethod, request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
+        tier.setShippingCost(scaleMoney(shippingCost));
+        tier.setTotalPrice(scaleMoney(request.getSellPrice().add(shippingCost)));
+        return tier;
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
     private RfqAdditionalCostEntity buildRequestPriceAdditionalCostEntity(
@@ -3202,12 +3427,10 @@ public class RFQService {
         snapshot.put("currency", tier.getCurrency() == null ? null : tier.getCurrency().name());
         snapshot.put("shippingMethod", resolveTierShippingMethod(tier.getShippingMethod(), tier.getContainerSize(), tier.getIsFcl(), tier.getIsShareFCL()));
         snapshot.put("containerSize", tier.getContainerSize());
-        snapshot.put("landFreightCost", tier.getLandFreightCost());
-        snapshot.put("seaFreightCost", tier.getSeaFreightCost());
+        snapshot.put("shippingCost", tier.getShippingCost());
         snapshot.put("isFcl", tier.getIsFcl());
         snapshot.put("isShareFCL", tier.getIsShareFCL());
-        snapshot.put("landTotalPrice", tier.getLandTotalPrice());
-        snapshot.put("seaTotalPrice", tier.getSeaTotalPrice());
+        snapshot.put("totalPrice", tier.getTotalPrice());
         snapshot.put("supplierQuoteTierId", tier.getSupplierQuoteTierId());
         snapshot.put("sortOrder", tier.getSortOrder());
         return snapshot;
@@ -3223,10 +3446,8 @@ public class RFQService {
         snapshot.put("currency", tierSplit.getCurrency() == null ? null : tierSplit.getCurrency().name());
         snapshot.put("shippingMethod", resolveTierShippingMethod(tierSplit.getShippingMethod(), tierSplit.getContainerSize(), tierSplit.getIsFcl(), tierSplit.getIsShareFCL()));
         snapshot.put("containerSize", tierSplit.getContainerSize());
-        snapshot.put("landFreightCost", tierSplit.getLandFreightCost());
-        snapshot.put("landFreightQty", tierSplit.getLandFreightQty());
-        snapshot.put("seaFreightQty", tierSplit.getSeaFreightQty());
-        snapshot.put("seaFreightCost", tierSplit.getSeaFreightCost());
+        snapshot.put("shippingCost", tierSplit.getShippingCost());
+        snapshot.put("totalPrice", tierSplit.getTotalPrice());
         snapshot.put("isFcl", tierSplit.getIsFcl());
         snapshot.put("isShareFCL", tierSplit.getIsShareFCL());
         return snapshot;
@@ -3676,10 +3897,8 @@ public class RFQService {
             case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case QUOTED -> "เสนอราคาแล้ว";
             case SPECIAL_PRICE_REVIEW -> "รอทบทวนราคาพิเศษ";
-            case CANCELED -> "ยกเลิก";
             case CLOSED -> "ปิดงาน";
             case COMPLETED -> "เสร็จสิ้น";
-            case REJECTED -> "ปฏิเสธ";
         };
     }
 

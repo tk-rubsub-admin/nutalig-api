@@ -7,8 +7,6 @@ public enum RfqStatus {
     REQUESTED_INFO,
     SPECIAL_PRICE_REVIEW,
     QUOTED,
-    CANCELED,
-    REJECTED,
     CLOSED,
     COMPLETED
 }

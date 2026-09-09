@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260906-001-add-rfq-close-reason
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: close_reason
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: close_reason
+                  type: VARCHAR(255)
+              - column:
+                  name: close_remark
+                  type: TEXT

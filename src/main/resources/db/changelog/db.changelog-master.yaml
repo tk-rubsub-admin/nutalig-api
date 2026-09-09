@@ -3000,6 +3000,10 @@ databaseChangeLog:
       file: db/changelog/20260904-002-add-purchase-order-supplier-contact-no-snapshot.yaml
   - include:
       file: db/changelog/20260904-003-add-purchase-order-payment-term.yaml
+  - include:
+      file: db/changelog/20260906-001-add-rfq-close-reason.yaml
+  - include:
+      file: db/changelog/20260906-002-split-rfq-tier-shipping-method.yaml
 
   - changeSet:
       id: 20260824-003-add-container-size-to-rfq-supplier-quote-tier
@@ -3018,3 +3022,9 @@ databaseChangeLog:
                   name: container_size
                   type: VARCHAR(20)
                   remarks: Container size for supplier quote tier
+  - include:
+      file: db/changelog/20260908-001-add-quotation-terms-fields.yaml
+  - include:
+      file: db/changelog/20260908-002-add-project-to-rfq-header.yaml
+  - include:
+      file: db/changelog/20260908-003-add-project-to-quotation.yaml

@@ -409,6 +409,20 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PutMapping("/{id}/additional-costs")
+    public GeneralResponse<RfqHeaderDto> syncRFQAdditionalCosts(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) java.util.List<SyncRequestPriceAdditionalCostRequest> requests,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start sync rfq additional costs {} by {} ===", id, userId);
+
+        RfqHeaderDto response = rfqService.syncRFQAdditionalCosts(id, requests, userId);
+
+        log.info("=== End sync rfq additional costs {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/{id}/customers/{customerId}")
     public GeneralResponse<RfqHeaderDto> updateCustomer(
             @PathVariable("id") String id,

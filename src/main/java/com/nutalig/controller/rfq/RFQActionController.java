@@ -74,19 +74,6 @@ public class RFQActionController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
-    @PatchMapping("/{id}/reject")
-    public GeneralResponse cancelRfq(@PathVariable("id") String id, @RequestHeader("userId") String userId) throws Exception {
-        log.info("=== Start cancel rfq {} ===", id);
-
-        rfqService.updateRFQStatus(id, RfqStatus.REJECTED, userId);
-
-        log.info("=== End cancel rfq {} ===", id);
-
-        return new GeneralResponse<>(SUCCESS);
-    }
-
-
-
     @PostMapping("/{id}/request-urgent-approve")
     public GeneralResponse requestUrgentApprove(
             @PathVariable("id") String id,

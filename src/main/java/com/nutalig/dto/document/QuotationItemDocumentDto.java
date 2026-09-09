@@ -13,6 +13,7 @@ public class QuotationItemDocumentDto {
     private String type;
     private String capacity;
     private String size;
+    private String unit;
     private String spec;
     private BigDecimal price;
     private BigDecimal quantity;

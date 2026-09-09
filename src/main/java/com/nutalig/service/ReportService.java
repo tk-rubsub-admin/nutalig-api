@@ -1,5 +1,7 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.ReceiptType;
@@ -14,6 +16,7 @@ import net.sf.jasperreports.engine.JRDataSource;
 import net.sf.jasperreports.engine.JREmptyDataSource;
 import net.sf.jasperreports.engine.design.JasperDesign;
 import net.sf.jasperreports.engine.xml.JRXmlLoader;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -22,6 +25,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +36,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ReportService {
 
-    private static final String DPK_LOGO = "report/img.png";
+    @JsonIgnoreProperties({"items", "logo"})
+    private abstract static class QuotationDocumentParametersMixin {
+    }
+
     private static final String NUTALIG_LOGO = "report/logo_nutalig.jpg";
     private static final String NUTALIG_STAMP = "report/stamp_nutalig.png";
     private static final String SIGNATURE = "report/signature.png";
@@ -50,6 +57,14 @@ public class ReportService {
     private static final String DEPOSIT_RECEIPT_TAX_INVOICE_TEMPLATE = "report/depositReceiptTaxInvoice.jrxml";
     private static final String RECEIPT_TEMPLATE = "report/receipt.jrxml";
     private static final String RECEIPT_TAX_INVOICE_TEMPLATE = "report/receiptTaxInvoice.jrxml";
+    private static final String NUTALIG_LOGO_V2 = "report/nutalig_new_logo.png";
+    private static final String QUOTATION_TEMPLATE_TH_V2 = "report/v2/quotation_th.jrxml";
+    private static final String QUOTATION_TEMPLATE_EN_V2 = "report/quotation_en.jrxml";
+    private static final String TERM_COND_TEMPLATE_TH_V2 = "report/v2/termAndCondition_th.jrxml";
+    private static final String TERM_COND_TEMPLATE_EN_V2 = "report/v2/termAndCondition_en.jrxml";
+
+    @Value("${app.report.version:1}")
+    private int reportVersion;
 
     private final ObjectMapper objectMapper;
 
@@ -66,7 +81,9 @@ public class ReportService {
         parameters.put("accountNo", dto.getAccountNo());
 
         JasperPrint jasperPrint = buildJasperPrint(
-                TemplateLanguage.EN.equals(language) ? TERM_COND_TEMPLATE_EN : TERM_COND_TEMPLATE_TH,
+                TemplateLanguage.EN.equals(language)
+                        ? TERM_COND_TEMPLATE_EN
+                        : isReportV2() ? TERM_COND_TEMPLATE_TH_V2 : TERM_COND_TEMPLATE_TH,
                 parameters,
                 new JREmptyDataSource(1)
         );
@@ -83,38 +100,12 @@ public class ReportService {
     }
 
     public Object getQuotationDocument(QuotationDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
-        Map<String, Object> parameters = new HashMap<>();
-
-        parameters.put("docNo", dto.getDocNo());
-        parameters.put("docDate", dto.getDocDate());
-        parameters.put("custName", dto.getCustName());
-        parameters.put("custTaxId", dto.getCustTaxId());
-        parameters.put("custAddress", dto.getCustAddress());
-        parameters.put("custMobileNo", dto.getCustMobileNo());
-
-        parameters.put("salesId", dto.getSalesId());
-        parameters.put("salesName", dto.getSalesName());
-        parameters.put("salesNickname", dto.getSalesNickname());
-        parameters.put("salesMobileNo", dto.getSalesMobileNo());
-        parameters.put("coSalesId", dto.getCoSalesId());
-
-        parameters.put("subTotal", dto.getSubTotal());
-        parameters.put("discount", dto.getDiscount());
-        parameters.put("freight", dto.getFreight());
-        parameters.put("vat", dto.getVat());
-        parameters.put("grandTotal", dto.getGrandTotal());
-        parameters.put("remark", dto.getRemark());
-        parameters.put("thaiBahtText", dto.getThaiBahtText());
-        parameters.put("logo", loadResource(NUTALIG_LOGO));
-        parameters.put("shipping", dto.getShipping());
-
-        parameters.put("bankName", dto.getBankName());
-        parameters.put("accountName", dto.getAccountName());
-        parameters.put("accountNo", dto.getAccountNo());
-        parameters.put("branchName", dto.getBranchName());
+        Map<String, Object> parameters = buildQuotationParameters(dto);
 
         JasperPrint jasperPrint = buildJasperPrint(
-                TemplateLanguage.EN.equals(language) ? QUOTATION_TEMPLATE_EN : QUOTATION_TEMPLATE_TH,
+                TemplateLanguage.EN.equals(language)
+                        ? QUOTATION_TEMPLATE_EN
+                        : isReportV2() ? QUOTATION_TEMPLATE_TH_V2 : QUOTATION_TEMPLATE_TH,
                 parameters,
                 new JRBeanCollectionDataSource(dto.getItems())
         );
@@ -128,6 +119,21 @@ public class ReportService {
         }
 
         return null;
+    }
+
+    private Map<String, Object> buildQuotationParameters(QuotationDocumentDto dto) {
+        Map<String, Object> parameters = new HashMap<>(objectMapper
+                .copy()
+                .addMixIn(QuotationDocumentDto.class, QuotationDocumentParametersMixin.class)
+                .convertValue(
+                dto,
+                new TypeReference<Map<String, Object>>() {
+                }
+        ));
+
+        parameters.put("totalAmount", getNetBeforeVat(dto));
+        parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
+        return parameters;
     }
 
     public Object getSalesOrderDocument(SalesOrderDocumentDto dto, ExportFileFormat format, TemplateLanguage language) throws Exception {
@@ -154,7 +160,7 @@ public class ReportService {
         parameters.put("grandTotal", dto.getGrandTotal());
         parameters.put("remark", dto.getRemark());
         parameters.put("thaiBahtText", dto.getThaiBahtText());
-        parameters.put("logo", loadResource(NUTALIG_LOGO));
+        parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
         parameters.put("shipping", dto.getShipping());
 
         parameters.put("bankName", dto.getBankName());
@@ -207,7 +213,7 @@ public class ReportService {
         parameters.put("grandTotal", dto.getGrandTotal());
         parameters.put("remark", dto.getRemark());
         parameters.put("thaiBahtText", dto.getThaiBahtText());
-        parameters.put("logo", loadResource(NUTALIG_LOGO));
+        parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
 
         parameters.put("bankName", dto.getBankName());
         parameters.put("accountName", dto.getAccountName());
@@ -234,7 +240,7 @@ public class ReportService {
     public Object getPurchaseOrderDocument(PurchaseOrderDocumentDto dto, ExportFileFormat format) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
-        parameters.put("logo", loadResource(NUTALIG_LOGO));
+        parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
         parameters.put("supplierName", dto.getSupplierName());
         parameters.put("supplierAddress", dto.getSupplierAddress());
         parameters.put("docNo", dto.getDocNo());
@@ -334,6 +340,21 @@ public class ReportService {
     }
 
     /* ======================= CORE METHODS ======================= */
+
+    private boolean isReportV2() {
+        return reportVersion >= 2;
+    }
+
+    private BigDecimal getNetBeforeVat(QuotationDocumentDto dto) {
+        if (dto.getGrandTotal() != null) {
+            return dto.getGrandTotal().subtract(dto.getVat() == null ? BigDecimal.ZERO : dto.getVat());
+        }
+
+        BigDecimal subTotal = dto.getSubTotal() == null ? BigDecimal.ZERO : dto.getSubTotal();
+        BigDecimal discount = dto.getDiscount() == null ? BigDecimal.ZERO : dto.getDiscount();
+        BigDecimal freight = dto.getFreight() == null ? BigDecimal.ZERO : dto.getFreight();
+        return subTotal.subtract(discount).max(BigDecimal.ZERO).add(freight);
+    }
 
     private JasperPrint buildJasperPrint(
             String templatePath,

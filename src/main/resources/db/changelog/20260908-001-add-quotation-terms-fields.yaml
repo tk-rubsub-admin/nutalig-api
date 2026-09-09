@@ -1,0 +1,85 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260908-001-add-quotation-sample-lead-time
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: sample_lead_time
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: sample_lead_time
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260908-002-add-quotation-production-lead-time
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: production_lead_time
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: production_lead_time
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260908-003-add-quotation-shipping-lead-time
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: shipping_lead_time
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: shipping_lead_time
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260908-004-add-quotation-product-qty-tolerance
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: product_qty_tolerance
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: product_qty_tolerance
+                  type: VARCHAR(255)
+
+  - changeSet:
+      id: 20260908-005-add-quotation-mold-lead-time
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: mold_lead_time
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: mold_lead_time
+                  type: VARCHAR(255)

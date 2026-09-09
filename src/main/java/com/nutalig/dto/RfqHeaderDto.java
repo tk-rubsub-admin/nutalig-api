@@ -44,6 +44,7 @@ public class RfqHeaderDto {
     private ZonedDateTime urgentRejectedDate;
     private String urgentRejectReason;
     private String description;
+    private String project;
     private String createdBy;
     private String updatedBy;
     private ZonedDateTime createdDate;
@@ -62,6 +63,8 @@ public class RfqHeaderDto {
     private RequestInfoTo requestTo;
     private String note;
     private String remark;
+    private SystemConfigDto closeReason;
+    private String closeRemark;
     private List<RfqStatusTimelineDto> rfqStatusTimeline;
     private Long confirmedDetailId;
     private Long confirmedTierId;

@@ -79,16 +79,14 @@ public class RfqUtil {
             tierLine.append(df.format(tier.getQuantity()));
             tierLine.append("\n");
 
-            if (tier.getSeaFreightCost() != null || BigDecimal.ZERO.compareTo(tier.getSeaFreightCost()) < 1) {
-                tierLine.append(tier.getIsFcl() ? "ส่งทางเรือแบบปิดตู้: " : "ส่งทางเรือ: ");
-                tierLine.append(df2.format(tier.getSeaTotalPrice()));
-                tierLine.append("\n");
-            }
-
-            if (tier.getLandFreightCost() != null || BigDecimal.ZERO.compareTo(tier.getLandFreightCost()) < 1) {
-                tierLine.append("ส่งทางรถ: ");
-                tierLine.append(df2.format(tier.getLandTotalPrice()));
-            }
+            tierLine.append(ShippingMethodUtil.getShippingMethodLabel(
+                    tier.getShippingMethod(),
+                    "-",
+                    Boolean.TRUE.equals(tier.getIsFcl()),
+                    Boolean.TRUE.equals(tier.getIsShareFCL())
+            ));
+            tierLine.append(": ");
+            tierLine.append(df2.format(tier.getTotalPrice()));
             lines.add(tierLine.toString());
         }
 

@@ -8,6 +8,8 @@ import java.io.FileInputStream;
 public class DefaultDocumentDto {
     private String docNo;
     private String docDate;
+    private String validDate;
+    private Integer revNo;
     private String refDocNo;
     private FileInputStream logo;
     private String accountName;

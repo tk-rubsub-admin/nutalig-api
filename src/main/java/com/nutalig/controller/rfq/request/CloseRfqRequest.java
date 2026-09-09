@@ -6,5 +6,6 @@ import lombok.Data;
 public class CloseRfqRequest {
 
     private String rfqId;
-    private String remark;
+    private String closeReason;
+    private String closeRemark;
 }

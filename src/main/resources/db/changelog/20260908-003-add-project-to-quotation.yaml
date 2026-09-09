@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260908-003-add-project-to-quotation
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: quotations
+                columnName: project
+      changes:
+        - addColumn:
+            tableName: quotations
+            columns:
+              - column:
+                  name: project
+                  type: VARCHAR(255)
+                  remarks: Project name for the quotation

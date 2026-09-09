@@ -12,10 +12,7 @@ import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.*;
-import com.nutalig.dto.document.DownloadDocumentDto;
-import com.nutalig.dto.document.QuotationDocumentDto;
-import com.nutalig.dto.document.QuotationItemDocumentDto;
-import com.nutalig.dto.document.TermAndConditionDocumentDto;
+import com.nutalig.dto.document.*;
 import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
@@ -55,6 +52,7 @@ import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.QUOTATIO
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
 import static com.nutalig.constant.SystemConstant.REPORT_ROW;
 import static com.nutalig.repository.specification.QuotationSpecification.*;
+import static com.nutalig.utils.ShippingMethodUtil.getShippingMethodLabel;
 
 @Slf4j
 @Service
@@ -163,7 +161,10 @@ public class QuotationService {
         LocalDate today = LocalDate.now(DateUtil.getTimeZone());
         quotationEntity.setDocDate(requestDto.getDocDate() == null ? today : requestDto.getDocDate());
         quotationEntity.setExpireDate(requestDto.getEffectiveDate() == null ? today.plusDays(7) : requestDto.getEffectiveDate());
-        quotationEntity.setStatus(QuotationStatus.ISSUED);
+        QuotationStatus status = QuotationStatus.DRAFT.equals(requestDto.getStatus())
+                ? QuotationStatus.DRAFT
+                : QuotationStatus.ISSUED;
+        quotationEntity.setStatus(status);
         quotationEntity.setCurrency(Currency.THB);
         quotationEntity.setCustomer(customerEntity);
         // New quotations render immutable customer data from these snapshots.
@@ -180,8 +181,14 @@ public class QuotationService {
         quotationEntity.getRfqIds().addAll(rfqIds);
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
-        quotationEntity.setRevNo(0);
+        quotationEntity.setRevNo(QuotationStatus.DRAFT.equals(requestDto.getStatus()) ? 0 : 1);
         quotationEntity.setShipping(requestDto.getShipping());
+        quotationEntity.setProject(requestDto.getProject());
+        quotationEntity.setSampleLeadTime(requestDto.getSampleLeadTime());
+        quotationEntity.setProductionLeadTime(requestDto.getProductionLeadTime());
+        quotationEntity.setShippingLeadTime(requestDto.getShippingLeadTime());
+        quotationEntity.setMoldLeadTime(requestDto.getMoldLeadTime());
+        quotationEntity.setProductQtyTolerance(requestDto.getProductQtyTolerance());
 
         if (StringUtils.isNotBlank(quotationEntity.getRfqId())) {
             RfqHeaderEntity rfqEntity = requestPriceHeaderRepository.findById(quotationEntity.getRfqId())
@@ -211,6 +218,7 @@ public class QuotationService {
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
             detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
@@ -285,6 +293,24 @@ public class QuotationService {
         }
         if (requestDto.getShipping() != null) {
             quotationEntity.setShipping(normalizeShipping(requestDto.getShipping()));
+        }
+        if (requestDto.getProject() != null) {
+            quotationEntity.setProject(requestDto.getProject());
+        }
+        if (requestDto.getSampleLeadTime() != null) {
+            quotationEntity.setSampleLeadTime(requestDto.getSampleLeadTime());
+        }
+        if (requestDto.getProductionLeadTime() != null) {
+            quotationEntity.setProductionLeadTime(requestDto.getProductionLeadTime());
+        }
+        if (requestDto.getShippingLeadTime() != null) {
+            quotationEntity.setShippingLeadTime(requestDto.getShippingLeadTime());
+        }
+        if (requestDto.getMoldLeadTime() != null) {
+            quotationEntity.setMoldLeadTime(requestDto.getMoldLeadTime());
+        }
+        if (requestDto.getProductQtyTolerance() != null) {
+            quotationEntity.setProductQtyTolerance(requestDto.getProductQtyTolerance());
         }
         if (requestDto.getItems() != null) {
             replaceQuotationItems(quotationEntity, requestDto.getItems());
@@ -423,6 +449,7 @@ public class QuotationService {
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
             detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
@@ -454,6 +481,7 @@ public class QuotationService {
             item.setAmount(detail.getAmount());
             item.setImagePreview(detail.getImageUrl());
             item.setTierId(detail.getTierId());
+            item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
             itemRequests.add(item);
         }
@@ -677,7 +705,7 @@ public class QuotationService {
         return dto;
     }
 
-    private QuotationDocumentDto  buildQuotationDocumentDto(
+    private QuotationDocumentDto buildQuotationDocumentDto(
             QuotationEntity quotationEntity,
             Boolean aFalse,
             TemplateLanguage language
@@ -685,8 +713,17 @@ public class QuotationService {
         QuotationDocumentDto dto = new QuotationDocumentDto();
         dto.setDocNo(quotationEntity.getQuotationNo());
         dto.setDocDate(quotationEntity.getDocDate().format(DateUtil.DD_MM_YY));
+        dto.setValidDate(quotationEntity.getExpireDate().format(DateUtil.DD_MM_YY));
         dto.setIsCopy(aFalse);
-
+        dto.setRefDocNo(quotationEntity.getRfqId());
+        dto.setRevNo(quotationEntity.getRevNo());
+        dto.setOrderType(quotationEntity.getRfq().getOrderType().getNameTh());
+        dto.setCurrency(quotationEntity.getCurrency().name());
+        dto.setSample(quotationEntity.getSampleLeadTime());
+        dto.setProductionLeadTime(quotationEntity.getProductionLeadTime());
+        dto.setShippingLeadTime(quotationEntity.getShippingLeadTime());
+        dto.setMoldLeadTime(quotationEntity.getMoldLeadTime());
+        dto.setTolerance(quotationEntity.getProductQtyTolerance());
         if (quotationEntity.getIsShowSummary()) {
             dto.setDiscount(quotationEntity.getDiscount());
             dto.setGrandTotal(quotationEntity.getGrandTotal());
@@ -708,12 +745,15 @@ public class QuotationService {
         dto.setCustName(StringUtils.defaultString(customerSnapshot.getCustomerName()));
         dto.setCustTaxId(customerSnapshot.getTaxId());
         dto.setCustAddress(customerSnapshot.getAddress());
+        dto.setCustContactName(customerSnapshot.getContactName());
         dto.setCustMobileNo(customerSnapshot.getContactNumber());
         dto.setSalesId(quotationEntity.getSales().getEmployeeId());
         dto.setSalesName(quotationEntity.getSales().getFirstNameTh() + " " + quotationEntity.getSales().getLastNameTh());
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(quotationEntity.getSales().getNickName());
-        dto.setShipping(quotationEntity.getShipping());
+        dto.setShipping(getShippingMethodLabel(quotationEntity.getShipping()));
+        dto.setProject(quotationEntity.getProject());
+        dto.setPaymentTerm(quotationEntity.getCustomer().getCustomerPaymentTerm().getNameTh());
         dto.setCoSalesId(quotationEntity.getCoSalesId());
 
         if (quotationEntity.getVatRate().compareTo(BigDecimal.ZERO) == 0) {
@@ -848,6 +888,7 @@ public class QuotationService {
             item.setSize(detail.getSize());
             item.setSpec(detail.getSpec());
             item.setPrice(detail.getUnitPrice());
+            item.setUnit("pcs.");
             item.setQuantity(detail.getQuantity());
             item.setAmount(detail.getAmount());
 
@@ -1011,6 +1052,13 @@ public class QuotationService {
         dto.setCoSaleId(entity.getCoSalesId());
         dto.setQuotationNo(entity.getQuotationNo());
         dto.setStatus(entity.getStatus());
+        dto.setShipping(entity.getShipping());
+        dto.setProject(entity.getProject());
+        dto.setSampleLeadTime(entity.getSampleLeadTime());
+        dto.setProductionLeadTime(entity.getProductionLeadTime());
+        dto.setShippingLeadTime(entity.getShippingLeadTime());
+        dto.setMoldLeadTime(entity.getMoldLeadTime());
+        dto.setProductQtyTolerance(entity.getProductQtyTolerance());
         dto.setStatusProfile(DocumentStatusResolver.resolveQuotation(entity.getStatus()));
         dto.setRemark(entity.getRemark());
         dto.setDiscount(entity.getDiscount());
@@ -1026,6 +1074,7 @@ public class QuotationService {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
             item.setId(detail.getId() != null ? detail.getId().toString() : null);
             item.setTierId(detail.getTierId());
+            item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
             item.setName(detail.getName());
             item.setImagePreview(detail.getImageUrl());
