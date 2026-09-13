@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260910-001-add-procurement-remark-to-rfq-header
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: procurement_remark
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: procurement_remark
+                  type: TEXT
+                  remarks: Internal procurement remark for the RFQ

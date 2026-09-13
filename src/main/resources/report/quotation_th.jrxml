@@ -38,6 +38,7 @@
 	<parameter name="coSalesId" class="java.lang.String"/>
 	<parameter name="salesId" class="java.lang.String"/>
 	<parameter name="shipping" class="java.lang.String"/>
+	<parameter name="shippingLabel" class="java.lang.String"/>
 	<field name="no" class="java.lang.Integer">
 		<description><![CDATA[no]]></description>
 		<property name="net.sf.jasperreports.json.field.expression" value="no"/>
@@ -96,10 +97,10 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</element>
 			<element kind="textField" uuid="f443fc9e-21de-4c95-a7f8-e09846418910" x="0" y="80" width="405" height="80" fontName="TH SarabunPSK" fontSize="12.0">
 				<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-				<expression><![CDATA["เรียน/Attention: " + $P{custName} + "\n" + 
-"เลขประจำตัวผู้เสียภาษี " + $P{custTaxId} + "\n" + 
-"ที่อยู่/Address: " + $P{custAddress} + "\n" +
-"TEL: " + $P{custMobileNo}]]></expression>
+				<expression><![CDATA["เรียน/Attention: " + ($P{custName} == null ? " - " : $P{custName}) + "\n" +
+  "เลขประจำตัวผู้เสียภาษี " + ($P{custTaxId} == null ? " - " : $P{custTaxId}) + "\n" +
+  "ที่อยู่/Address: " + ($P{custAddress} == null ? " - " : $P{custAddress}) + "\n" +
+  "TEL: " + ($P{custMobileNo} == null ? " - " : $P{custMobileNo})]]></expression>
 				<property name="com.jaspersoft.studio.unit.x" value="px"/>
 				<property name="com.jaspersoft.studio.unit.width" value="px"/>
 				<box topPadding="3" leftPadding="5">
@@ -388,7 +389,7 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 			</box>
 		</element>
-		<element kind="textField" uuid="8dec3c52-b036-4958-aa2a-8f134e8acf21" positionType="Float" x="160" y="30" width="284" height="80" fontName="TH SarabunPSK" fontSize="12.0" hTextAlign="Left" vTextAlign="Top">
+		<element kind="textField" uuid="8dec3c52-b036-4958-aa2a-8f134e8acf21" positionType="Float" x="160" y="30" width="284" height="80" fontName="TH SarabunPSK" fontSize="12.0" textAdjust="ScaleFont" hTextAlign="Left" vTextAlign="Top">
 			<expression><![CDATA["หมายเหตุ*  " + $P{remark}]]></expression>
 			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="492cd97e-40b7-4bed-9202-f7f8a1c728a7"/>
 			<property name="com.jaspersoft.studio.unit.width" value="px"/>
@@ -558,8 +559,23 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 			</box>
 		</element>
 		<element kind="textField" uuid="c25cbf9b-14ef-4b67-ae9b-ac2227e15190" positionType="Float" x="160" y="0" width="395" height="30" forecolor="#FF0905" markup="none" fontName="TH SarabunPSK" fontSize="19.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{shipping} != null && !"SEA".equalsIgnoreCase($P{shipping})]]></printWhenExpression>
 			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
-			<expression><![CDATA[$P{shipping}.equalsIgnoreCase( "ALL" ) ? "ขนส่งทางรถและทางเรือ" : $P{shipping}.equalsIgnoreCase( "LAND" ) ? "ขนส่งทางรถ" : $P{shipping}.equalsIgnoreCase( "SEA" ) ? "ขนส่งทางเรือ" : "-"]]></expression>
+			<expression><![CDATA[$P{shippingLabel}]]></expression>
+			<property name="com.jaspersoft.studio.unit.x" value="px"/>
+			<property name="com.jaspersoft.studio.unit.width" value="px"/>
+			<property name="com.jaspersoft.studio.unit.y" value="px"/>
+			<box topPadding="0" leftPadding="5" rightPadding="0">
+				<topPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<leftPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<bottomPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
+			</box>
+		</element>
+		<element kind="textField" uuid="3a12a194-e139-4ec5-a100-01f0732c557e" positionType="Float" x="161" y="0" width="395" height="30" forecolor="#4351BF" markup="none" fontName="TH SarabunPSK" fontSize="19.0" pattern="#,##0.##;(#,##0.##)" blankWhenNull="true" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<printWhenExpression><![CDATA[$P{shipping} != null && "SEA".equalsIgnoreCase($P{shipping})]]></printWhenExpression>
+			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
+			<expression><![CDATA[$P{shippingLabel}]]></expression>
 			<property name="com.jaspersoft.studio.unit.x" value="px"/>
 			<property name="com.jaspersoft.studio.unit.width" value="px"/>
 			<property name="com.jaspersoft.studio.unit.y" value="px"/>

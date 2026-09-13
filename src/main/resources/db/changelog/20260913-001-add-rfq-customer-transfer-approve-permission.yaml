@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260913-001-add-rfq-customer-transfer-approve-permission
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at)
+              VALUES ('PERM_RFQ_CUSTOMER_TRANSFER_APPROVE', 'อนุมัติการเปลี่ยนลูกค้า', 'Approve RFQ customer transfers', 'rfq', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              VALUES
+                  ('SALES_MANAGER', 'PERM_RFQ_CUSTOMER_TRANSFER_APPROVE'),
+                  ('ADMIN', 'PERM_RFQ_CUSTOMER_TRANSFER_APPROVE');

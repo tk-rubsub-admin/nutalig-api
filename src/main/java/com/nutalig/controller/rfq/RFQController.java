@@ -451,6 +451,24 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PatchMapping("/{id}/procurement-remark")
+    public GeneralResponse<RfqHeaderDto> updateProcurementRemark(
+            @PathVariable("id") String id,
+            @RequestBody(required = false) UpdateRfqProcurementRemarkRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        log.info("=== Start update procurement remark for rfq {} by {} ===", id, userId);
+
+        RfqHeaderDto response = rfqService.updateProcurementRemark(
+                id,
+                request == null ? null : request.getProcurementRemark(),
+                userId
+        );
+
+        log.info("=== End update procurement remark for rfq {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/{id}/sales-order")
     public GeneralResponse<RfqHeaderDto> linkSalesOrder(
             @PathVariable("id") String id,

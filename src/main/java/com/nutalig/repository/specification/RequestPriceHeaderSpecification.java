@@ -1,7 +1,6 @@
 package com.nutalig.repository.specification;
 
 import com.nutalig.constant.RfqStatus;
-import com.nutalig.constant.UrgentRequestStatus;
 import com.nutalig.entity.*;
 import com.nutalig.utils.DateUtil;
 import jakarta.persistence.criteria.Expression;
@@ -46,14 +45,6 @@ public class RequestPriceHeaderSpecification {
         }
 
         return (root, query, cb) -> cb.equal(root.get("isAccept"), isAccept);
-    }
-
-    public static Specification<RfqHeaderEntity> urgentRequestStatusEqual(UrgentRequestStatus urgentRequestStatus) {
-        if (urgentRequestStatus == null) {
-            return null;
-        }
-
-        return (root, query, cb) -> cb.equal(root.get("urgentRequestStatus"), urgentRequestStatus);
     }
 
     public static Specification<RfqHeaderEntity> customerIdEqual(String customerId) {
@@ -225,20 +216,4 @@ public class RequestPriceHeaderSpecification {
         };
     }
 
-    public static Specification<RfqHeaderEntity> orderByApprovedUrgentFirst() {
-        return (root, query, cb) -> {
-            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
-                Expression<Integer> urgentOrder = cb.<Integer>selectCase()
-                        .when(cb.equal(root.get("urgentRequestStatus"), UrgentRequestStatus.APPROVED), 0)
-                        .otherwise(1);
-                query.orderBy(
-                        cb.asc(urgentOrder),
-                        cb.asc(root.get("slaDate")),
-                        cb.asc(root.get("requestedDate"))
-                );
-            }
-
-            return cb.conjunction();
-        };
-    }
 }

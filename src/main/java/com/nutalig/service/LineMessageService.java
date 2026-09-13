@@ -43,7 +43,7 @@ public class LineMessageService {
         UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found"));
 
-        if (StringUtils.isEmpty(userEntity.getLineUserId())) {
+        if (StringUtils.isEmpty(userEntity.getLineUserId()) && !isTestEnvironment()) {
             throw new InvalidRequestException("User " + userId + " doesn't have line user id");
         }
 
@@ -54,7 +54,7 @@ public class LineMessageService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         SendMessageRequest sendMessageRequest = new SendMessageRequest();
-        sendMessageRequest.setTo(userEntity.getLineUserId());
+        sendMessageRequest.setTo(resolveRecipient(userEntity.getLineUserId()));
         sendMessageRequest.setMessages(List.of(new Msg("text", message)));
 
         // สร้าง RequestEntity สำหรับ HTTP POST
@@ -72,7 +72,7 @@ public class LineMessageService {
         UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found"));
 
-        if (StringUtils.isBlank(userEntity.getLineUserId())) {
+        if (StringUtils.isBlank(userEntity.getLineUserId()) && !isTestEnvironment()) {
             throw new InvalidRequestException("User " + userId + " doesn't have line user id");
         }
 
@@ -147,11 +147,31 @@ public class LineMessageService {
         headers.set("Authorization", "Bearer " + lineConfiguration.getLineMessageAccessToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<String> entity = new HttpEntity<>(objectMapper.writeValueAsString(request), headers);
+        LinePushMessageRequest redirectedRequest = new LinePushMessageRequest(
+                resolveRecipient(request.to()),
+                request.messages()
+        );
+        HttpEntity<String> entity = new HttpEntity<>(objectMapper.writeValueAsString(redirectedRequest), headers);
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
         log.info("Response from Line API for approval card: {}", response.getBody());
+    }
+
+    private boolean isTestEnvironment() {
+        return StringUtils.equalsIgnoreCase("test", StringUtils.trimToEmpty(lineConfiguration.getLineMessageEnv()));
+    }
+
+    private String resolveRecipient(String requestedLineUserId) throws InvalidRequestException {
+        if (!isTestEnvironment()) {
+            return requestedLineUserId;
+        }
+        String testUser = StringUtils.trimToNull(lineConfiguration.getLineMessageTestUser());
+        if (testUser == null) {
+            throw new InvalidRequestException("line.message.test-user is required when line.message.env is test.");
+        }
+        log.info("LINE test environment: redirecting message to configured test user.");
+        return testUser;
     }
 
     private JsonNode loadApprovalCardTemplate() throws Exception {

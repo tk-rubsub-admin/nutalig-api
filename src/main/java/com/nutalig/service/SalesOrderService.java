@@ -60,13 +60,18 @@ import static com.nutalig.repository.specification.SalesOrderSpecification.*;
 public class SalesOrderService {
     private static final Set<SalesOrderStatus> EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES =
             EnumSet.of(SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED);
+    private static final Set<SalesOrderStatus> CANCELLABLE_SALES_ORDER_STATUSES =
+            EnumSet.of(SalesOrderStatus.DRAFT, SalesOrderStatus.CREATED, SalesOrderStatus.ISSUED,
+                    SalesOrderStatus.SENT, SalesOrderStatus.ACCEPTED);
     private static final String SALES_ADMIN_POSITION_CODE = "SALES_ADMIN";
 
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final SalesOrderRepository salesOrderRepository;
     private final InvoiceRepository invoiceRepository;
+    private final ReceiptRepository receiptRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final RFQService rfqService;
     private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
     private final CustomerRepository customerRepository;
@@ -286,6 +291,83 @@ public class SalesOrderService {
         refreshCustomerOrderTotal(entity.getCustomer());
         recalculatePaymentSummary(entity.getSalesOrderNo());
         recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderDto cancelSalesOrder(String salesOrderNo, CancelSalesOrderRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getReason())) {
+            throw new InvalidRequestException("Cancellation reason is required");
+        }
+
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        if (!CANCELLABLE_SALES_ORDER_STATUSES.contains(entity.getStatus())) {
+            throw new InvalidRequestException("Sales order status " + entity.getStatus() + " cannot be cancelled");
+        }
+
+        boolean hasActivePurchaseOrder = purchaseOrderRepository
+                .findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrderNo)
+                .stream()
+                .anyMatch(purchaseOrder -> purchaseOrder.getStatus() != PurchaseOrderStatus.CANCELLED);
+        if (hasActivePurchaseOrder) {
+            throw new InvalidRequestException("Sales order with an active purchase order cannot be cancelled");
+        }
+
+        boolean hasActiveInvoice = invoiceRepository.findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrderNo)
+                .stream()
+                .anyMatch(invoice -> invoice.getStatus() != InvoiceStatus.CANCELLED && invoice.getStatus() != InvoiceStatus.VOID);
+        if (hasActiveInvoice) {
+            throw new InvalidRequestException("Sales order with an active invoice cannot be cancelled");
+        }
+
+        boolean hasActiveReceipt = receiptRepository.findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrderNo)
+                .stream()
+                .anyMatch(receipt -> receipt.getStatus() != ReceiptStatus.CANCELLED && receipt.getStatus() != ReceiptStatus.VOID);
+        if (hasActiveReceipt) {
+            throw new InvalidRequestException("Sales order with an active receipt cannot be cancelled");
+        }
+
+        BigDecimal approvedPaymentTotal = defaultIfNull(
+                invoiceRepository.sumApprovedPaymentAmountBySalesOrderNo(salesOrderNo)
+        );
+        if (approvedPaymentTotal.compareTo(BigDecimal.ZERO) > 0) {
+            throw new InvalidRequestException("Sales order with approved payment cannot be cancelled");
+        }
+
+        SalesOrderStatus previousStatus = entity.getStatus();
+        Integer oldRevNo = defaultRevNo(entity.getRevNo());
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        entity.setStatus(SalesOrderStatus.CANCELLED);
+        entity.setCancelReason(request.getReason().trim());
+        entity.setRevNo(oldRevNo + 1);
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now);
+        entity = salesOrderRepository.save(entity);
+        refreshCustomerOrderTotal(entity.getCustomer());
+        rfqService.rollbackSalesOrderLink(salesOrderNo, entity.getCancelReason(), userId);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("previousStatus", previousStatus);
+        detail.put("status", entity.getStatus());
+        detail.put("reason", entity.getCancelReason());
+        detail.put("oldRevNo", oldRevNo);
+        detail.put("newRevNo", entity.getRevNo());
+        activityHistoryService.record(
+                ActivityEntityType.SALES_ORDER,
+                entity.getSalesOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.STATUS_CHANGE,
+                ActivitySource.API,
+                "ยกเลิก Sales Order เลขที่ " + entity.getSalesOrderNo(),
+                detail
+        );
 
         return mapToDto(entity);
     }
@@ -1029,6 +1111,7 @@ public class SalesOrderService {
         detail.put("outstandingTotal", entity.getOutstandingTotal());
         detail.put("vatRate", entity.getVatRate());
         detail.put("remark", entity.getRemark());
+        detail.put("cancelReason", entity.getCancelReason());
         detail.put("subTotal", entity.getSubTotal());
         detail.put("vat", entity.getVat());
         detail.put("grandTotal", entity.getGrandTotal());
@@ -1221,6 +1304,7 @@ public class SalesOrderService {
         dto.setUrgentRejectReason(entity.getUrgentRejectReason());
         dto.setVatRate(entity.getVatRate());
         dto.setRemark(entity.getRemark());
+        dto.setCancelReason(entity.getCancelReason());
         dto.setRfqId(resolveRfq(entity.getSalesOrderNo()));
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));

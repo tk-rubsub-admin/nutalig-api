@@ -1,5 +1,7 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.*;
 import com.nutalig.entity.ApprovalRequestEntity;
 import com.nutalig.entity.RfqHeaderEntity;
@@ -9,6 +11,7 @@ import com.nutalig.entity.UserEntity;
 import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.CustomerRepository;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.repository.SalesOrderRepository;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,8 @@ import java.util.Map;
 public class ApprovalBusinessService {
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final CustomerRepository customerRepository;
+    private final ObjectMapper objectMapper;
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final UserRepository userRepository;
@@ -52,6 +58,7 @@ public class ApprovalBusinessService {
             handleInvoicePaymentTermApproved(approvalRequest, actorUserId, source);
             return;
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) { handleRfqCustomerTransferApproved(approvalRequest, actorUserId, source); return; }
 
         log.info("No business approval handler for requestType={}", approvalRequest.getRequestType());
     }
@@ -75,6 +82,7 @@ public class ApprovalBusinessService {
             handleInvoicePaymentTermRejected(approvalRequest, actorUserId, source, reason);
             return;
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) { handleRfqCustomerTransferRejected(approvalRequest, actorUserId, source, reason); return; }
 
         log.info("No business rejection handler for requestType={}", approvalRequest.getRequestType());
     }
@@ -89,6 +97,7 @@ public class ApprovalBusinessService {
         if (approvalRequest.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
             return "/invoice/" + approvalRequest.getReferenceId();
         }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) return "/price-inquiry/" + approvalRequest.getReferenceId();
         return null;
     }
 
@@ -152,20 +161,13 @@ public class ApprovalBusinessService {
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         String actor = userProfileService.getNameFromId(actorUserId);
 
-        entity.setUrgentRequestStatus(UrgentRequestStatus.APPROVED);
-        entity.setUrgentApprovedBy(actor);
-        entity.setUrgentApprovedDate(now);
-        entity.setUrgentRejectedBy(null);
-        entity.setUrgentRejectedDate(null);
-        entity.setUrgentRejectReason(null);
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         requestPriceHeaderRepository.save(entity);
 
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
-        detail.put("urgentApprovedBy", entity.getUrgentApprovedBy());
-        detail.put("urgentApprovedDate", entity.getUrgentApprovedDate());
+        detail.put("urgentApprovalStatus", approvalRequest.getStatus());
+        detail.put("approvedDate", approvalRequest.getApprovedDate());
         detail.put("approvalRequestId", approvalRequest.getId());
         detail.put("approvalRequestNo", approvalRequest.getRequestNo());
         detail.put("approvalSource", source);
@@ -184,6 +186,73 @@ public class ApprovalBusinessService {
         completeApprovalTodos(approvalRequest.getId(), actorUserId);
     }
 
+    private void handleRfqCustomerTransferApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source) throws DataNotFoundException {
+        RfqHeaderEntity rfq = requestPriceHeaderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("RFQ " + approvalRequest.getReferenceId() + " not found."));
+        JsonNode payload;
+        try { payload = objectMapper.readTree(approvalRequest.getPayloadJson()); }
+        catch (Exception exception) { throw new DataNotFoundException("Invalid customer transfer approval payload."); }
+        String targetId = payload.path("targetCustomerId").asText(null);
+        if (StringUtils.isBlank(targetId)) throw new DataNotFoundException("Target customer is missing from approval payload.");
+        var target = customerRepository.findById(targetId).orElseThrow(() -> new DataNotFoundException("Customer " + targetId + " not found."));
+        String oldId = rfq.getCustomer() == null ? null : rfq.getCustomer().getId();
+        String oldName = rfq.getCustomer() == null ? "-" : rfq.getCustomer().getCustomerName();
+        Map<String, Object> clearedSalesOrderConfirmation = new LinkedHashMap<>();
+        clearedSalesOrderConfirmation.put("saleOrderId", rfq.getSaleOrderId());
+        clearedSalesOrderConfirmation.put("confirmedDetailId", rfq.getConfirmedDetailId());
+        clearedSalesOrderConfirmation.put("confirmedTierId", rfq.getConfirmedTierId());
+        clearedSalesOrderConfirmation.put("confirmedSupplierQuoteId", rfq.getConfirmedSupplierQuoteId());
+        clearedSalesOrderConfirmation.put("confirmedShippingMethod", rfq.getConfirmedShippingMethod());
+        clearedSalesOrderConfirmation.put("confirmedPrice", rfq.getConfirmedPrice());
+        clearedSalesOrderConfirmation.put("confirmedDate", rfq.getConfirmedDate());
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        rfq.setCustomer(target);
+        rfq.setContactName(target.getCustomerName());
+        rfq.setContactPhone(null);
+        rfq.setSaleOrderId(null);
+        rfq.setConfirmedDetailId(null);
+        rfq.setConfirmedTierId(null);
+        rfq.setConfirmedSupplierQuoteId(null);
+        rfq.setConfirmedShippingMethod(null);
+        rfq.setConfirmedPrice(null);
+        rfq.setConfirmedDate(null);
+        rfq.setUpdatedBy(userProfileService.getNameFromId(actorUserId));
+        rfq.setUpdatedDate(now);
+        rfq.setQuotedDate(null);
+        rfq.setQuotations(new ArrayList<>());
+        rfq.setQuotationNo(null);
+        requestPriceHeaderRepository.save(rfq);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("approvalRequestId", approvalRequest.getId()); detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("previousCustomerId", oldId); detail.put("previousCustomerName", oldName);
+        detail.put("targetCustomerId", target.getId()); detail.put("targetCustomerName", target.getCustomerName());
+        detail.put("reason", payload.path("reason").asText(approvalRequest.getRequestReason())); detail.put("approvalSource", source);
+        detail.put("clearedSalesOrderConfirmation", clearedSalesOrderConfirmation);
+        activityHistoryService.record(ActivityEntityType.RFQ, rfq.getId(), actorUserId, ActivityActorType.USER, ActivityAction.APPROVE,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "อนุมัติเปลี่ยนลูกค้าของคำขอราคาเลขที่ " + rfq.getId(), detail);
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handleRfqCustomerTransferRejected(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source, String rejectReason) throws DataNotFoundException {
+        RfqHeaderEntity rfq = requestPriceHeaderRepository.findById(approvalRequest.getReferenceId())
+                .orElseThrow(() -> new DataNotFoundException("RFQ " + approvalRequest.getReferenceId() + " not found."));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("approvalRequestId", approvalRequest.getId()); detail.put("approvalRequestNo", approvalRequest.getRequestNo());
+        detail.put("previousCustomerId", readPayloadValue(approvalRequest, "currentCustomerId")); detail.put("previousCustomerName", readPayloadValue(approvalRequest, "currentCustomerName"));
+        detail.put("targetCustomerId", readPayloadValue(approvalRequest, "targetCustomerId")); detail.put("targetCustomerName", readPayloadValue(approvalRequest, "targetCustomerName"));
+        detail.put("requestReason", approvalRequest.getRequestReason()); detail.put("rejectReason", rejectReason); detail.put("approvalSource", source);
+        activityHistoryService.record(ActivityEntityType.RFQ, rfq.getId(), actorUserId, ActivityActorType.USER, ActivityAction.REJECT,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "ไม่อนุมัติเปลี่ยนลูกค้าของคำขอราคาเลขที่ " + rfq.getId(), detail);
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private String readPayloadValue(ApprovalRequestEntity request, String field) {
+        try { return objectMapper.readTree(request.getPayloadJson()).path(field).asText(null); }
+        catch (Exception exception) { return null; }
+    }
+
     private void handleUrgentRfqRejected(
             ApprovalRequestEntity approvalRequest,
             String actorUserId,
@@ -195,19 +264,14 @@ public class ApprovalBusinessService {
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         String actor = userProfileService.getNameFromId(actorUserId);
 
-        entity.setUrgentRequestStatus(UrgentRequestStatus.REJECTED);
-        entity.setUrgentRejectedBy(actor);
-        entity.setUrgentRejectedDate(now);
-        entity.setUrgentRejectReason(StringUtils.trimToNull(reason));
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         requestPriceHeaderRepository.save(entity);
 
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
-        detail.put("urgentRejectedBy", entity.getUrgentRejectedBy());
-        detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
-        detail.put("urgentRejectReason", entity.getUrgentRejectReason());
+        detail.put("urgentApprovalStatus", approvalRequest.getStatus());
+        detail.put("rejectedDate", approvalRequest.getRejectedDate());
+        detail.put("rejectReason", approvalRequest.getRejectReason());
         detail.put("approvalRequestId", approvalRequest.getId());
         detail.put("approvalRequestNo", approvalRequest.getRequestNo());
         detail.put("approvalSource", source);

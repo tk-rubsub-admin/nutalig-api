@@ -76,6 +76,9 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "remark", length = 2000)
     private String remark;
 
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    private String cancelReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")
     @ToString.Exclude

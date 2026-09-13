@@ -60,6 +60,9 @@ public class ApprovalRequestEntity extends AuditDateEntity {
     @Column(name = "requested_date", nullable = false)
     private ZonedDateTime requestedDate;
 
+    @Column(name = "request_reason", columnDefinition = "TEXT")
+    private String requestReason;
+
     @Column(name = "approved_date")
     private ZonedDateTime approvedDate;
 

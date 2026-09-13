@@ -751,7 +751,8 @@ public class QuotationService {
         dto.setSalesName(quotationEntity.getSales().getFirstNameTh() + " " + quotationEntity.getSales().getLastNameTh());
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(quotationEntity.getSales().getNickName());
-        dto.setShipping(getShippingMethodLabel(quotationEntity.getShipping()));
+        dto.setShipping(quotationEntity.getShipping());
+        dto.setShippingLabel(getShippingMethodLabel(quotationEntity.getShipping()));
         dto.setProject(quotationEntity.getProject());
         dto.setPaymentTerm(quotationEntity.getCustomer().getCustomerPaymentTerm().getNameTh());
         dto.setCoSalesId(quotationEntity.getCoSalesId());

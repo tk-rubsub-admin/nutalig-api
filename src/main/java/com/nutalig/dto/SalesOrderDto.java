@@ -40,6 +40,7 @@ public class SalesOrderDto {
     private String shippingType;
     private BigDecimal vatRate;
     private String remark;
+    private String cancelReason;
     private UserDto createdBy;
     private UserDto updatedBy;
     private Integer revNo;

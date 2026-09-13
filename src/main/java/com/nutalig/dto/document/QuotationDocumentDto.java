@@ -36,6 +36,7 @@ public class QuotationDocumentDto extends DefaultDocumentDto {
     private String project;
     private String orderType;
     private String shipping;
+    private String shippingLabel;
     private String tolerance;
     private String productionLeadTime;
     private String sample;

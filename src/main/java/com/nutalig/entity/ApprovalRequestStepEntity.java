@@ -8,6 +8,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.ZonedDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -34,6 +37,16 @@ public class ApprovalRequestStepEntity extends AuditDateEntity {
 
     @Column(name = "approver_role_code", length = 50)
     private String approverRoleCode;
+
+    @OneToMany(mappedBy = "approvalRequestStep", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ApprovalRequestStepRoleEntity> approverRoles = new LinkedHashSet<>();
+
+    public void setApproverRoleCodes(List<String> roleCodes) {
+        approverRoles.clear();
+        if (roleCodes == null) return;
+        roleCodes.stream().filter(role -> role != null && !role.isBlank()).map(String::trim).distinct()
+                .forEach(role -> { ApprovalRequestStepRoleEntity entity = new ApprovalRequestStepRoleEntity(role); entity.setApprovalRequestStep(this); approverRoles.add(entity); });
+    }
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)

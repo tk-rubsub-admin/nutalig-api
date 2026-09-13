@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260912-001-add-sales-order-cancel-reason
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: cancel_reason
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column:
+                  name: cancel_reason
+                  type: TEXT
+                  remarks: Reason provided when sales order is cancelled

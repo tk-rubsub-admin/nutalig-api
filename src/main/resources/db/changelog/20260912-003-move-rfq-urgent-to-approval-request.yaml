@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260912-003-add-approval-request-reason
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: approval_request
+                columnName: request_reason
+      changes:
+        - addColumn:
+            tableName: approval_request
+            columns:
+              - column: { name: request_reason, type: TEXT }

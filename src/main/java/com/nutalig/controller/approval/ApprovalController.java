@@ -29,6 +29,16 @@ public class ApprovalController {
         return new GeneralResponse<>(SUCCESS, approvalService.getLatestApprovalByEntity(entityType, referenceId));
     }
 
+    @GetMapping("/v1/approvals/rfq-urgent/pending")
+    public GeneralResponse<java.util.List<ApprovalRequestDto>> getPendingUrgentRfqApprovals() {
+        return new GeneralResponse<>(SUCCESS, approvalService.getPendingUrgentRfqApprovals());
+    }
+
+    @GetMapping("/v1/approvals/rfq-customer-transfer/pending")
+    public GeneralResponse<java.util.List<ApprovalRequestDto>> getPendingRfqCustomerTransferApprovals() {
+        return new GeneralResponse<>(SUCCESS, approvalService.getPendingRfqCustomerTransferApprovals());
+    }
+
     @GetMapping("/v1/approvals/reject-form")
     public GeneralResponse<ApprovalRejectTokenResolveResponse> resolveRejectToken(
             @RequestParam("token") String token

@@ -19,6 +19,10 @@ public class LineConfiguration {
 
     public String getLineMessageApiUrl() { return message.getApi(); }
 
+    public String getLineMessageEnv() { return message.getEnv() == null || message.getEnv().isBlank() ? "prod" : message.getEnv(); }
+
+    public String getLineMessageTestUser() { return message.getTestUser(); }
+
     public String getLineMessageChannelId() { return message.getChannel().getId(); }
 
     public String getLineMessageChannelSecret() { return message.getChannel().getSecret(); }
@@ -121,6 +125,8 @@ public class LineConfiguration {
     @Setter
     public static class Message {
         private String api;
+        private String env = "prod";
+        private String testUser;
         private Channel channel;
 
     }

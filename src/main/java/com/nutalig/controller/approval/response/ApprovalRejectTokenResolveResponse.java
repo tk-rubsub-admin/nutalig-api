@@ -8,6 +8,7 @@ import lombok.Value;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
+import java.util.List;
 
 @Value
 @Builder
@@ -22,6 +23,7 @@ public class ApprovalRejectTokenResolveResponse {
     ApprovalRequestStatus status;
     Integer currentStepNo;
     String approverRoleCode;
+    List<String> approverRoleCodes;
     String approverDisplayName;
     String rejectReason;
     Map<String, Object> payload;

@@ -22,6 +22,7 @@ public class ApprovalRequestDto {
     private Integer currentStepNo;
     private String requestedBy;
     private ZonedDateTime requestedDate;
+    private String requestReason;
     private ZonedDateTime approvedDate;
     private ZonedDateTime rejectedDate;
     private String rejectReason;

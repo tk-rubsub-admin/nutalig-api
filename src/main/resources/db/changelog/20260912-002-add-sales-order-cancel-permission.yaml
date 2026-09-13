@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260912-002-add-sales-order-cancel-permission
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at)
+              VALUES ('PERM_SALES_ORDER_CANCEL', 'ยกเลิกใบยืนยันสั่งซื้อ', 'Cancel sales orders', 'document', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              VALUES ('SUPER_ADMIN', 'PERM_SALES_ORDER_CANCEL');
+#  - changeSet:
+#      id: 20260912-002-add-sales-order-cancel-permission
+#      author: codex
+#      changes:
+#        - sql:
+#            splitStatements: true
+#            sql: |
+#              INSERT INTO permission (code, name_th, name_en, `group`, created_at)
+#              VALUES ('PERM_RFQ_CUSTOMER_TRANSFER', 'ย้ายข้อมูลลกค้า', 'RFQ customer transfer', 'rfq', NOW(6))
+#              ON DUPLICATE KEY UPDATE
+#                  name_th = VALUES(name_th),
+#                  name_en = VALUES(name_en),
+#                  `group` = VALUES(`group`);
+#
+#              INSERT IGNORE INTO role_permission (role_code, permission_code)
+#              VALUES ('SUPER_ADMIN', 'PERM_RFQ_CUSTOMER_TRANSFER');

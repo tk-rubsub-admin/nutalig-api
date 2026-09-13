@@ -8,6 +8,7 @@ import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.controller.rfq.request.RequestUrgentRfqApproveRequest;
 import com.nutalig.controller.salesorder.request.CreateSalesOrderRequest;
+import com.nutalig.controller.salesorder.request.CancelSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.RejectUrgentSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.RequestReadyPoApproveRequest;
 import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
@@ -83,6 +84,18 @@ public class SalesOrderController {
         SalesOrderDto response = salesOrderService.updateSalesOrder(id, request, userId);
 
         log.info("=== End update sales order {} ===", id);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public GeneralResponse<SalesOrderDto> cancelSalesOrder(
+            @PathVariable(name = "id") String id,
+            @RequestBody CancelSalesOrderRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        log.info("=== Start cancel sales order {} ===", id);
+        SalesOrderDto response = salesOrderService.cancelSalesOrder(id, request, userId);
+        log.info("=== End cancel sales order {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

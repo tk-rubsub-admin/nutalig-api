@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260912-004-backfill-rfq-urgent-approvals
+      author: codex
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              UPDATE approval_request AS ar
+                JOIN rfq_header AS rh
+                  ON rh.id = ar.reference_id
+                SET ar.request_reason = rh.urgent_request_reason
+                  WHERE ar.entity_type = 'RFQ'
+                  AND ar.request_type = 'URGENT_RFQ'
+                  AND NULLIF(TRIM(rh.urgent_request_reason), '') IS NOT NULL;
+
+  - changeSet:
+      id: 20260912-004-remove-rfq-urgent
+      author: codex
+      changes:
+        - dropColumn: { tableName: rfq_header, columnName: is_urgent_request }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_request_reason }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_request_status }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_requested_by }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_requested_date }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_approved_by }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_approved_date }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_rejected_by }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_rejected_date }
+        - dropColumn: { tableName: rfq_header, columnName: urgent_reject_reason }

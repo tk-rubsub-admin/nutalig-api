@@ -5,6 +5,7 @@ import com.nutalig.constant.ApprovalStepStatus;
 import lombok.Data;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 @Data
 public class ApprovalRequestStepDto {
@@ -13,6 +14,7 @@ public class ApprovalRequestStepDto {
     private String approverUserId;
     private String approverDisplayName;
     private String approverRoleCode;
+    private List<String> approverRoleCodes;
     private ApprovalStepStatus status;
     private ZonedDateTime sentAt;
     private ZonedDateTime actedAt;

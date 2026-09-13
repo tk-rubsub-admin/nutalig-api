@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260912-005-add-approval-step-roles
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS approval_request_step_role (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  approval_request_step_id BIGINT NOT NULL,
+                  role_code VARCHAR(50) NOT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_approval_step_role (approval_request_step_id, role_code),
+                  KEY idx_approval_step_role_code (role_code),
+                  CONSTRAINT fk_approval_step_role_step FOREIGN KEY (approval_request_step_id) REFERENCES approval_request_step (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT IGNORE INTO approval_request_step_role (approval_request_step_id, role_code)
+              SELECT id, approver_role_code
+              FROM approval_request_step
+              WHERE NULLIF(TRIM(approver_role_code), '') IS NOT NULL;

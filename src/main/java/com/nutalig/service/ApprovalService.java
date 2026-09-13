@@ -35,10 +35,14 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ApprovalService {
 
-    private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
+    private static final List<String> SUPER_ADMIN_APPROVER_ROLES = List.of(RoleCode.SUPER_ADMIN.name());
+    private static final List<String> RFQ_CUSTOMER_TRANSFER_APPROVER_ROLES = List.of(
+            RoleCode.SALES_MANAGER.name(), RoleCode.ADMIN.name(), RoleCode.SUPER_ADMIN.name()
+    );
     private static final String URGENT_RFQ_TEMPLATE_CODE = "urgent-rfq-approval";
     private static final String URGENT_READY_PO_TEMPLATE_CODE = "urgent-ready-po-approval";
     private static final String INVOICE_PAYMENT_TERM_TEMPLATE_CODE = "invoice-change-payment-term-approval";
+    private static final String RFQ_CUSTOMER_TRANSFER_TEMPLATE_CODE = "rfq-transfer-customer";
     private static final String CLAIM_STEP_ID = "stepId";
     private static final String CLAIM_ACTION = "action";
     private static final String CLAIM_SOURCE = "source";
@@ -63,12 +67,16 @@ public class ApprovalService {
     private final LineConfiguration lineConfiguration;
 
     @Transactional(rollbackFor = Exception.class)
-    public ApprovalRequestDto createUrgentRfqApprovalRequest(RfqHeaderEntity rfqEntity, String userId) throws Exception {
+    public ApprovalRequestDto createUrgentRfqApprovalRequest(
+            RfqHeaderEntity rfqEntity,
+            String requestReason,
+            String userId
+    ) throws Exception {
         if (rfqEntity == null) {
             throw new InvalidRequestException("RFQ is required.");
         }
 
-        List<UserEntity> approvers = findApproversByRole(SUPER_ADMIN_ROLE_CODE);
+        List<UserEntity> approvers = findApproversByRoles(SUPER_ADMIN_APPROVER_ROLES);
         if (approvers.isEmpty()) {
             throw new InvalidRequestException("No SUPER_ADMIN approver is available.");
         }
@@ -87,13 +95,17 @@ public class ApprovalService {
         request.setCurrentStepNo(1);
         request.setRequestedBy(actor);
         request.setRequestedDate(now);
+        request.setRequestReason(StringUtils.trimToNull(requestReason));
         request.setCreatedBy(userId);
         request.setUpdatedBy(userId);
-        request.setPayloadJson(objectMapper.writeValueAsString(buildUrgentRfqPayload(rfqEntity, actor)));
+        request.setPayloadJson(objectMapper.writeValueAsString(
+                buildUrgentRfqPayload(rfqEntity, actor, request.getRequestReason(), request.getRequestedDate())
+        ));
 
         ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
         step.setStepNo(1);
-        step.setApproverRoleCode(SUPER_ADMIN_ROLE_CODE);
+        step.setApproverRoleCode(RoleCode.SUPER_ADMIN.name());
+        step.setApproverRoleCodes(SUPER_ADMIN_APPROVER_ROLES);
         step.setStatus(ApprovalStepStatus.PENDING);
         step.setCreatedBy(userId);
         step.setUpdatedBy(userId);
@@ -158,12 +170,62 @@ public class ApprovalService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public ApprovalRequestDto createRfqCustomerTransferApprovalRequest(
+            RfqHeaderEntity rfqEntity, CustomerEntity targetCustomer, String reason, String userId
+    ) throws Exception {
+        if (rfqEntity == null || rfqEntity.getCustomer() == null || targetCustomer == null) {
+            throw new InvalidRequestException("RFQ current customer and target customer are required.");
+        }
+        List<UserEntity> approvers = findApproversByRoles(RFQ_CUSTOMER_TRANSFER_APPROVER_ROLES);
+        if (approvers.isEmpty()) throw new InvalidRequestException("No SALES_MANAGER or ADMIN approver is available.");
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(userId);
+        ApprovalRequestEntity request = new ApprovalRequestEntity();
+        request.setRequestNo(generateApprovalRequestNo());
+        request.setEntityType(ActivityEntityType.RFQ);
+        request.setReferenceId(rfqEntity.getId());
+        request.setRequestType(ApprovalRequestType.RFQ_CUSTOMER_TRANSFER);
+        request.setTemplateCode(RFQ_CUSTOMER_TRANSFER_TEMPLATE_CODE);
+        request.setTitle("อนุมัติย้ายลูกค้า RFQ " + rfqEntity.getId());
+        request.setStatus(ApprovalRequestStatus.PENDING);
+        request.setCurrentStepNo(1);
+        request.setRequestedBy(actor);
+        request.setRequestedDate(now);
+        request.setRequestReason(StringUtils.trimToNull(reason));
+        request.setCreatedBy(userId);
+        request.setUpdatedBy(userId);
+        request.setPayloadJson(objectMapper.writeValueAsString(buildRfqCustomerTransferPayload(rfqEntity, targetCustomer, actor, request.getRequestReason(), now)));
+        ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
+        step.setStepNo(1);
+        step.setApproverRoleCode(RFQ_CUSTOMER_TRANSFER_APPROVER_ROLES.get(0)); // legacy compatibility
+        step.setApproverRoleCodes(RFQ_CUSTOMER_TRANSFER_APPROVER_ROLES);
+        step.setStatus(ApprovalStepStatus.PENDING);
+        step.setCreatedBy(userId);
+        step.setUpdatedBy(userId);
+        request.addStep(step);
+        request = approvalRequestRepository.save(request);
+        recordAudit(request, step, ApprovalAuditEventType.REQUEST_CREATED, getUserOrNull(userId), null, ApprovalSource.SYSTEM,
+                "สร้างคำขออนุมัติย้ายลูกค้าของ " + rfqEntity.getId(), buildAuditDetail(Map.of("requestType", request.getRequestType(), "referenceId", request.getReferenceId())), userId);
+        recordAudit(request, step, ApprovalAuditEventType.STEP_CREATED, getUserOrNull(userId), null, ApprovalSource.SYSTEM,
+                "สร้าง approval step ลำดับที่ 1 สำหรับ " + request.getRequestNo(), buildAuditDetail(buildMap("stepNo", 1, "approverRoleCodes", RFQ_CUSTOMER_TRANSFER_APPROVER_ROLES)), userId);
+        createApprovalTodos(request, step, approvers, userId);
+        try {
+            sendCurrentStepApprovalCard(request, step, approvers, userId);
+        } catch (Exception exception) {
+            log.warn("Cannot send approval card for request {}", request.getRequestNo(), exception);
+        }
+        activityHistoryService.record(ActivityEntityType.APPROVAL_REQUEST, String.valueOf(request.getId()), userId, ActivityActorType.USER, ActivityAction.REQUEST_APPROVAL, ActivitySource.API,
+                "สร้างคำขออนุมัติ " + request.getRequestNo(), Map.of("requestType", request.getRequestType(), "referenceId", request.getReferenceId()));
+        return toDto(request);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public ApprovalRequestDto createInvoicePaymentTermApprovalRequest(InvoiceEntity invoiceEntity, String userId) throws Exception {
         if (invoiceEntity == null) {
             throw new InvalidRequestException("Invoice is required.");
         }
 
-        List<UserEntity> approvers = findApproversByRole(SUPER_ADMIN_ROLE_CODE);
+        List<UserEntity> approvers = findApproversByRoles(SUPER_ADMIN_APPROVER_ROLES);
         if (approvers.isEmpty()) {
             throw new InvalidRequestException("No SUPER_ADMIN approver is available.");
         }
@@ -187,7 +249,8 @@ public class ApprovalService {
 
         ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
         step.setStepNo(1);
-        step.setApproverRoleCode(SUPER_ADMIN_ROLE_CODE);
+        step.setApproverRoleCode(RoleCode.SUPER_ADMIN.name());
+        step.setApproverRoleCodes(SUPER_ADMIN_APPROVER_ROLES);
         step.setStatus(ApprovalStepStatus.PENDING);
         step.setCreatedBy(userId);
         step.setUpdatedBy(userId);
@@ -224,7 +287,7 @@ public class ApprovalService {
             throw new InvalidRequestException("Sales order is required.");
         }
 
-        List<UserEntity> approvers = findApproversByRole(SUPER_ADMIN_ROLE_CODE);
+        List<UserEntity> approvers = findApproversByRoles(SUPER_ADMIN_APPROVER_ROLES);
         if (approvers.isEmpty()) {
             throw new InvalidRequestException("No SUPER_ADMIN approver is available.");
         }
@@ -251,7 +314,8 @@ public class ApprovalService {
 
         ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
         step.setStepNo(1);
-        step.setApproverRoleCode(SUPER_ADMIN_ROLE_CODE);
+        step.setApproverRoleCode(RoleCode.SUPER_ADMIN.name());
+        step.setApproverRoleCodes(SUPER_ADMIN_APPROVER_ROLES);
         step.setStatus(ApprovalStepStatus.PENDING);
         step.setCreatedBy(userId);
         step.setUpdatedBy(userId);
@@ -333,6 +397,60 @@ public class ApprovalService {
         return toDto(entity);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<ApprovalRequestDto> findUrgentRfqApproval(String rfqId) {
+        return approvalRequestRepository
+                .findFirstByEntityTypeAndReferenceIdAndRequestTypeOrderByCreatedDateDesc(
+                        ActivityEntityType.RFQ, rfqId, ApprovalRequestType.URGENT_RFQ
+                )
+                .map(this::toSummaryDto);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasUrgentRfqApproval(String rfqId) {
+        return approvalRequestRepository
+                .findFirstByEntityTypeAndReferenceIdAndRequestTypeOrderByCreatedDateDesc(
+                        ActivityEntityType.RFQ, rfqId, ApprovalRequestType.URGENT_RFQ
+                )
+                .isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getPendingUrgentRfqApprovals() {
+        return approvalRequestRepository.findAllByEntityTypeAndRequestTypeAndStatusOrderByRequestedDateDesc(
+                ActivityEntityType.RFQ,
+                ApprovalRequestType.URGENT_RFQ,
+                ApprovalRequestStatus.PENDING
+        ).stream().map(this::toSummaryDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ApprovalRequestDto> findRfqCustomerTransferApproval(String rfqId) {
+        return approvalRequestRepository.findFirstByEntityTypeAndReferenceIdAndRequestTypeOrderByCreatedDateDesc(ActivityEntityType.RFQ, rfqId, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER).map(this::toSummaryDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, ApprovalRequestDto> findLatestRfqApprovalSummaries(
+            List<String> rfqIds, ApprovalRequestType requestType
+    ) {
+        if (rfqIds == null || rfqIds.isEmpty()) return Map.of();
+        Map<String, ApprovalRequestDto> approvals = new HashMap<>();
+        approvalRequestRepository.findAllByEntityTypeAndReferenceIdInAndRequestTypeOrderByCreatedDateDesc(
+                        ActivityEntityType.RFQ, rfqIds, requestType
+                ).forEach(request -> approvals.putIfAbsent(request.getReferenceId(), toSummaryDto(request)));
+        return approvals;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasPendingRfqCustomerTransferApproval(String rfqId) {
+        return approvalRequestRepository.existsByEntityTypeAndReferenceIdAndRequestTypeAndStatus(ActivityEntityType.RFQ, rfqId, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER, ApprovalRequestStatus.PENDING);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getPendingRfqCustomerTransferApprovals() {
+        return approvalRequestRepository.findAllByEntityTypeAndRequestTypeAndStatusOrderByRequestedDateDesc(ActivityEntityType.RFQ, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER, ApprovalRequestStatus.PENDING).stream().map(this::toSummaryDto).toList();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ApprovalRequestDto approveLatestApprovalByEntity(ActivityEntityType entityType, String referenceId, String userId)
             throws DataNotFoundException, InvalidRequestException {
@@ -340,6 +458,23 @@ public class ApprovalService {
         ApprovalRequestStepEntity step = getCurrentPendingStep(request);
         validateUserCanAct(step, userId);
         return approveStep(request, step, getUserOrThrow(userId), null, ApprovalSource.WEB);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ApprovalRequestDto approveLatestApprovalByEntityAndType(ActivityEntityType entityType, String referenceId, ApprovalRequestType requestType, String userId) throws DataNotFoundException, InvalidRequestException {
+        ApprovalRequestEntity request = getPendingRequestForEntityAndType(entityType, referenceId, requestType);
+        ApprovalRequestStepEntity step = getCurrentPendingStep(request);
+        validateUserCanAct(step, userId);
+        return approveStep(request, step, getUserOrThrow(userId), null, ApprovalSource.WEB);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ApprovalRequestDto rejectLatestApprovalByEntityAndType(ActivityEntityType entityType, String referenceId, ApprovalRequestType requestType, String reason, String userId) throws DataNotFoundException, InvalidRequestException {
+        if (StringUtils.isBlank(reason)) throw new InvalidRequestException("reason is required.");
+        ApprovalRequestEntity request = getPendingRequestForEntityAndType(entityType, referenceId, requestType);
+        ApprovalRequestStepEntity step = getCurrentPendingStep(request);
+        validateUserCanAct(step, userId);
+        return rejectStep(request, step, getUserOrThrow(userId), null, reason.trim(), ApprovalSource.WEB);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -375,6 +510,7 @@ public class ApprovalService {
                 .status(request.getStatus())
                 .currentStepNo(request.getCurrentStepNo())
                 .approverRoleCode(step.getApproverRoleCode())
+                .approverRoleCodes(step.getApproverRoles().stream().map(ApprovalRequestStepRoleEntity::getRoleCode).toList())
                 .approverDisplayName(step.getApproverUser() != null ? step.getApproverUser().getDisplayName() : step.getApproverRoleCode())
                 .rejectReason(step.getRejectReason())
                 .payload(parsePayload(request.getPayloadJson()))
@@ -696,7 +832,12 @@ public class ApprovalService {
         return generatedIdSequenceService.getNextIdWithMonth(BusinessConstant.DocumentPrefix.APPROVAL_REQUEST_PREFIX, 4);
     }
 
-    private Map<String, Object> buildUrgentRfqPayload(RfqHeaderEntity rfqEntity, String actorName) {
+    private Map<String, Object> buildUrgentRfqPayload(
+            RfqHeaderEntity rfqEntity,
+            String actorName,
+            String requestReason,
+            ZonedDateTime requestedDate
+    ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         String productFamilyName = rfqEntity.getProductFamilyEntity() != null
                 ? rfqEntity.getProductFamilyEntity().getNameTh()
@@ -720,10 +861,25 @@ public class ApprovalService {
         payload.put("productType", StringUtils.defaultIfBlank(productType, "-"));
         payload.put("capacity", rfqEntity.getCapacity());
         payload.put("salesName", actorName);
-        payload.put("urgentReason", rfqEntity.getUrgentRequestReason());
-        payload.put("requestedDate", rfqEntity.getRequestedDate() != null ? rfqEntity.getRequestedDate().toString() : null);
+        payload.put("urgentReason", requestReason);
+        payload.put("requestedDate", requestedDate != null ? requestedDate.toString() : null);
         payload.put("orderTypeName", rfqEntity.getOrderType() != null ? rfqEntity.getOrderType().getNameTh() : null);
         payload.put("rfqTypeName", rfqEntity.getRfqType() != null ? rfqEntity.getRfqType().getNameTh() : null);
+        payload.put("statusText", "รออนุมัติ");
+        return payload;
+    }
+
+    private Map<String, Object> buildRfqCustomerTransferPayload(RfqHeaderEntity rfq, CustomerEntity target, String actor, String reason, ZonedDateTime requestedDate) {
+        CustomerEntity current = rfq.getCustomer();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("rfqId", rfq.getId());
+        payload.put("currentCustomerId", current.getId());
+        payload.put("currentCustomerName", StringUtils.defaultIfBlank(current.getCustomerName(), current.getCompanyName()));
+        payload.put("targetCustomerId", target.getId());
+        payload.put("targetCustomerName", StringUtils.defaultIfBlank(target.getCustomerName(), target.getCompanyName()));
+        payload.put("requesterName", actor);
+        payload.put("reason", reason);
+        payload.put("requestedDate", requestedDate.toString());
         payload.put("statusText", "รออนุมัติ");
         return payload;
     }
@@ -791,6 +947,14 @@ public class ApprovalService {
             placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
             placeholders.put("requesterName", String.valueOf(payload.getOrDefault("requesterName", request.getRequestedBy())));
             placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("urgentReason", "-")));
+        } else if (request.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) {
+            placeholders.put("entityLabel", "คำขอย้ายลูกค้า RFQ");
+            placeholders.put("requestNo", String.valueOf(payload.getOrDefault("rfqId", request.getReferenceId())));
+            placeholders.put("customerName", String.valueOf(payload.getOrDefault("currentCustomerName", "-")) + " → " + String.valueOf(payload.getOrDefault("targetCustomerName", "-")));
+            placeholders.put("currentCustomerName", String.valueOf(payload.getOrDefault("currentCustomerName", "-")));
+            placeholders.put("targetCustomerName", String.valueOf(payload.getOrDefault("targetCustomerName", "-")));
+            placeholders.put("requesterName", String.valueOf(payload.getOrDefault("requesterName", request.getRequestedBy())));
+            placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("reason", "-")));
         } else {
             placeholders.put("entityLabel", "คำขอราคาเร่งด่วน");
             placeholders.put("requestNo", String.valueOf(payload.getOrDefault("rfqId", request.getReferenceId())));
@@ -812,7 +976,7 @@ public class ApprovalService {
 
     private String buildDetailUrl(ApprovalRequestEntity request) throws InvalidRequestException {
         String frontendBaseUrl = buildFrontendBaseUrl();
-        if (request.getRequestType() == ApprovalRequestType.URGENT_RFQ) {
+        if (request.getRequestType() == ApprovalRequestType.URGENT_RFQ || request.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) {
             return UriComponentsBuilder.fromUriString(frontendBaseUrl)
                     .path("/price-inquiry/" + request.getReferenceId())
                     .build()
@@ -867,6 +1031,14 @@ public class ApprovalService {
         return request;
     }
 
+    private ApprovalRequestEntity getPendingRequestForEntityAndType(ActivityEntityType entityType, String referenceId, ApprovalRequestType requestType) throws DataNotFoundException, InvalidRequestException {
+        ApprovalRequestEntity request = approvalRequestRepository.findFirstByEntityTypeAndReferenceIdAndRequestTypeOrderByCreatedDateDesc(entityType, referenceId, requestType)
+                .orElseThrow(() -> new DataNotFoundException("Pending approval request not found."));
+        hydrateAuditLogs(request);
+        if (request.getStatus() != ApprovalRequestStatus.PENDING) throw new InvalidRequestException("Approval request is not pending.");
+        return request;
+    }
+
     private ApprovalRequestEntity getApprovalRequestById(Long requestId) throws DataNotFoundException {
         ApprovalRequestEntity request = approvalRequestRepository.findById(requestId)
                 .orElseThrow(() -> new DataNotFoundException("Approval request " + requestId + " not found."));
@@ -910,6 +1082,10 @@ public class ApprovalService {
         if (step.getApproverUser() != null) {
             return StringUtils.equals(step.getApproverUser().getId(), actorUser.getId());
         }
+        if (!step.getApproverRoles().isEmpty()) {
+            String actorRole = actorUser.getUserRoleEntity() == null ? null : actorUser.getUserRoleEntity().getRoleCode();
+            return step.getApproverRoles().stream().anyMatch(role -> StringUtils.equals(role.getRoleCode(), actorRole));
+        }
         if (StringUtils.isNotBlank(step.getApproverRoleCode())) {
             return actorUser.getUserRoleEntity() != null
                     && StringUtils.equals(step.getApproverRoleCode(), actorUser.getUserRoleEntity().getRoleCode());
@@ -917,8 +1093,8 @@ public class ApprovalService {
         return false;
     }
 
-    private List<UserEntity> findApproversByRole(String roleCode) {
-        return userRepository.findByRoleIn(List.of(roleCode)).stream()
+    private List<UserEntity> findApproversByRoles(List<String> roleCodes) {
+        return userRepository.findByRoleIn(roleCodes).stream()
                 .filter(user -> Status.ACTIVE.equals(user.getStatus()))
                 .toList();
     }
@@ -1091,12 +1267,37 @@ public class ApprovalService {
         dto.setCurrentStepNo(entity.getCurrentStepNo());
         dto.setRequestedBy(entity.getRequestedBy());
         dto.setRequestedDate(entity.getRequestedDate());
+        dto.setRequestReason(entity.getRequestReason());
         dto.setApprovedDate(entity.getApprovedDate());
         dto.setRejectedDate(entity.getRejectedDate());
         dto.setRejectReason(entity.getRejectReason());
         dto.setPayload(parsePayload(entity.getPayloadJson()));
         dto.setSteps(entity.getSteps().stream().map(this::toStepDto).toList());
         dto.setAuditLogs(entity.getAuditLogs().stream().map(this::toAuditDto).toList());
+        dto.setCreatedDate(entity.getCreatedDate());
+        dto.setUpdatedDate(entity.getUpdatedDate());
+        return dto;
+    }
+
+    /** Lightweight representation for RFQ lists and pending approval queues; avoids loading steps and audit logs. */
+    private ApprovalRequestDto toSummaryDto(ApprovalRequestEntity entity) {
+        ApprovalRequestDto dto = new ApprovalRequestDto();
+        dto.setId(entity.getId());
+        dto.setRequestNo(entity.getRequestNo());
+        dto.setEntityType(entity.getEntityType());
+        dto.setReferenceId(entity.getReferenceId());
+        dto.setRequestType(entity.getRequestType());
+        dto.setTemplateCode(entity.getTemplateCode());
+        dto.setTitle(entity.getTitle());
+        dto.setStatus(entity.getStatus());
+        dto.setCurrentStepNo(entity.getCurrentStepNo());
+        dto.setRequestedBy(entity.getRequestedBy());
+        dto.setRequestedDate(entity.getRequestedDate());
+        dto.setRequestReason(entity.getRequestReason());
+        dto.setApprovedDate(entity.getApprovedDate());
+        dto.setRejectedDate(entity.getRejectedDate());
+        dto.setRejectReason(entity.getRejectReason());
+        dto.setPayload(parsePayload(entity.getPayloadJson()));
         dto.setCreatedDate(entity.getCreatedDate());
         dto.setUpdatedDate(entity.getUpdatedDate());
         return dto;
@@ -1109,6 +1310,7 @@ public class ApprovalService {
         dto.setApproverUserId(entity.getApproverUser() != null ? entity.getApproverUser().getId() : null);
         dto.setApproverDisplayName(entity.getApproverUser() != null ? entity.getApproverUser().getDisplayName() : null);
         dto.setApproverRoleCode(entity.getApproverRoleCode());
+        dto.setApproverRoleCodes(entity.getApproverRoles().stream().map(ApprovalRequestStepRoleEntity::getRoleCode).toList());
         dto.setStatus(entity.getStatus());
         dto.setSentAt(entity.getSentAt());
         dto.setActedAt(entity.getActedAt());

@@ -798,7 +798,7 @@ public class RFQSupplierService {
 
     private void ensureCanDeleteSupplierQuote(RfqHeaderEntity rfq, String userId) throws InvalidRequestException {
         String roleCode = userProfileService.getRoleCodeFromId(userId);
-        if (StringUtils.equals(roleCode, SUPER_ADMIN_ROLE_CODE)) {
+        if (StringUtils.equals(roleCode, RoleCode.SUPER_ADMIN.name())) {
             return;
         }
 
@@ -1746,7 +1746,7 @@ public class RFQSupplierService {
 
     private void sendSupplierQuoteSavedNotifications(RfqHeaderEntity rfq, RfqSupplierQuoteEntity quote) {
         try {
-            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of(SUPER_ADMIN_ROLE_CODE)).stream()
+            List<UserEntity> adminUsers = userRepository.findByRoleIn(List.of(RoleCode.SUPER_ADMIN.name())).stream()
                     .filter(user -> Status.ACTIVE.equals(user.getStatus()))
                     .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
                     .toList();

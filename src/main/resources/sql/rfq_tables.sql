@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS rfq_header (
     quotation_no VARCHAR(50) DEFAULT NULL,
     shipping_method VARCHAR(20) DEFAULT 'ALL',
     request_information TEXT DEFAULT NULL,
+    procurement_remark TEXT DEFAULT NULL,
     close_reason VARCHAR(255) DEFAULT NULL,
     close_remark TEXT DEFAULT NULL,
     created_date DATETIME(6) DEFAULT NULL,

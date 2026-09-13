@@ -74,6 +74,9 @@ public class PurchaseOrderService {
 
         SalesOrderEntity salesOrder = salesOrderRepository.findById(request.getSalesOrderNo())
                 .orElseThrow(() -> new DataNotFoundException("Sales order " + request.getSalesOrderNo() + " not found."));
+        if (salesOrder.getStatus() == SalesOrderStatus.CANCELLED) {
+            throw new InvalidRequestException("Cancelled sales order cannot create a purchase order");
+        }
         SupplierEntity supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new DataNotFoundException("Supplier " + request.getSupplierId() + " not found."));
         SupplierShippingEntity supplierShipping = supplierShippingRepository

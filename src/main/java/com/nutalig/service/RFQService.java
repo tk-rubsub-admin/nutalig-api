@@ -115,16 +115,21 @@ public class RFQService {
 
     @Transactional(readOnly = true)
     public com.nutalig.controller.response.Pageable<RfqHeaderDto> getAllRFQ(SearchRFQRequest searchRequest, PageableRequest pageableRequest) {
-        if (Boolean.TRUE.equals(searchRequest != null ? searchRequest.getPrioritizeApprovedUrgent() : null)) {
-            pageableRequest.setSortBy(null);
-            pageableRequest.setSortDirection(null);
-        } else if (pageableRequest.getSortBy() == null || pageableRequest.getSortDirection() == null) {
+        if (pageableRequest.getSortBy() == null || pageableRequest.getSortDirection() == null) {
             pageableRequest.setSortBy("requestedDate");
             pageableRequest.setSortDirection(Sort.Direction.DESC);
         }
 
-        Page<RfqHeaderDto> page = requestPriceHeaderRepository.findAll(buildSearchCriteria(searchRequest), pageableRequest.build())
-                .map(requestPriceHeaderMapper::toDto);
+        Page<RfqHeaderEntity> entityPage = requestPriceHeaderRepository.findAll(buildSearchCriteria(searchRequest), pageableRequest.build());
+        List<String> rfqIds = entityPage.getContent().stream().map(RfqHeaderEntity::getId).toList();
+        Map<String, ApprovalRequestDto> urgentApprovals = approvalService.findLatestRfqApprovalSummaries(rfqIds, ApprovalRequestType.URGENT_RFQ);
+        Map<String, ApprovalRequestDto> customerTransferApprovals = approvalService.findLatestRfqApprovalSummaries(rfqIds, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER);
+        Page<RfqHeaderDto> page = entityPage.map(entity -> {
+            RfqHeaderDto dto = requestPriceHeaderMapper.toDto(entity);
+            dto.setUrgentApproval(urgentApprovals.get(entity.getId()));
+            dto.setCustomerTransferApproval(customerTransferApprovals.get(entity.getId()));
+            return dto;
+        });
 
         com.nutalig.controller.response.Pageable<RfqHeaderDto> response =
                 new com.nutalig.controller.response.Pageable<>();
@@ -630,19 +635,13 @@ public class RFQService {
         entity.setShippingMethod(normalizeRfqShippingMethod(request.getShippingMethod()));
         entity.setCreatedBy(actor);
         entity.setUpdatedBy(actor);
-        entity.setUrgentRequest(Boolean.TRUE.equals(request.getUrgentRequest()));
-
-        if (Boolean.TRUE.equals(entity.getUrgentRequest())) {
+        boolean isUrgentRequest = Boolean.TRUE.equals(request.getUrgentRequest());
+        String urgentRequestReason = null;
+        if (isUrgentRequest) {
             if (StringUtils.isBlank(request.getUrgentRequestReason())) {
                 throw new InvalidRequestException("urgentRequestReason is required.");
             }
-
-            entity.setUrgentRequestReason(request.getUrgentRequestReason().trim());
-            entity.setUrgentRequestStatus(UrgentRequestStatus.PENDING_APPROVAL);
-            entity.setUrgentRequestedBy(actor);
-            entity.setUrgentRequestedDate(now);
-        } else {
-            entity.setUrgentRequest(Boolean.FALSE);
+            urgentRequestReason = request.getUrgentRequestReason().trim();
         }
 
         applyRelations(
@@ -690,14 +689,14 @@ public class RFQService {
                 ActivityActorType.USER,
                 ActivityAction.CREATE,
                 ActivitySource.API,
-                Boolean.TRUE.equals(entity.getUrgentRequest())
+                isUrgentRequest
                         ? "สร้างคำขอราคาเร่งด่วนเลขที่ " + entity.getId()
                         : "สร้างคำขอราคาเลขที่ " + entity.getId(),
                 detail
         );
 
-        if (Boolean.TRUE.equals(entity.getUrgentRequest())) {
-            approvalService.createUrgentRfqApprovalRequest(entity, userId);
+        if (isUrgentRequest) {
+            approvalService.createUrgentRfqApprovalRequest(entity, urgentRequestReason, userId);
         } else {
             sendAwaitingAcceptNotifications(entity);
             Optional<UserEntity> userEntityOptional = userRepository.findByEmployeeEntity_EmployeeId(entity.getProcurement().getEmployeeId());
@@ -903,16 +902,27 @@ public class RFQService {
             throw new InvalidRequestException("urgentRequestMessage is required.");
         }
 
-        entity.setUrgentRequest(Boolean.TRUE);
-        entity.setUrgentRequestReason(urgentRequestMessage.trim());
-        entity.setUrgentRequestStatus(UrgentRequestStatus.PENDING_APPROVAL);
-        entity.setUrgentRequestedBy(actor);
-        entity.setUrgentRequestedDate(now);
+        if (approvalService.hasUrgentRfqApproval(rfqId)) {
+            throw new InvalidRequestException("RFQ already has an urgent approval request.");
+        }
         entity.setUpdatedBy(actor);
         entity.setUpdatedDate(now);
         requestPriceHeaderRepository.save(entity);
 
-        approvalService.createUrgentRfqApprovalRequest(entity, userId);
+        approvalService.createUrgentRfqApprovalRequest(entity, urgentRequestMessage.trim(), userId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void createCustomerTransferApprovalRequest(String rfqId, RequestRfqCustomerTransferApprovalRequest request, String userId) throws Exception {
+        RfqHeaderEntity rfq = getEntityById(rfqId);
+        if (rfq.getCustomer() == null) throw new InvalidRequestException("RFQ has no customer. Use link customer instead.");
+        if (request == null || StringUtils.isBlank(request.getTargetCustomerId())) throw new InvalidRequestException("targetCustomerId is required.");
+        if (StringUtils.isBlank(request.getReason())) throw new InvalidRequestException("reason is required.");
+        String targetId = request.getTargetCustomerId().trim();
+        if (StringUtils.equals(rfq.getCustomer().getId(), targetId)) throw new InvalidRequestException("Target customer must be different from the current customer.");
+        CustomerEntity target = customerRepository.findById(targetId).orElseThrow(() -> new DataNotFoundException("Customer " + targetId + " not found."));
+        if (approvalService.hasPendingRfqCustomerTransferApproval(rfqId)) throw new InvalidRequestException("RFQ already has a pending customer transfer approval request.");
+        approvalService.createRfqCustomerTransferApprovalRequest(rfq, target, request.getReason().trim(), userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -1110,6 +1120,9 @@ public class RFQService {
         String userId
     ) throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity entity = getEntityById(rfqId);
+        if (entity.getCustomer() != null) {
+            throw new InvalidRequestException("RFQ already has a customer. Request customer transfer approval to change it.");
+        }
         if (StringUtils.isBlank(customerId)) {
             throw new InvalidRequestException("CustomerId is required");
         }
@@ -1123,6 +1136,47 @@ public class RFQService {
         entity.setUpdatedBy(updatedBy);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         requestPriceHeaderRepository.save(entity);
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto updateProcurementRemark(
+            String rfqId,
+            String procurementRemark,
+            String userId
+    ) throws DataNotFoundException {
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        String normalizedRemark = StringUtils.trimToNull(procurementRemark);
+        if (normalizedRemark == null) {
+            return mapToDto(entity);
+        }
+
+        List<RfqProcurementRemarkDto> remarks = parseProcurementRemarks(entity.getProcurementRemark());
+        RfqProcurementRemarkDto newRemark = new RfqProcurementRemarkDto();
+        newRemark.setRemark(normalizedRemark);
+        newRemark.setCreatedBy(userProfileService.getNameFromId(userId));
+        newRemark.setCreatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        remarks.add(newRemark);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("procurementRemark", newRemark);
+
+        entity.setProcurementRemark(serializeProcurementRemarks(remarks));
+        entity.setUpdatedBy(newRemark.getCreatedBy());
+        entity.setUpdatedDate(newRemark.getCreatedDate());
+        requestPriceHeaderRepository.save(entity);
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "แก้ไขหมายเหตุจัดซื้อของคำขอราคาเลขที่ " + entity.getId(),
+                detail
+        );
 
         return mapToDto(entity);
     }
@@ -1187,6 +1241,63 @@ public class RFQService {
         saveRfqStatusTimeline(entity, RfqStatus.COMPLETED, entity.getConfirmedDate());
 
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void rollbackSalesOrderLink(String saleOrderId, String cancelReason, String userId) {
+        if (StringUtils.isBlank(saleOrderId)) {
+            return;
+        }
+
+        Optional<RfqHeaderEntity> optionalRfq = requestPriceHeaderRepository.findFirstBySaleOrderId(saleOrderId);
+        if (optionalRfq.isEmpty()) {
+            return;
+        }
+
+        RfqHeaderEntity entity = optionalRfq.get();
+        if (!StringUtils.equals(entity.getSaleOrderId(), saleOrderId)) {
+            return;
+        }
+
+        RfqStatus previousStatus = entity.getStatus();
+        Map<String, Object> activityDetail = new LinkedHashMap<>();
+        activityDetail.put("saleOrderId", saleOrderId);
+        activityDetail.put("previousStatus", previousStatus);
+        activityDetail.put("previousConfirmedDetailId", entity.getConfirmedDetailId());
+        activityDetail.put("previousConfirmedTierId", entity.getConfirmedTierId());
+        activityDetail.put("previousConfirmedSupplierQuoteId", entity.getConfirmedSupplierQuoteId());
+        activityDetail.put("previousConfirmedShippingMethod", entity.getConfirmedShippingMethod());
+        activityDetail.put("previousConfirmedPrice", entity.getConfirmedPrice());
+        activityDetail.put("previousConfirmedDate", entity.getConfirmedDate());
+        activityDetail.put("cancelReason", cancelReason);
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        entity.setSaleOrderId(null);
+        entity.setConfirmedDetailId(null);
+        entity.setConfirmedTierId(null);
+        entity.setConfirmedSupplierQuoteId(null);
+        entity.setConfirmedShippingMethod(null);
+        entity.setConfirmedPrice(null);
+        entity.setConfirmedDate(null);
+        if (RfqStatus.COMPLETED.equals(entity.getStatus())) {
+            entity.setStatus(RfqStatus.QUOTED);
+            saveRfqStatusTimeline(entity, RfqStatus.QUOTED, now);
+        }
+        entity.setUpdatedBy(userProfileService.getNameFromId(userId));
+        entity.setUpdatedDate(now);
+        requestPriceHeaderRepository.save(entity);
+
+        activityDetail.put("status", entity.getStatus());
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.STATUS_CHANGE,
+                ActivitySource.API,
+                "ยกเลิกการเชื่อม Sales Order " + saleOrderId + " ของคำขอราคาเลขที่ " + entity.getId(),
+                activityDetail
+        );
     }
 
     private List<ResolvedLinkSelection> resolveLinkSelections(
@@ -1634,6 +1745,12 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto approveCustomerTransferRequest(String id, String userId) throws DataNotFoundException, InvalidRequestException {
+        approvalService.approveLatestApprovalByEntityAndType(ActivityEntityType.RFQ, id, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER, userId);
+        return mapToDto(getEntityById(id));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto requestSpecialPrice(String id, RequestSpecialPriceRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity entity = getEntityById(id);
         String actor = userProfileService.getNameFromId(userId);
@@ -1759,6 +1876,13 @@ public class RFQService {
         }
 
         approvalService.rejectLatestApprovalByEntity(ActivityEntityType.RFQ, id, request.getReason().trim(), userId);
+        return mapToDto(getEntityById(id));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto rejectCustomerTransferRequest(String id, RejectUrgentRfqRequest request, String userId) throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getReason())) throw new InvalidRequestException("reason is required.");
+        approvalService.rejectLatestApprovalByEntityAndType(ActivityEntityType.RFQ, id, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER, request.getReason().trim(), userId);
         return mapToDto(getEntityById(id));
     }
 
@@ -2583,6 +2707,9 @@ public class RFQService {
 
     public RfqHeaderDto mapToDto(RfqHeaderEntity entity) throws DataNotFoundException {
         RfqHeaderDto dto = requestPriceHeaderMapper.toDto(entity);
+        dto.setUrgentApproval(approvalService.findUrgentRfqApproval(entity.getId()).orElse(null));
+        dto.setCustomerTransferApproval(approvalService.findRfqCustomerTransferApproval(entity.getId()).orElse(null));
+        dto.setProcurementRemarks(parseProcurementRemarks(entity.getProcurementRemark()));
         List<RfqQuotationDto> quotations = getRfqQuotationDtos(entity.getId());
         dto.setQuotations(quotations);
         dto.setQuotationNo(quotations.isEmpty() ? null : quotations.get(0).getQuotationNo());
@@ -2639,6 +2766,7 @@ public class RFQService {
         detail.put("requestInformation", entity.getRequestInformation());
         detail.put("requestTo", entity.getRequestTo());
         detail.put("note", entity.getNote());
+        detail.put("procurementRemarks", parseProcurementRemarks(entity.getProcurementRemark()));
         detail.put("contactName", entity.getContactName());
         detail.put("contactPhone", entity.getContactPhone());
         detail.put("contactChannel", entity.getContactChannel());
@@ -2655,16 +2783,6 @@ public class RFQService {
         detail.put("capacity", entity.getCapacity());
         detail.put("requestedMoqs", parseRequestedMoq(entity.getRequestedMoq()));
         detail.put("requestSample", entity.getRequestSample());
-        detail.put("urgentRequest", entity.getUrgentRequest());
-        detail.put("urgentRequestReason", entity.getUrgentRequestReason());
-        detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());
-        detail.put("urgentRequestedBy", entity.getUrgentRequestedBy());
-        detail.put("urgentRequestedDate", entity.getUrgentRequestedDate());
-        detail.put("urgentApprovedBy", entity.getUrgentApprovedBy());
-        detail.put("urgentApprovedDate", entity.getUrgentApprovedDate());
-        detail.put("urgentRejectedBy", entity.getUrgentRejectedBy());
-        detail.put("urgentRejectedDate", entity.getUrgentRejectedDate());
-        detail.put("urgentRejectReason", entity.getUrgentRejectReason());
         detail.put("description", entity.getDescription());
         detail.put("closeReasonCode", entity.getCloseReason() != null ? entity.getCloseReason().getId().getCode() : null);
         detail.put("closeRemark", entity.getCloseRemark());
@@ -2753,7 +2871,6 @@ public class RFQService {
         entity.setDescription(StringUtils.trimToNull(readRfqUploadCell(row, headerIndexMap, evaluator, "description")));
         entity.setCreatedBy(actor);
         entity.setUpdatedBy(actor);
-        entity.setUrgentRequest(Boolean.FALSE);
 
         EmployeeEntity sales = resolveSales(salesId);
         EmployeeEntity procurement = resolveDefaultProcurementForSales(sales);
@@ -3057,6 +3174,48 @@ public class RFQService {
         } catch (Exception exception) {
             log.warn("Cannot parse request information json", exception);
             return new ArrayList<>();
+        }
+    }
+
+    private List<RfqProcurementRemarkDto> parseProcurementRemarks(String procurementRemarkJson) {
+        if (StringUtils.isBlank(procurementRemarkJson)) {
+            return new ArrayList<>();
+        }
+
+        String trimmedJson = procurementRemarkJson.trim();
+        if (!trimmedJson.startsWith("{") && !trimmedJson.startsWith("[")) {
+            return legacyProcurementRemark(procurementRemarkJson);
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(procurementRemarkJson);
+            JsonNode entries = root.isObject() ? root.path("entries") : root;
+            if (entries.isArray()) {
+                return new ArrayList<>(objectMapper.convertValue(
+                        entries,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, RfqProcurementRemarkDto.class)
+                ));
+            }
+        } catch (Exception exception) {
+            log.warn("Cannot parse procurement remark history", exception);
+        }
+
+        return legacyProcurementRemark(procurementRemarkJson);
+    }
+
+    private List<RfqProcurementRemarkDto> legacyProcurementRemark(String remark) {
+        RfqProcurementRemarkDto legacyRemark = new RfqProcurementRemarkDto();
+        legacyRemark.setRemark(remark);
+        legacyRemark.setCreatedBy("Unknown");
+        return new ArrayList<>(List.of(legacyRemark));
+    }
+
+    private String serializeProcurementRemarks(List<RfqProcurementRemarkDto> remarks) {
+        try {
+            JsonNode entries = objectMapper.valueToTree(remarks == null ? List.of() : remarks);
+            return objectMapper.createObjectNode().set("entries", entries).toString();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot serialize procurement remark history", exception);
         }
     }
 
@@ -3767,16 +3926,6 @@ public class RFQService {
         }
     }
 
-    private void validateUrgentPendingApproval(RfqHeaderEntity entity) throws InvalidRequestException {
-        if (!Boolean.TRUE.equals(entity.getUrgentRequest())) {
-            throw new InvalidRequestException("RFQ is not an urgent request.");
-        }
-
-        if (!UrgentRequestStatus.PENDING_APPROVAL.equals(entity.getUrgentRequestStatus())) {
-            throw new InvalidRequestException("Urgent request is not pending approval.");
-        }
-    }
-
     private void attachPictures(RfqHeaderEntity entity, List<MultipartFile> pictures, String fileType, String userId) throws Exception {
         if (pictures == null || pictures.isEmpty()) {
             return;
@@ -3868,7 +4017,6 @@ public class RFQService {
         return Specification.where(idEqual(request.getId()))
                 .and(statusIn(statuses))
                 .and(isAcceptEqual(request.getIsAccept()))
-                .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
                 .and(customerIdEqual(request.getCustomerId()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(procurementIdEqual(request.getProcurementId()))
@@ -3882,8 +4030,7 @@ public class RFQService {
                 .and(productSubtype1Equal(request.getProductSubtype1()))
                 .and(productMaterialEqual(request.getProductMaterial()))
                 .and(requestedDateBetween(request.getRequestedDateStart(), request.getRequestedDateEnd()))
-                .and(keywordContain(request.getKeyword()))
-                .and(Boolean.TRUE.equals(request.getPrioritizeApprovedUrgent()) ? orderByApprovedUrgentFirst() : null);
+                .and(keywordContain(request.getKeyword()));
     }
 
     private String displayRfqStatus(RfqStatus status) {

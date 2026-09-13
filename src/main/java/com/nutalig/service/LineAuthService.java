@@ -43,6 +43,7 @@ public class LineAuthService {
     private static final String INTENT_REGISTER = "register";
     private static final String REGISTER_INVITE_INTENT = "register_invite";
     private static final String LINE_REGISTER_ACTOR = "LINE_REGISTER";
+    private static final String LINE_LOGIN_ACTOR = "LINE_LOGIN";
     private static final String SUPER_ADMIN_ACTOR = "USER-000001";
     private static final long STATE_EXPIRATION_SECONDS = 10 * 60;
     private static final long REGISTER_INVITE_EXPIRATION_SECONDS = 7 * 24 * 60 * 60;
@@ -58,9 +59,19 @@ public class LineAuthService {
     private final AppSessionService appSessionService;
 
     public LineLoginResponse login(LineLoginRequest request) throws InvalidRequestException, DataNotFoundException {
-        UserDto user = getAuthenticatedUserByAccessToken(request.getAccessToken());
+        LineProfileResponse profile = resolveProfileFromAccessToken(request.getAccessToken());
+        UserDto user = userDetailsService.getUserByLineUserId(profile.getUserId());
         UserEntity userEntity = userRepository.findById(user.getId())
                 .orElseThrow(() -> new DataNotFoundException("User " + user.getId() + " not found."));
+
+        String latestPictureUrl = StringUtils.trimToNull(profile.getPictureUrl());
+        String currentPictureUrl = StringUtils.trimToNull(userEntity.getPictureUrl());
+        if (latestPictureUrl != null && !StringUtils.equals(currentPictureUrl, latestPictureUrl)) {
+            userEntity.setPictureUrl(latestPictureUrl);
+            userEntity.setUpdatedBy(LINE_LOGIN_ACTOR);
+            userRepository.save(userEntity);
+        }
+
         String sessionToken = appSessionService.issueSessionToken(userEntity, request.getDeviceType());
         return new LineLoginResponse(sessionToken, userDetailsService.getUserById(userEntity.getId()));
     }

@@ -2,7 +2,6 @@ package com.nutalig.entity;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.constant.RequestInfoTo;
-import com.nutalig.constant.UrgentRequestStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Table;
 import jakarta.persistence.*;
@@ -162,37 +161,6 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "is_request_sample")
     private Boolean requestSample;
 
-    @Column(name = "is_urgent_request")
-    private Boolean urgentRequest;
-
-    @Column(name = "urgent_request_reason", columnDefinition = "TEXT")
-    private String urgentRequestReason;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "urgent_request_status", length = 30)
-    private UrgentRequestStatus urgentRequestStatus;
-
-    @Column(name = "urgent_requested_by")
-    private String urgentRequestedBy;
-
-    @Column(name = "urgent_requested_date")
-    private ZonedDateTime urgentRequestedDate;
-
-    @Column(name = "urgent_approved_by")
-    private String urgentApprovedBy;
-
-    @Column(name = "urgent_approved_date")
-    private ZonedDateTime urgentApprovedDate;
-
-    @Column(name = "urgent_rejected_by")
-    private String urgentRejectedBy;
-
-    @Column(name = "urgent_rejected_date")
-    private ZonedDateTime urgentRejectedDate;
-
-    @Column(name = "urgent_reject_reason", columnDefinition = "TEXT")
-    private String urgentRejectReason;
-
     @ToString.Include
     @Column(name = "description")
     private String description;
@@ -249,6 +217,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
 
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
+
+    @Column(name = "procurement_remark", columnDefinition = "TEXT")
+    private String procurementRemark;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumnsOrFormulas({

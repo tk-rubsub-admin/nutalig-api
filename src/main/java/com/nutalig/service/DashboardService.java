@@ -1,12 +1,15 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.RfqStatus;
+import com.nutalig.constant.ActivityEntityType;
+import com.nutalig.constant.ApprovalRequestType;
 import com.nutalig.config.AppProperties;
 import com.nutalig.dto.*;
 import com.nutalig.entity.*;
 import com.nutalig.repository.QuotationRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.RfqStatusTimelineRepository;
+import com.nutalig.repository.ApprovalRequestRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,8 @@ import static com.nutalig.repository.specification.RequestPriceHeaderSpecificati
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+
+    private final ApprovalRequestRepository approvalRequestRepository;
 
     private static final DateTimeFormatter REQUEST_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM");
     private static final List<String> DISTRIBUTION_PALETTE = List.of(
@@ -255,6 +260,11 @@ public class DashboardService {
                         LinkedHashMap::new,
                         Collectors.toList()
                 ));
+        Set<String> urgentRfqIds = approvalRequestRepository
+                .findAllByEntityTypeAndRequestType(ActivityEntityType.RFQ, ApprovalRequestType.URGENT_RFQ)
+                .stream()
+                .map(approval -> approval.getReferenceId())
+                .collect(Collectors.toSet());
 
         DashboardTrendChartDto volumeChart = new DashboardTrendChartDto();
         volumeChart.setId("rfq-volume");
@@ -263,8 +273,8 @@ public class DashboardService {
         volumeChart.setUnit("COUNT");
         volumeChart.setLabels(dates.stream().map(date -> date.format(REQUEST_DATE_FORMAT)).toList());
         volumeChart.setSeries(List.of(
-                series("งานปกติ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> Boolean.FALSE.equals(item.getUrgentRequest()) || item.getUrgentRequest() == null).count()),
-                series("งานเร่งด่วน", "#f2994a", dates, rfqByDate, items -> (double) items.stream().filter(item -> Boolean.TRUE.equals(item.getUrgentRequest())).count())
+                series("งานปกติ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> !urgentRfqIds.contains(item.getId())).count()),
+                series("งานเร่งด่วน", "#f2994a", dates, rfqByDate, items -> (double) items.stream().filter(item -> urgentRfqIds.contains(item.getId())).count())
         ));
         volumeChart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
 

@@ -88,6 +88,30 @@ public class RFQActionController {
         return new GeneralResponse<>(SUCCESS);
     }
 
+    @PostMapping("/{id}/customer-transfer-approvals")
+    public GeneralResponse requestCustomerTransferApproval(
+            @PathVariable("id") String id,
+            @RequestBody RequestRfqCustomerTransferApprovalRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        rfqService.createCustomerTransferApprovalRequest(id, request, userId);
+        return new GeneralResponse<>(SUCCESS);
+    }
+
+    @PatchMapping("/{id}/customer-transfer/approve")
+    public GeneralResponse<RfqHeaderDto> approveCustomerTransfer(
+            @PathVariable("id") String id, @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, rfqService.approveCustomerTransferRequest(id, userId));
+    }
+
+    @PatchMapping("/{id}/customer-transfer/reject")
+    public GeneralResponse<RfqHeaderDto> rejectCustomerTransfer(
+            @PathVariable("id") String id, @RequestBody RejectUrgentRfqRequest request, @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, rfqService.rejectCustomerTransferRequest(id, request, userId));
+    }
+
     @PatchMapping("/{id}/urgent/approve")
     public GeneralResponse<RfqHeaderDto> approveUrgentRfq(
             @PathVariable("id") String id,

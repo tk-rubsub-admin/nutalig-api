@@ -3028,3 +3028,17 @@ databaseChangeLog:
       file: db/changelog/20260908-002-add-project-to-rfq-header.yaml
   - include:
       file: db/changelog/20260908-003-add-project-to-quotation.yaml
+  - include:
+      file: db/changelog/20260910-001-add-procurement-remark-to-rfq-header.yaml
+  - include:
+      file: db/changelog/20260912-001-add-sales-order-cancel-reason.yaml
+  - include:
+      file: db/changelog/20260912-002-add-sales-order-cancel-permission.yaml
+  - include:
+      file: db/changelog/20260912-003-move-rfq-urgent-to-approval-request.yaml
+  - include:
+      file: db/changelog/20260912-004-remove-rfq-urgent.yaml
+  - include:
+      file: db/changelog/20260912-005-add-approval-step-roles.yaml
+  - include:
+      file: db/changelog/20260913-001-add-rfq-customer-transfer-approve-permission.yaml

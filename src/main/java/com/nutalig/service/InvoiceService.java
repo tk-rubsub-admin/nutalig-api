@@ -104,6 +104,9 @@ public class InvoiceService {
         validateCreateRequest(request);
         SalesOrderEntity salesOrder = salesOrderRepository.findById(request.getSalesOrderNo())
                 .orElseThrow(() -> new DataNotFoundException("Sales order " + request.getSalesOrderNo() + " not found."));
+        if (salesOrder.getStatus() == SalesOrderStatus.CANCELLED) {
+            throw new InvalidRequestException("Cancelled sales order cannot create an invoice");
+        }
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 

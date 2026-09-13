@@ -2,7 +2,6 @@ package com.nutalig.dto;
 
 import com.nutalig.constant.RfqStatus;
 import com.nutalig.constant.RequestInfoTo;
-import com.nutalig.constant.UrgentRequestStatus;
 import lombok.Data;
 
 import java.time.ZonedDateTime;
@@ -33,16 +32,8 @@ public class RfqHeaderDto {
     private String capacity;
     private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
-    private Boolean urgentRequest;
-    private String urgentRequestReason;
-    private UrgentRequestStatus urgentRequestStatus;
-    private String urgentRequestedBy;
-    private ZonedDateTime urgentRequestedDate;
-    private String urgentApprovedBy;
-    private ZonedDateTime urgentApprovedDate;
-    private String urgentRejectedBy;
-    private ZonedDateTime urgentRejectedDate;
-    private String urgentRejectReason;
+    private ApprovalRequestDto urgentApproval;
+    private ApprovalRequestDto customerTransferApproval;
     private String description;
     private String project;
     private String createdBy;
@@ -63,6 +54,8 @@ public class RfqHeaderDto {
     private RequestInfoTo requestTo;
     private String note;
     private String remark;
+    private String procurementRemark;
+    private List<RfqProcurementRemarkDto> procurementRemarks;
     private SystemConfigDto closeReason;
     private String closeRemark;
     private List<RfqStatusTimelineDto> rfqStatusTimeline;

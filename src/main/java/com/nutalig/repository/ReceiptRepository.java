@@ -7,8 +7,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface ReceiptRepository extends JpaRepository<ReceiptEntity, String>, JpaSpecificationExecutor<ReceiptEntity> {
+    List<ReceiptEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
+
     @Query(value = """
             select count(*)
             from receipt
