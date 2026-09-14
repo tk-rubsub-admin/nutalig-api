@@ -6,6 +6,7 @@ import com.nutalig.dto.ProductMaterialDto;
 import com.nutalig.dto.ProductSubtype1Dto;
 import com.nutalig.dto.ProductSubtype2Dto;
 import com.nutalig.entity.ProductFamilyEntity;
+import com.nutalig.entity.ProductMaterialEntity;
 import com.nutalig.entity.ProductSubtype1Entity;
 import com.nutalig.entity.ProductSubtype2Entity;
 import com.nutalig.exception.DataNotFoundException;
@@ -42,7 +43,6 @@ public class ProductService {
     private final ProductMaterialMapper productMaterialMapper;
     private final ProductSubtype1Mapper productSubtype1Mapper;
     private final ProductSubtype2Mapper productSubtype2Mapper;
-
     @Transactional(readOnly = true)
     public List<ProductFamilyDto> getAllProductFamily() {
         log.info("Get all product families");
@@ -106,6 +106,25 @@ public class ProductService {
                 .toList();
     }
 
+    @Transactional
+    public ProductMaterialDto createProductMaterial(CreateProductMaterialRequest request)
+            throws InvalidRequestException, DataNotFoundException {
+        log.info("Create product material request: {}", request);
+
+        validateCreateMaterialRequest(request);
+        String familyCode = request.getProductFamilyCode().trim();
+        validateProductFamilyExists(familyCode);
+
+        ProductMaterialEntity entity = new ProductMaterialEntity();
+        entity.setProductFamilyCode(familyCode);
+        entity.setNameTh(StringUtils.trimToNull(request.getNameTh()));
+        entity.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        entity = productMaterialRepository.save(entity);
+
+        log.info("Create product material success code: {}, family: {}", entity.getCode(), familyCode);
+        return productMaterialMapper.toDto(entity);
+    }
+
     @Transactional(readOnly = true)
     public List<ProductSubtype2Dto> getProductSubtype2BySubtype1(String subtype1Code) {
         log.info("Get product subtype2 by subtype1 code: {}", subtype1Code);
@@ -121,18 +140,11 @@ public class ProductService {
 
         validateCreateRequest(request);
 
-        boolean existed = productFamilyRepository.findById(request.getCode().trim()).isPresent();
-        if (existed) {
-            throw new InvalidRequestException("Product family code " + request.getCode() + " already exists.");
-        }
-
-        ProductFamilyDto dto = new ProductFamilyDto();
-        dto.setCode(request.getCode().trim());
-        dto.setNameTh(StringUtils.trimToNull(request.getNameTh()));
-        dto.setNameEn(StringUtils.trimToNull(request.getNameEn()));
-        dto.setIsActive(request.getIsActive() == null ? Boolean.TRUE : request.getIsActive());
-
-        ProductFamilyEntity entity = productFamilyRepository.save(productFamilyMapper.toEntity(dto));
+        ProductFamilyEntity entity = new ProductFamilyEntity();
+        entity.setNameTh(StringUtils.trimToNull(request.getNameTh()));
+        entity.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        entity.setIsActive(request.getIsActive() == null ? Boolean.TRUE : request.getIsActive());
+        entity = productFamilyRepository.save(entity);
 
         log.info("Create product family success code: {}", entity.getCode());
         return productFamilyMapper.toDto(entity);
@@ -188,19 +200,12 @@ public class ProductService {
         validateCreateSubtype1Request(request);
         validateProductFamilyExists(request.getProductFamilyCode().trim());
 
-        boolean existed = productSubtype1Repository.findById(request.getCode().trim()).isPresent();
-        if (existed) {
-            throw new InvalidRequestException("Product subtype1 code " + request.getCode() + " already exists.");
-        }
-
-        ProductSubtype1Dto dto = new ProductSubtype1Dto();
-        dto.setCode(request.getCode().trim());
-        dto.setProductFamilyCode(request.getProductFamilyCode().trim());
-        dto.setNameTh(StringUtils.trimToNull(request.getNameTh()));
-        dto.setNameEn(StringUtils.trimToNull(request.getNameEn()));
-        dto.setSubtype2Required(Boolean.TRUE.equals(request.getSubtype2Required()));
-
-        ProductSubtype1Entity entity = productSubtype1Repository.save(productSubtype1Mapper.toEntity(dto));
+        ProductSubtype1Entity entity = new ProductSubtype1Entity();
+        entity.setProductFamilyCode(request.getProductFamilyCode().trim());
+        entity.setNameTh(StringUtils.trimToNull(request.getNameTh()));
+        entity.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        entity.setSubtype2Required(Boolean.TRUE.equals(request.getSubtype2Required()));
+        entity = productSubtype1Repository.save(entity);
 
         log.info("Create product subtype1 success code: {}", entity.getCode());
         return productSubtype1Mapper.toDto(entity);
@@ -262,18 +267,11 @@ public class ProductService {
         validateCreateSubtype2Request(request);
         validateProductSubtype1Exists(request.getProductSubtype1Code().trim());
 
-        boolean existed = productSubtype2Repository.findById(request.getCode().trim()).isPresent();
-        if (existed) {
-            throw new InvalidRequestException("Product subtype2 code " + request.getCode() + " already exists.");
-        }
-
-        ProductSubtype2Dto dto = new ProductSubtype2Dto();
-        dto.setCode(request.getCode().trim());
-        dto.setProductSubtype1Code(request.getProductSubtype1Code().trim());
-        dto.setNameTh(StringUtils.trimToNull(request.getNameTh()));
-        dto.setNameEn(StringUtils.trimToNull(request.getNameEn()));
-
-        ProductSubtype2Entity entity = productSubtype2Repository.save(productSubtype2Mapper.toEntity(dto));
+        ProductSubtype2Entity entity = new ProductSubtype2Entity();
+        entity.setProductSubtype1Code(request.getProductSubtype1Code().trim());
+        entity.setNameTh(StringUtils.trimToNull(request.getNameTh()));
+        entity.setNameEn(StringUtils.trimToNull(request.getNameEn()));
+        entity = productSubtype2Repository.save(entity);
 
         log.info("Create product subtype2 success code: {}", entity.getCode());
         return productSubtype2Mapper.toDto(entity);
@@ -324,9 +322,6 @@ public class ProductService {
             throw new InvalidRequestException("Request is required.");
         }
 
-        if (StringUtils.isBlank(request.getCode())) {
-            throw new InvalidRequestException("Product family code is required.");
-        }
     }
 
     private void validateCreateSubtype1Request(CreateProductSubtype1Request request) throws InvalidRequestException {
@@ -334,8 +329,14 @@ public class ProductService {
             throw new InvalidRequestException("Request is required.");
         }
 
-        if (StringUtils.isBlank(request.getCode())) {
-            throw new InvalidRequestException("Product subtype1 code is required.");
+        if (StringUtils.isBlank(request.getProductFamilyCode())) {
+            throw new InvalidRequestException("Product family code is required.");
+        }
+    }
+
+    private void validateCreateMaterialRequest(CreateProductMaterialRequest request) throws InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("Request is required.");
         }
 
         if (StringUtils.isBlank(request.getProductFamilyCode())) {
@@ -346,10 +347,6 @@ public class ProductService {
     private void validateCreateSubtype2Request(CreateProductSubtype2Request request) throws InvalidRequestException {
         if (request == null) {
             throw new InvalidRequestException("Request is required.");
-        }
-
-        if (StringUtils.isBlank(request.getCode())) {
-            throw new InvalidRequestException("Product subtype2 code is required.");
         }
 
         if (StringUtils.isBlank(request.getProductSubtype1Code())) {

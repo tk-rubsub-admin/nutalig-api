@@ -2710,13 +2710,17 @@ public class RFQService {
         dto.setUrgentApproval(approvalService.findUrgentRfqApproval(entity.getId()).orElse(null));
         dto.setCustomerTransferApproval(approvalService.findRfqCustomerTransferApproval(entity.getId()).orElse(null));
         dto.setProcurementRemarks(parseProcurementRemarks(entity.getProcurementRemark()));
-        List<RfqQuotationDto> quotations = getRfqQuotationDtos(entity.getId());
+        String customerId = entity.getCustomer() == null ? null : entity.getCustomer().getId();
+        List<RfqQuotationDto> quotations = getRfqQuotationDtos(entity.getId()).stream()
+                .filter(quotation -> StringUtils.equals(quotation.getCustomerId(), customerId))
+                .collect(Collectors.toCollection(ArrayList::new));
+        quotations.forEach(quotation -> quotation.setIsLatest(false));
+        if (!quotations.isEmpty()) quotations.get(0).setIsLatest(true);
         dto.setQuotations(quotations);
         dto.setQuotationNo(quotations.isEmpty() ? null : quotations.get(0).getQuotationNo());
         return dto;
 //        dto.setServiceLevelAgreement(slaConfigService.getSlaConfigById(SLA));
 //        dto.getServiceLevelAgreement().setDayLeft(slaConfigService.calculateDayLeft(dto.getServiceLevelAgreement(), dto.getRequestedDate().toLocalDate()));
-//        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -3654,6 +3658,7 @@ public class RFQService {
         RfqQuotationDto quotationDto = new RfqQuotationDto();
         quotationDto.setQuotationNo(quotationEntity.getQuotationNo());
         quotationDto.setRfqId(quotationEntity.getRfqId());
+        quotationDto.setCustomerId(quotationEntity.getCustomer().getId());
         quotationDto.setCreatedDate(quotationEntity.getCreatedDate());
         quotationDto.setUpdatedDate(quotationEntity.getUpdatedDate());
         quotationDto.setStatus(quotationEntity.getStatus());

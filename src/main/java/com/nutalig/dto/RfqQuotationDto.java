@@ -10,6 +10,7 @@ import java.time.ZonedDateTime;
 public class RfqQuotationDto {
     private String quotationNo;
     private String rfqId;
+    private String customerId;
     private ZonedDateTime createdDate;
     private ZonedDateTime updatedDate;
     private QuotationStatus status;

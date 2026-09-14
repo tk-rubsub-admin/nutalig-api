@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260914-003-copy-procurement-permissions-to-procurement-manager
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT 'PROCUREMENT_MANAGER', permission_code
+              FROM role_permission
+              WHERE role_code = 'PROCUREMENT';

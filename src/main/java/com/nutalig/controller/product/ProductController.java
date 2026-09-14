@@ -38,7 +38,7 @@ public class ProductController {
     @PostMapping("/product-families")
     public GeneralResponse<ProductFamilyDto> createProductFamily(@RequestBody CreateProductFamilyRequest request)
             throws InvalidRequestException {
-        log.info("=== Start create product family code {} ===", request.getCode());
+        log.info("=== Start create product family ===");
 
         ProductFamilyDto response = productService.createProductFamily(request);
 
@@ -94,10 +94,21 @@ public class ProductController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/product-materials")
+    public GeneralResponse<ProductMaterialDto> createProductMaterial(@RequestBody CreateProductMaterialRequest request)
+            throws InvalidRequestException, DataNotFoundException {
+        log.info("=== Start create product material ===");
+
+        ProductMaterialDto response = productService.createProductMaterial(request);
+
+        log.info("=== End create product material code {} ===", response.getCode());
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PostMapping("/product-subtype1")
     public GeneralResponse<ProductSubtype1Dto> createProductSubtype1(@RequestBody CreateProductSubtype1Request request)
             throws InvalidRequestException, DataNotFoundException {
-        log.info("=== Start create product subtype1 code {} ===", request.getCode());
+        log.info("=== Start create product subtype1 ===");
 
         ProductSubtype1Dto response = productService.createProductSubtype1(request);
 
@@ -144,7 +155,7 @@ public class ProductController {
     @PostMapping("/product-subtype2")
     public GeneralResponse<ProductSubtype2Dto> createProductSubtype2(@RequestBody CreateProductSubtype2Request request)
             throws InvalidRequestException, DataNotFoundException {
-        log.info("=== Start create product subtype2 code {} ===", request.getCode());
+        log.info("=== Start create product subtype2 ===");
 
         ProductSubtype2Dto response = productService.createProductSubtype2(request);
 

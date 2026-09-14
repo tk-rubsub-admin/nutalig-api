@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260914-002-copy-sales-permissions-to-sales-manager
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT 'SALES_MANAGER', permission_code
+              FROM role_permission
+              WHERE role_code = 'SALES';

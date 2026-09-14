@@ -2,6 +2,7 @@ package com.nutalig.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.GenericGenerator;
 
 @Data
 @Table(name = "product_subtype2")
@@ -9,6 +10,14 @@ import lombok.Data;
 public class ProductSubtype2Entity {
 
     @Id
+    @GeneratedValue(generator = "productSubtype2IdGenerator")
+    @GenericGenerator(name = "productSubtype2IdGenerator",
+            parameters = {
+                    @org.hibernate.annotations.Parameter(name = "prefix", value = "PST2"),
+                    @org.hibernate.annotations.Parameter(name = "length", value = "%04d"),
+                    @org.hibernate.annotations.Parameter(name = "separator", value = "")
+            },
+            strategy = "com.nutalig.repository.jpa.IdGenerator")
     @Column(name = "code")
     private String code;
 

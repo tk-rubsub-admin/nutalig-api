@@ -1,7 +1,6 @@
 package com.nutalig.entity;
 
 import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,12 +8,10 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "approval_request_step_role", uniqueConstraints = @UniqueConstraint(name = "uk_approval_step_role", columnNames = {"approval_request_step_id", "role_code"}))
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ApprovalRequestStepRoleEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

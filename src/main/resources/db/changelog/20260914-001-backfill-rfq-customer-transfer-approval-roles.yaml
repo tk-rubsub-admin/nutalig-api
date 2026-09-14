@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260914-001-backfill-rfq-customer-transfer-approval-roles
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT IGNORE INTO approval_request_step_role (approval_request_step_id, role_code)
+              SELECT ars.id, roles.role_code
+              FROM approval_request_step ars
+              JOIN approval_request ar ON ar.id = ars.approval_request_id
+              JOIN (
+                  SELECT 'SALES_MANAGER' AS role_code
+                  UNION ALL SELECT 'ADMIN'
+                  UNION ALL SELECT 'SUPER_ADMIN'
+              ) roles
+              WHERE ar.request_type = 'RFQ_CUSTOMER_TRANSFER';

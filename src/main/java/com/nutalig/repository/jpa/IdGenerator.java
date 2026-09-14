@@ -12,12 +12,14 @@ import org.hibernate.type.Type;
 
 import java.io.Serializable;
 import java.util.Properties;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class IdGenerator implements IdentifierGenerator,Configurable {
     private String idPrefix;
     private String length;
+    private String separator;
 
     @Override
     public Serializable generate(SharedSessionContractImplementor session, Object obj)
@@ -25,18 +27,20 @@ public class IdGenerator implements IdentifierGenerator,Configurable {
 
         var entityPersister = session.getEntityPersister(obj.getClass().getName(), obj);
         Object assignedId = entityPersister.getIdentifier(obj, session);
-        if (assignedId != null) {
-            return (Serializable) assignedId;
+        if (assignedId instanceof String id && !id.isBlank()) {
+            return id;
         }
 
         String query = String.format("select %s from %s",
                 entityPersister.getIdentifierPropertyName(),
                 obj.getClass().getAnnotation(Entity.class).name());
 
-        Pattern generatedIdPattern = Pattern.compile("^" + Pattern.quote(idPrefix) + "-(\\d+)$");
+        Pattern generatedIdPattern = Pattern.compile("^" + Pattern.quote(idPrefix)
+                + Pattern.quote(separator) + "(\\d+)$");
         Stream<String> ids = session.createQuery(query).stream();
 
         Long max = ids
+                .filter(Objects::nonNull)
                 .map(generatedIdPattern::matcher)
                 .filter(java.util.regex.Matcher::matches)
                 .map(matcher -> matcher.group(1))
@@ -44,12 +48,13 @@ public class IdGenerator implements IdentifierGenerator,Configurable {
                 .max()
                 .orElse(0L);
 
-        return idPrefix + "-" +  String.format(length,(max + 1));
+        return idPrefix + separator + String.format(length, max + 1);
     }
 
     @Override
     public void configure(Type type, Properties properties, ServiceRegistry serviceRegistry) throws MappingException {
         this.idPrefix = ConfigurationHelper.getString("prefix", properties, "prefix");
         this.length = ConfigurationHelper.getString("length", properties, "length");
+        this.separator = ConfigurationHelper.getString("separator", properties, "-");
     }
 }

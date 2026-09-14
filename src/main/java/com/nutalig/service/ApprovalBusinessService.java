@@ -58,7 +58,10 @@ public class ApprovalBusinessService {
             handleInvoicePaymentTermApproved(approvalRequest, actorUserId, source);
             return;
         }
-        if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) { handleRfqCustomerTransferApproved(approvalRequest, actorUserId, source); return; }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) {
+            handleRfqCustomerTransferApproved(approvalRequest, actorUserId, source);
+            return;
+        }
 
         log.info("No business approval handler for requestType={}", approvalRequest.getRequestType());
     }

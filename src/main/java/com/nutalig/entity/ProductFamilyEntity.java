@@ -1,10 +1,8 @@
 package com.nutalig.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.GenericGenerator;
 
 @Data
 @Table(name = "product_family")
@@ -12,6 +10,14 @@ import lombok.Data;
 public class ProductFamilyEntity {
 
     @Id
+    @GeneratedValue(generator = "productFamilyIdGenerator")
+    @GenericGenerator(name = "productFamilyIdGenerator",
+            parameters = {
+                    @org.hibernate.annotations.Parameter(name = "prefix", value = "PF"),
+                    @org.hibernate.annotations.Parameter(name = "length", value = "%03d"),
+                    @org.hibernate.annotations.Parameter(name = "separator", value = "")
+            },
+            strategy = "com.nutalig.repository.jpa.IdGenerator")
     @Column(name = "code")
     private String code;
 
