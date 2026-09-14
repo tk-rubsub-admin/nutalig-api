@@ -288,12 +288,6 @@ Website: www.nutalig.com/ Facebook: nutalig/ IG nutalig]]></text>
 )
 +
 (
-  ($F{capacity} != null && !$F{capacity}.trim().isEmpty()) 
-    ? "ขนาดบรรจุ: " + $F{capacity} + "\n" 
-    : ""
-)
-+
-(
   ($F{spec} != null && !$F{spec}.trim().isEmpty()) 
     ? "สเปคงาน: " + $F{spec} 
     : ""
