@@ -10,6 +10,8 @@ public class PurchaseOrderDocumentDto extends DefaultDocumentDto {
 
     private String supplierName;
     private String supplierAddress;
+    private String supplierContact;
+    private String supplierPhone;
 
     private String salesName;
     private String salesMobileNo;

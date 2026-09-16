@@ -71,6 +71,7 @@ public class SalesOrderService {
     private final ReceiptRepository receiptRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final RequestPriceDetailRepository requestPriceDetailRepository;
     private final RFQService rfqService;
     private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
@@ -1041,10 +1042,12 @@ public class SalesOrderService {
                 return;
             }
 
+            UserEntity recipient = userRepository.findById(userId).orElse(null);
+
             String message = String.format(
                     "มีคำขอออกใบยืนยันสั่งซื้อเลขที่ %s จากผู้ใช้ %s",
                     StringUtils.defaultString(entity.getSalesOrderNo(), "-"),
-                    userId
+                    recipient == null ? userId : recipient.getDisplayName()
             );
 
             for (UserEntity salesAdminUser : salesAdminUsers) {
@@ -1330,6 +1333,18 @@ public class SalesOrderService {
         }
         dto.setAttachments(attachments);
 
+        Map<Long, String> rfqIdByDetailId = requestPriceDetailRepository.findAllById(
+                        entity.getItems().stream()
+                                .map(SalesOrderDetailEntity::getRfqDetailId)
+                                .filter(Objects::nonNull)
+                                .collect(java.util.stream.Collectors.toSet())
+                ).stream()
+                .filter(rfqDetail -> rfqDetail.getRequestPriceHeader() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        RfqDetailEntity::getId,
+                        rfqDetail -> rfqDetail.getRequestPriceHeader().getId()
+                ));
+
         List<SalesOrderDetailDto> items = new ArrayList<>();
         for (SalesOrderDetailEntity detail : entity.getItems()) {
             SalesOrderDetailDto item = new SalesOrderDetailDto();
@@ -1345,6 +1360,7 @@ public class SalesOrderService {
             item.setQuantity(detail.getQuantity());
             item.setAmount(detail.getAmount());
             item.setImageUrl(detail.getImageUrl());
+            item.setRfqId(rfqIdByDetailId.get(detail.getRfqDetailId()));
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setRfqTierId(detail.getRfqTierId());
             item.setQuotationDetailId(detail.getQuotationDetailId());

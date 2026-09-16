@@ -56,6 +56,7 @@ public class PurchaseOrderService {
     private final FileStorageService fileStorageService;
     private final PurchaseOrderAttachmentRepository purchaseOrderAttachmentRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
+    private final RequestPriceDetailRepository requestPriceDetailRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SupplierRepository supplierRepository;
     private final SupplierShippingRepository supplierShippingRepository;
@@ -779,6 +780,8 @@ public class PurchaseOrderService {
         dto.setIsCopy(isCopy);
         dto.setSupplierName(purchaseOrderEntity.getSupplierNameSnapshot());
         dto.setSupplierAddress(purchaseOrderEntity.getSupplierAddressSnapshot());
+        dto.setSupplierContact(purchaseOrderEntity.getSupplierContactSnapshot());
+        dto.setSupplierPhone(purchaseOrderEntity.getSupplierContactNoSnapshot());
         dto.setRemark(purchaseOrderEntity.getRemark());
         dto.setTotalAmount(defaultIfNull(purchaseOrderEntity.getGrandTotal()));
         dto.setDiscount(BigDecimal.ZERO);
@@ -1027,6 +1030,18 @@ public class PurchaseOrderService {
         }
         dto.setAttachments(attachments);
 
+        Map<Long, String> rfqIdByDetailId = requestPriceDetailRepository.findAllById(
+                        entity.getItems().stream()
+                                .map(PurchaseOrderDetailEntity::getRfqDetailId)
+                                .filter(Objects::nonNull)
+                                .collect(java.util.stream.Collectors.toSet())
+                ).stream()
+                .filter(rfqDetail -> rfqDetail.getRequestPriceHeader() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        RfqDetailEntity::getId,
+                        rfqDetail -> rfqDetail.getRequestPriceHeader().getId()
+                ));
+
         List<PurchaseOrderDetailDto> items = new ArrayList<>();
         for (PurchaseOrderDetailEntity detail : entity.getItems()) {
             PurchaseOrderDetailDto item = new PurchaseOrderDetailDto();
@@ -1046,6 +1061,7 @@ public class PurchaseOrderService {
             item.setAmountSupplierCurrency(detail.getAmountSupplierCurrency());
             item.setAmountThb(detail.getAmountThb());
             item.setImageUrl(detail.getImageUrl());
+            item.setRfqId(rfqIdByDetailId.get(detail.getRfqDetailId()));
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setRfqTierId(detail.getRfqTierId());
             item.setQuotationDetailId(detail.getQuotationDetailId());

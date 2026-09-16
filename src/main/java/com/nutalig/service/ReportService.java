@@ -243,6 +243,8 @@ public class ReportService {
         parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
         parameters.put("supplierName", dto.getSupplierName());
         parameters.put("supplierAddress", dto.getSupplierAddress());
+        parameters.put("supplierContact", dto.getSupplierContact());
+        parameters.put("supplierContactNo", dto.getSupplierPhone());
         parameters.put("docNo", dto.getDocNo());
         parameters.put("docDate", dto.getDocDate());
         parameters.put("salesName", dto.getSalesName());

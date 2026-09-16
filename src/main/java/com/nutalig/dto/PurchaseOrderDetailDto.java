@@ -23,6 +23,7 @@ public class PurchaseOrderDetailDto {
     private BigDecimal amountSupplierCurrency;
     private BigDecimal amountThb;
     private String imageUrl;
+    private String rfqId;
     private Long rfqDetailId;
     private Long rfqTierId;
     private Long quotationDetailId;
