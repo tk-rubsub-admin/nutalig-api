@@ -3448,10 +3448,22 @@ public class RFQService {
     ) throws InvalidRequestException {
         List<RfqTierSplitEntity> tiers = new ArrayList<>();
         if (isPositive(request.getLandFreightCost())) {
-            tiers.add(buildTierSplitForShippingMethod(request, supplier, "LAND", request.getLandFreightCost()));
+            tiers.add(buildTierSplitForShippingMethod(
+                    request,
+                    supplier,
+                    "LAND",
+                    request.getLandFreightCost(),
+                    request.getLandFreightQty() != null ? request.getLandFreightQty() : request.getQuantity()
+            ));
         }
         if (isPositive(request.getSeaFreightCost())) {
-            tiers.add(buildTierSplitForShippingMethod(request, supplier, request.getShippingMethod(), request.getSeaFreightCost()));
+            tiers.add(buildTierSplitForShippingMethod(
+                    request,
+                    supplier,
+                    request.getShippingMethod(),
+                    request.getSeaFreightCost(),
+                    request.getSeaFreightQty() != null ? request.getSeaFreightQty() : request.getQuantity()
+            ));
         }
         if (tiers.isEmpty()) {
             throw new InvalidRequestException("tierSplit requires a land or sea shipping cost greater than zero");
@@ -3463,11 +3475,12 @@ public class RFQService {
             CreateRequestPriceDetailRequest.CreateRequestPriceTierSplitRequest request,
             SupplierEntity supplier,
             String shippingMethod,
-            BigDecimal shippingCost
+            BigDecimal shippingCost,
+            BigDecimal quantity
     ) throws InvalidRequestException {
         RfqTierSplitEntity tier = new RfqTierSplitEntity();
         tier.setSupplier(supplier);
-        tier.setQuantity(request.getQuantity());
+        tier.setQuantity(quantity);
         tier.setSellPrice(scaleMoney(request.getSellPrice()));
         tier.setCommission(scaleMoney(request.getCommission()));
         tier.setCurrency(request.getCurrency());
