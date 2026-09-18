@@ -15,5 +15,6 @@ public class SearchPurchaseOrderRequest {
     private LocalDate docDateEnd;
     private PurchaseOrderStatus status;
     private List<PurchaseOrderStatus> statuses;
+    private String shippingMethod;
     private String keyword;
 }

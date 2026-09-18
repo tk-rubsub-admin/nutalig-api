@@ -4,6 +4,7 @@ import com.nutalig.constant.PurchaseOrderStatus;
 import com.nutalig.entity.PurchaseOrderDetailEntity;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.SupplierEntity;
+import com.nutalig.entity.SupplierShippingEntity;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.apache.commons.lang3.StringUtils;
@@ -54,6 +55,21 @@ public class PurchaseOrderSpecification {
             return null;
         }
         return (root, query, cb) -> root.get("status").in(statuses);
+    }
+
+    public static Specification<PurchaseOrderEntity> shippingMethodContains(String shippingMethod) {
+        if (StringUtils.isBlank(shippingMethod)) {
+            return null;
+        }
+        return (root, query, cb) -> {
+            String likeShippingMethod = "%" + shippingMethod.trim().toLowerCase() + "%";
+            Join<PurchaseOrderEntity, SupplierShippingEntity> supplierShippingJoin =
+                    root.join("supplierShipping", JoinType.LEFT);
+            return cb.or(
+                    cb.like(cb.lower(root.get("shippingMethodSnapshot")), likeShippingMethod),
+                    cb.like(cb.lower(supplierShippingJoin.get("shippingMethod")), likeShippingMethod)
+            );
+        };
     }
 
     public static Specification<PurchaseOrderEntity> docDateBetween(LocalDate start, LocalDate end) {

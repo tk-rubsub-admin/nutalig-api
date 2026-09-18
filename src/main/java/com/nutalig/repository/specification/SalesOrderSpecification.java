@@ -76,6 +76,16 @@ public class SalesOrderSpecification {
         return (root, query, cb) -> root.get("procurementStatus").in(procurementStatuses);
     }
 
+    public static Specification<SalesOrderEntity> shippingTypeContains(String shippingType) {
+        if (StringUtils.isBlank(shippingType)) {
+            return null;
+        }
+        return (root, query, cb) -> cb.like(
+                cb.lower(root.get("shippingType")),
+                "%" + shippingType.trim().toLowerCase() + "%"
+        );
+    }
+
     public static Specification<SalesOrderEntity> docDateBetween(LocalDate start, LocalDate end) {
         if (start != null && end != null) {
             return (root, query, cb) -> cb.between(root.get("docDate"), start, end);

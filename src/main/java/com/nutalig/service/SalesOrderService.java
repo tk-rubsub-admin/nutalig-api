@@ -783,6 +783,7 @@ public class SalesOrderService {
                 .and(statusIn(request.getStatuses()))
                 .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
                 .and(procurementStatusIn(request.getProcurementStatus()))
+                .and(shippingTypeContains(request.getShippingType()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
     }

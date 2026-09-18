@@ -451,6 +451,15 @@ public class ApprovalService {
         return approvalRequestRepository.findAllByEntityTypeAndRequestTypeAndStatusOrderByRequestedDateDesc(ActivityEntityType.RFQ, ApprovalRequestType.RFQ_CUSTOMER_TRANSFER, ApprovalRequestStatus.PENDING).stream().map(this::toSummaryDto).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getPendingUrgentReadyPoApprovals() {
+        return approvalRequestRepository.findAllByEntityTypeAndRequestTypeAndStatusOrderByRequestedDateDesc(
+                ActivityEntityType.SALES_ORDER,
+                ApprovalRequestType.URGENT_READY_PO,
+                ApprovalRequestStatus.PENDING
+        ).stream().map(this::toSummaryDto).toList();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ApprovalRequestDto approveLatestApprovalByEntity(ActivityEntityType entityType, String referenceId, String userId)
             throws DataNotFoundException, InvalidRequestException {

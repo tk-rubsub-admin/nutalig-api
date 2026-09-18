@@ -432,7 +432,7 @@ public class QuotationService {
             }
         }
 
-        quotationEntity.getItems().clear();
+        Set<String> retainedItemIds = new HashSet<>();
 
         int lineNo = 1;
         for (QuotationItemRequestDto itemRequest : itemRequests) {
@@ -440,7 +440,9 @@ public class QuotationService {
                     ? existingItemsById.get(itemRequest.getId())
                     : null;
 
-            QuotationDetailEntity detailEntity = new QuotationDetailEntity();
+            QuotationDetailEntity detailEntity = existingItem != null
+                    ? existingItem
+                    : new QuotationDetailEntity();
             detailEntity.setQuotation(quotationEntity);
             detailEntity.setLineNo(lineNo++);
             detailEntity.setName(itemRequest.getName());
@@ -462,8 +464,16 @@ public class QuotationService {
                     existingItem != null ? existingItem.getImageUrl() : null
             ));
 
-            quotationEntity.getItems().add(detailEntity);
+            if (existingItem != null) {
+                retainedItemIds.add(existingItem.getId().toString());
+            } else {
+                quotationEntity.getItems().add(detailEntity);
+            }
         }
+
+        quotationEntity.getItems().removeIf(item ->
+                item.getId() != null && !retainedItemIds.contains(item.getId().toString())
+        );
     }
 
     private List<QuotationItemRequestDto> toItemRequests(Set<QuotationDetailEntity> details) {

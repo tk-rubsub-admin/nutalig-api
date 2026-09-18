@@ -39,6 +39,11 @@ public class ApprovalController {
         return new GeneralResponse<>(SUCCESS, approvalService.getPendingRfqCustomerTransferApprovals());
     }
 
+    @GetMapping("/v1/approvals/urgent-ready-po/pending")
+    public GeneralResponse<java.util.List<ApprovalRequestDto>> getPendingUrgentReadyPoApprovals() {
+        return new GeneralResponse<>(SUCCESS, approvalService.getPendingUrgentReadyPoApprovals());
+    }
+
     @GetMapping("/v1/approvals/reject-form")
     public GeneralResponse<ApprovalRejectTokenResolveResponse> resolveRejectToken(
             @RequestParam("token") String token

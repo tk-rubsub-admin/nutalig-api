@@ -565,6 +565,7 @@ public class PurchaseOrderService {
                 .and(supplierIdEqual(request.getSupplierId()))
                 .and(statusEqual(request.getStatus()))
                 .and(statusIn(request.getStatuses()))
+                .and(shippingMethodContains(request.getShippingMethod()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
     }

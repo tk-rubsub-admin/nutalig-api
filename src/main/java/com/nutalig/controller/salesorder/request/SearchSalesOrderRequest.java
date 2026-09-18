@@ -19,5 +19,6 @@ public class SearchSalesOrderRequest {
     private List<SalesOrderStatus> statuses;
     private UrgentRequestStatus urgentRequestStatus;
     private List<ProcurementStatus> procurementStatus;
+    private String shippingType;
     private String keyword;
 }
