@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260920-002-add-purchase-order-payment-schedules
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_payment_schedule (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  installment_no INT NOT NULL,
+                  payment_type VARCHAR(30) NOT NULL,
+                  percentage DECIMAL(8,4) NOT NULL,
+                  expected_amount DECIMAL(18,5) NOT NULL,
+                  expected_amount_thb DECIMAL(18,5) NOT NULL,
+                  paid_amount DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  paid_amount_thb DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  status VARCHAR(30) NOT NULL DEFAULT 'UNPAID',
+                  due_date DATE DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_po_payment_schedule_installment (purchase_order_no, installment_no),
+                  KEY idx_po_payment_schedule_status (status),
+                  CONSTRAINT fk_po_payment_schedule_po
+                      FOREIGN KEY (purchase_order_no) REFERENCES purchase_order (purchase_order_no)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              ALTER TABLE purchase_order_payment
+                  ADD COLUMN schedule_id BIGINT DEFAULT NULL AFTER purchase_order_no,
+                  ADD KEY idx_po_payment_schedule_id (schedule_id),
+                  ADD CONSTRAINT fk_po_payment_schedule
+                      FOREIGN KEY (schedule_id) REFERENCES purchase_order_payment_schedule (id);
+

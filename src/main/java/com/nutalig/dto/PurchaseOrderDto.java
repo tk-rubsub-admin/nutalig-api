@@ -2,6 +2,7 @@ package com.nutalig.dto;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.PurchaseOrderStatus;
+import com.nutalig.constant.PurchaseOrderPaymentLifecycleStatus;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -24,6 +25,12 @@ public class PurchaseOrderDto {
     private BigDecimal subTotalThb;
     private BigDecimal grandTotal;
     private BigDecimal grandTotalThb;
+    private PurchaseOrderPaymentLifecycleStatus paymentStatus;
+    private BigDecimal paidTotal;
+    private BigDecimal paidTotalThb;
+    private BigDecimal outstandingTotal;
+    private BigDecimal outstandingTotalThb;
+    private BigDecimal totalCbm;
     private String remark;
     private Integer revNo;
     private String supplierNameSnapshot;

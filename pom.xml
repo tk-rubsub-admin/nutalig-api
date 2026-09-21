@@ -5,7 +5,7 @@
 
     <groupId>com.dpkflower</groupId>
     <artifactId>api</artifactId>
-    <version>0.0.8.0</version>
+    <version>0.1.10</version>
     <name>api</name>
     <description>DPK Flower API</description>
 

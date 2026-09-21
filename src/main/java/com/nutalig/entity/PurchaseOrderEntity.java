@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.PurchaseOrderPaymentLifecycleStatus;
 import com.nutalig.constant.PurchaseOrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -80,6 +81,25 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "grand_total_thb", precision = 18, scale = 5)
     private BigDecimal grandTotalThb;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 30, nullable = false)
+    private PurchaseOrderPaymentLifecycleStatus paymentStatus = PurchaseOrderPaymentLifecycleStatus.UNPAID;
+
+    @Column(name = "paid_total", precision = 18, scale = 5, nullable = false)
+    private BigDecimal paidTotal = BigDecimal.ZERO;
+
+    @Column(name = "paid_total_thb", precision = 18, scale = 5, nullable = false)
+    private BigDecimal paidTotalThb = BigDecimal.ZERO;
+
+    @Column(name = "outstanding_total", precision = 18, scale = 5, nullable = false)
+    private BigDecimal outstandingTotal = BigDecimal.ZERO;
+
+    @Column(name = "outstanding_total_thb", precision = 18, scale = 5, nullable = false)
+    private BigDecimal outstandingTotalThb = BigDecimal.ZERO;
+
+    @Column(name = "total_cbm", precision = 18, scale = 6)
+    private BigDecimal totalCbm;
+
     @Column(name = "remark", length = 2000)
     private String remark;
 
@@ -127,6 +147,16 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @ToString.Exclude
     private Set<PurchaseOrderAttachmentEntity> attachments = new LinkedHashSet<>();
 
+    @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdDate desc, id desc")
+    @ToString.Exclude
+    private Set<PurchaseOrderPaymentEntity> payments = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("installmentNo asc")
+    @ToString.Exclude
+    private Set<PurchaseOrderPaymentScheduleEntity> paymentSchedules = new LinkedHashSet<>();
+
     public void addItem(PurchaseOrderDetailEntity item) {
         if (item == null) return;
         items.add(item);
@@ -149,6 +179,18 @@ public class PurchaseOrderEntity extends AuditDateEntity {
         if (attachment == null) return;
         attachments.remove(attachment);
         attachment.setPurchaseOrder(null);
+    }
+
+    public void addPayment(PurchaseOrderPaymentEntity payment) {
+        if (payment == null) return;
+        payments.add(payment);
+        payment.setPurchaseOrder(this);
+    }
+
+    public void addPaymentSchedule(PurchaseOrderPaymentScheduleEntity schedule) {
+        if (schedule == null) return;
+        paymentSchedules.add(schedule);
+        schedule.setPurchaseOrder(this);
     }
 
     @Override

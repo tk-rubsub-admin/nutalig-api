@@ -24,6 +24,7 @@ public enum SystemConstant {
     RFQ_CLOSE_REASON,
     SALES_TYPE,
     POSITION,
+    PURCHASE_ORDER,
     TEAM,
     VAT,
     UNIT

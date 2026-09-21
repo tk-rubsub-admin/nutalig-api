@@ -52,6 +52,8 @@ import static com.nutalig.repository.specification.PurchaseOrderSpecification.*;
 @RequiredArgsConstructor
 public class PurchaseOrderService {
 
+    private static final String PURCHASE_ORDER_PREPARE_DOC_DATE_CODE = "PREPARE_DOC_DATE";
+
     private final GeneratedIdSequenceService generatedIdSequenceService;
     private final FileStorageService fileStorageService;
     private final PurchaseOrderAttachmentRepository purchaseOrderAttachmentRepository;
@@ -67,6 +69,9 @@ public class PurchaseOrderService {
     private final ActivityHistoryService activityHistoryService;
     private final SystemConfigService systemConfigService;
     private final ReportService reportService;
+    private final PurchaseOrderCbmService purchaseOrderCbmService;
+    private final PurchaseOrderPaymentService purchaseOrderPaymentService;
+    private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -96,7 +101,7 @@ public class PurchaseOrderService {
 
         List<SalesOrderDetailEntity> sourceItems = salesOrder.getItems().stream()
                 .filter(item -> item.getSupplier() != null && StringUtils.equals(item.getSupplier().getId(), supplier.getId()))
-                .filter(item -> StringUtils.equalsIgnoreCase(item.getShippingMethod(), supplierShipping.getShippingMethod().name()))
+                .filter(item -> StringUtils.containsIgnoreCase(item.getShippingMethod(), supplierShipping.getShippingMethod().name()))
                 .sorted(Comparator.comparing(item -> Optional.ofNullable(item.getLineNo()).orElse(0)))
                 .toList();
         List<CreatePurchaseOrderRequest.Item> manualItems = getManualCreateItems(request.getItems());
@@ -216,6 +221,7 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(sourceItem.getQuotationDetailId());
             detail.setShippingMethod(sourceItem.getShippingMethod());
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
+            purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
             entity.addItem(detail);
 
             subTotal = subTotal.add(amountSupplierCurrency);
@@ -248,16 +254,21 @@ public class PurchaseOrderService {
         entity.setSubTotalThb(subTotalThb.setScale(2, RoundingMode.HALF_UP));
         entity.setGrandTotal(entity.getSubTotal());
         entity.setGrandTotalThb(entity.getSubTotalThb());
+        purchaseOrderPaymentService.initializePaymentSummary(entity);
+        purchaseOrderPaymentScheduleService.initializeSchedules(entity, now);
+        purchaseOrderCbmService.recalculateTotal(entity);
         attachFiles(entity, attachments, user, now);
 
-        purchaseOrderRepository.save(entity);
+        // PurchaseOrder uses an assigned String ID, so save() delegates to EntityManager.merge().
+        // Always continue with the managed instance returned by save(); reusing the original
+        // instance would merge transient child schedules again and insert duplicate installments.
+        entity = purchaseOrderRepository.save(entity);
         recordCreatePurchaseOrderActivity(entity, userId);
 
         PurchaseOrderStatus createdStatus = entity.getStatus();
         entity.setStatus(PurchaseOrderStatus.AWAITING_PAYMENT);
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);
-        purchaseOrderRepository.save(entity);
         recordPurchaseOrderStatusChangeActivity(
                 entity,
                 userId,
@@ -371,6 +382,7 @@ public class PurchaseOrderService {
         }
 
         recalculateTotals(entity);
+        purchaseOrderPaymentService.validateAndRecalculateAfterOrderTotalChange(entity);
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -394,6 +406,15 @@ public class PurchaseOrderService {
         }
         if (entity.getStatus() == PurchaseOrderStatus.CLOSED) {
             throw new InvalidRequestException("Closed purchase order cannot be cancelled");
+        }
+        boolean hasCommittedPayment = entity.getPayments().stream().anyMatch(payment ->
+                payment.getStatus() == PurchaseOrderPaymentStatus.PENDING
+                        || payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED
+        );
+        if (hasCommittedPayment) {
+            throw new InvalidRequestException(
+                    "Purchase order with pending or approved payments cannot be cancelled. Reject or void the payments first."
+            );
         }
 
         PurchaseOrderStatus beforeStatus = entity.getStatus();
@@ -652,7 +673,14 @@ public class PurchaseOrderService {
     }
 
     private String generatePurchaseOrderNo() {
-        return generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 4);
+        for (int attempt = 0; attempt < 10_000; attempt++) {
+            String purchaseOrderNo = generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 4);
+            if (!purchaseOrderRepository.existsById(purchaseOrderNo)) {
+                return purchaseOrderNo;
+            }
+            log.warn("Skip existing purchase order number {} while synchronizing generated sequence", purchaseOrderNo);
+        }
+        throw new IllegalStateException("Cannot generate an unused purchase order number");
     }
 
     private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests) {
@@ -693,6 +721,11 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            if (previousItem != null && Objects.equals(previousItem.getSupplierQuoteTierId(), detail.getSupplierQuoteTierId())) {
+                purchaseOrderCbmService.copyAndRecalculateSnapshots(previousItem, detail);
+            } else {
+                purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
+            }
             entity.addItem(detail);
         }
     }
@@ -763,6 +796,7 @@ public class PurchaseOrderService {
         entity.setSubTotalThb(subTotalThb.setScale(2, RoundingMode.HALF_UP));
         entity.setGrandTotal(entity.getSubTotal());
         entity.setGrandTotalThb(entity.getSubTotalThb());
+        purchaseOrderCbmService.recalculateTotal(entity);
     }
 
     private boolean shouldRestoreSalesOrderProcurementStatus(PurchaseOrderEntity entity) {
@@ -978,9 +1012,26 @@ public class PurchaseOrderService {
         if (purchaseOrderEntity.getDocDate() == null) {
             return null;
         }
+        int configuredDays = resolvePurchaseOrderDueDateDays();
         int productionDays = Optional.ofNullable(purchaseOrderEntity.getProductionLeadTimeDay()).orElse(0);
-        int shippingDays = Optional.ofNullable(purchaseOrderEntity.getShippingLeadTimeDay()).orElse(0);
-        return purchaseOrderEntity.getDocDate().plusDays((long) productionDays + shippingDays).format(DateUtil.DD_MM_YY);
+        return purchaseOrderEntity.getDocDate()
+                .plusDays((long) configuredDays + productionDays)
+                .format(DateUtil.DD_MM_YY);
+    }
+
+    private int resolvePurchaseOrderDueDateDays() {
+        SystemConfigEntity config = systemConfigService.getConfigEntity(
+                SystemConstant.PURCHASE_ORDER,
+                PURCHASE_ORDER_PREPARE_DOC_DATE_CODE
+        );
+        if (config == null) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(StringUtils.trimToEmpty(config.getNameTh())));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private PurchaseOrderDto mapToDto(PurchaseOrderEntity entity) {
@@ -1000,6 +1051,12 @@ public class PurchaseOrderService {
         dto.setSubTotalThb(entity.getSubTotalThb());
         dto.setGrandTotal(entity.getGrandTotal());
         dto.setGrandTotalThb(entity.getGrandTotalThb());
+        dto.setPaymentStatus(entity.getPaymentStatus());
+        dto.setPaidTotal(entity.getPaidTotal());
+        dto.setPaidTotalThb(entity.getPaidTotalThb());
+        dto.setOutstandingTotal(entity.getOutstandingTotal());
+        dto.setOutstandingTotalThb(entity.getOutstandingTotalThb());
+        dto.setTotalCbm(entity.getTotalCbm());
         dto.setRemark(entity.getRemark());
         dto.setRevNo(entity.getRevNo());
         dto.setSupplierNameSnapshot(entity.getSupplierNameSnapshot());
@@ -1068,6 +1125,7 @@ public class PurchaseOrderService {
             item.setQuotationDetailId(detail.getQuotationDetailId());
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());
+            item.setPackages(detail.getPackages().stream().map(purchaseOrderCbmService::toDto).toList());
             items.add(item);
         }
         dto.setItems(items);
@@ -1119,6 +1177,10 @@ public class PurchaseOrderService {
         snapshot.put("subTotalThb", entity.getSubTotalThb());
         snapshot.put("grandTotal", entity.getGrandTotal());
         snapshot.put("grandTotalThb", entity.getGrandTotalThb());
+        snapshot.put("paymentStatus", entity.getPaymentStatus());
+        snapshot.put("paidTotal", entity.getPaidTotal());
+        snapshot.put("outstandingTotal", entity.getOutstandingTotal());
+        snapshot.put("totalCbm", entity.getTotalCbm());
         snapshot.put("remark", entity.getRemark());
         snapshot.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
         return snapshot;

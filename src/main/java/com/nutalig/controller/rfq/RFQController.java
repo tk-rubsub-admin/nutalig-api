@@ -514,6 +514,22 @@ public class RFQController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PatchMapping("/{id}/details/{detailId}/tier-splits/{tierSplitId}")
+    public GeneralResponse<RfqHeaderDto> updateRFQDetailTierSplit(
+            @PathVariable("id") String rfqId,
+            @PathVariable("detailId") Long detailId,
+            @PathVariable("tierSplitId") Long tierSplitId,
+            @RequestBody UpdateRequestPriceTierSplitRequest request,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start update rfq tier split {} detail {} from {} by {} ===", tierSplitId, detailId, rfqId, userId);
+
+        RfqHeaderDto response = rfqService.updateRFQDetailTierSplit(rfqId, detailId, tierSplitId, request, userId);
+
+        log.info("=== End update rfq tier split {} detail {} from {} ===", tierSplitId, detailId, rfqId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
     @PatchMapping("/{id}/additional-costs/{additionalCostId}")
     public GeneralResponse<RfqHeaderDto> updateRFQAdditionalCost(
             @PathVariable("id") String id,

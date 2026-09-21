@@ -1520,6 +1520,98 @@ public class RFQService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public RfqHeaderDto updateRFQDetailTierSplit(
+            String rfqId,
+            Long detailId,
+            Long tierSplitId,
+            UpdateRequestPriceTierSplitRequest request,
+            String userId
+    ) throws Exception {
+        if (request == null) {
+            throw new InvalidRequestException("request is required");
+        }
+        if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidRequestException("quantity must be greater than zero");
+        }
+        if (request.getSellPrice() == null || request.getSellPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException("sellPrice must be greater than or equal to zero");
+        }
+        if (request.getShippingCost() != null && request.getShippingCost().compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException("shippingCost must be greater than or equal to zero");
+        }
+        if (request.getCommission() != null && request.getCommission().compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException("commission must be greater than or equal to zero");
+        }
+
+        RfqHeaderEntity entity = getEntityById(rfqId);
+        RfqDetailEntity detailEntity = getDetailFromHeader(entity, detailId);
+        RfqTierSplitEntity tierSplitEntity = getTierSplitFromDetail(detailEntity, tierSplitId);
+        String shippingMethod = normalizeTierShippingMethod(request.getShippingMethod());
+
+        boolean quantityExists = detailEntity.getTierSplits().stream()
+                .filter(item -> !Objects.equals(item.getId(), tierSplitEntity.getId()))
+                .anyMatch(item -> item.getQuantity() != null
+                        && item.getQuantity().compareTo(request.getQuantity()) == 0
+                        && Objects.equals(item.getShippingMethod(), shippingMethod));
+        if (quantityExists) {
+            throw new InvalidRequestException(
+                    "quantity and shippingMethod already exist in detail " + detailId
+            );
+        }
+
+        SupplierEntity supplier = tierSplitEntity.getSupplier();
+        if (StringUtils.isNotBlank(request.getSupplierId())) {
+            supplier = getSupplierEntity(request.getSupplierId().trim());
+        } else if (detailEntity.getSupplier() != null) {
+            supplier = detailEntity.getSupplier();
+        }
+
+        BigDecimal shippingCost = Optional.ofNullable(request.getShippingCost()).orElse(BigDecimal.ZERO);
+        String actor = userProfileService.getNameFromId(userId);
+        tierSplitEntity.setSupplier(supplier);
+        tierSplitEntity.setQuantity(request.getQuantity());
+        tierSplitEntity.setSellPrice(scaleMoney(request.getSellPrice()));
+        tierSplitEntity.setCommission(scaleMoney(request.getCommission()));
+        tierSplitEntity.setCurrency(request.getCurrency());
+        applyTierSplitShippingMethod(
+                tierSplitEntity,
+                shippingMethod,
+                request.getContainerSize(),
+                request.getIsFcl(),
+                request.getIsShareFCL()
+        );
+        tierSplitEntity.setShippingCost(scaleMoney(shippingCost));
+        tierSplitEntity.setTotalPrice(scaleMoney(request.getSellPrice().add(shippingCost)));
+
+        detailEntity.setUpdatedBy(actor);
+        entity.setUpdatedBy(actor);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        requestPriceHeaderRepository.save(entity);
+
+        Map<String, Object> activityDetail = new LinkedHashMap<>();
+        activityDetail.put("detailId", detailId);
+        activityDetail.put("tierSplitId", tierSplitId);
+        activityDetail.put("quantity", tierSplitEntity.getQuantity());
+        activityDetail.put("sellPrice", tierSplitEntity.getSellPrice());
+        activityDetail.put("shippingCost", tierSplitEntity.getShippingCost());
+        activityDetail.put("commission", tierSplitEntity.getCommission());
+        activityDetail.put("shippingMethod", tierSplitEntity.getShippingMethod());
+
+        activityHistoryService.record(
+                ActivityEntityType.RFQ,
+                entity.getId(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "แก้ไข tier split ของรายละเอียดคำขอราคาเลขที่ " + entity.getId(),
+                activityDetail
+        );
+
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public RfqHeaderDto updateRFQAdditionalCost(
             String rfqId,
             Long additionalCostId,
@@ -3994,6 +4086,16 @@ public class RFQService {
                 .findFirst()
                 .orElseThrow(() -> new DataNotFoundException(
                         "Tier " + tierId + " not found in detail " + detail.getId()
+                ));
+    }
+
+    private RfqTierSplitEntity getTierSplitFromDetail(RfqDetailEntity detail, Long tierSplitId)
+            throws DataNotFoundException {
+        return detail.getTierSplits().stream()
+                .filter(tierSplit -> Objects.equals(tierSplit.getId(), tierSplitId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Tier split " + tierSplitId + " not found in detail " + detail.getId()
                 ));
     }
 

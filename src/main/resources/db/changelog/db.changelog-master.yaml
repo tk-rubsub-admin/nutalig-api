@@ -3048,3 +3048,9 @@ databaseChangeLog:
       file: db/changelog/20260914-002-copy-sales-permissions-to-sales-manager.yaml
   - include:
       file: db/changelog/20260914-003-copy-procurement-permissions-to-procurement-manager.yaml
+  - include:
+      file: db/changelog/20260919-001-add-purchase-order-cbm-snapshots.yaml
+  - include:
+      file: db/changelog/20260920-001-add-purchase-order-payments.yaml
+  - include:
+      file: db/changelog/20260920-002-add-purchase-order-payment-schedules.yaml

@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260919-001-add-purchase-order-cbm-snapshots
+      author: codex
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: total_cbm
+                  type: DECIMAL(18,6)
+        - createTable:
+            tableName: purchase_order_detail_package
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: purchase_order_detail_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_package_id
+                  type: BIGINT
+              - column:
+                  name: package_name
+                  type: VARCHAR(255)
+              - column:
+                  name: package_dimension
+                  type: VARCHAR(255)
+              - column:
+                  name: package_weight
+                  type: VARCHAR(255)
+              - column:
+                  name: package_capacity
+                  type: VARCHAR(255)
+              - column:
+                  name: width_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: length_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: height_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: capacity_qty
+                  type: DECIMAL(18,4)
+              - column:
+                  name: carton_count
+                  type: BIGINT
+              - column:
+                  name: cbm_per_carton
+                  type: DECIMAL(18,6)
+              - column:
+                  name: total_cbm
+                  type: DECIMAL(18,6)
+              - column:
+                  name: selected_for_calculation
+                  type: BIT(1)
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sort_order
+                  type: INT
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_detail_package
+            baseColumnNames: purchase_order_detail_id
+            referencedTableName: purchase_order_detail
+            referencedColumnNames: id
+            constraintName: fk_po_detail_package_detail
+            onDelete: CASCADE
+        - createIndex:
+            tableName: purchase_order_detail_package
+            indexName: idx_po_detail_package_detail
+            columns:
+              - column:
+                  name: purchase_order_detail_id

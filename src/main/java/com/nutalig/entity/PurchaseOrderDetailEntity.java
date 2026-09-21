@@ -8,6 +8,8 @@ import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -89,6 +91,15 @@ public class PurchaseOrderDetailEntity {
 
     @Column(name = "supplier_quote_tier_id")
     private Long supplierQuoteTierId;
+
+    @OneToMany(mappedBy = "purchaseOrderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder asc, id asc")
+    private List<PurchaseOrderDetailPackageEntity> packages = new ArrayList<>();
+
+    public void addPackage(PurchaseOrderDetailPackageEntity packageEntity) {
+        packages.add(packageEntity);
+        packageEntity.setPurchaseOrderDetail(this);
+    }
 
     @Override
     public boolean equals(Object o) {
