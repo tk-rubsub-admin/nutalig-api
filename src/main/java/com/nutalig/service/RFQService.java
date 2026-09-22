@@ -1533,6 +1533,9 @@ public class RFQService {
         if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidRequestException("quantity must be greater than zero");
         }
+        if (request.getProductPrice() == null || request.getProductPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException("productPrice must be greater than or equal to zero");
+        }
         if (request.getSellPrice() == null || request.getSellPrice().compareTo(BigDecimal.ZERO) < 0) {
             throw new InvalidRequestException("sellPrice must be greater than or equal to zero");
         }
@@ -1570,6 +1573,7 @@ public class RFQService {
         String actor = userProfileService.getNameFromId(userId);
         tierSplitEntity.setSupplier(supplier);
         tierSplitEntity.setQuantity(request.getQuantity());
+        tierSplitEntity.setProductPrice(scaleMoney(request.getProductPrice()));
         tierSplitEntity.setSellPrice(scaleMoney(request.getSellPrice()));
         tierSplitEntity.setCommission(scaleMoney(request.getCommission()));
         tierSplitEntity.setCurrency(request.getCurrency());
@@ -1581,7 +1585,7 @@ public class RFQService {
                 request.getIsShareFCL()
         );
         tierSplitEntity.setShippingCost(scaleMoney(shippingCost));
-        tierSplitEntity.setTotalPrice(scaleMoney(request.getSellPrice().add(shippingCost)));
+        tierSplitEntity.setTotalPrice(scaleMoney(request.getProductPrice().add(shippingCost)));
 
         detailEntity.setUpdatedBy(actor);
         entity.setUpdatedBy(actor);
@@ -1592,6 +1596,7 @@ public class RFQService {
         activityDetail.put("detailId", detailId);
         activityDetail.put("tierSplitId", tierSplitId);
         activityDetail.put("quantity", tierSplitEntity.getQuantity());
+        activityDetail.put("productPrice", tierSplitEntity.getProductPrice());
         activityDetail.put("sellPrice", tierSplitEntity.getSellPrice());
         activityDetail.put("shippingCost", tierSplitEntity.getShippingCost());
         activityDetail.put("commission", tierSplitEntity.getCommission());
@@ -3478,6 +3483,9 @@ public class RFQService {
                 if (tierSplitRequest.getQuantity() == null) {
                     throw new InvalidRequestException("tierSplit.quantity is required");
                 }
+                if (tierSplitRequest.getProductPrice() == null) {
+                    throw new InvalidRequestException("tierSplit.productPrice is required");
+                }
                 if (tierSplitRequest.getSellPrice() == null) {
                     throw new InvalidRequestException("tierSplit.sellPrice is required");
                 }
@@ -3573,12 +3581,13 @@ public class RFQService {
         RfqTierSplitEntity tier = new RfqTierSplitEntity();
         tier.setSupplier(supplier);
         tier.setQuantity(quantity);
+        tier.setProductPrice(scaleMoney(request.getProductPrice()));
         tier.setSellPrice(scaleMoney(request.getSellPrice()));
         tier.setCommission(scaleMoney(request.getCommission()));
         tier.setCurrency(request.getCurrency());
         applyTierSplitShippingMethod(tier, shippingMethod, request.getContainerSize(), request.getIsFcl(), request.getIsShareFCL());
         tier.setShippingCost(scaleMoney(shippingCost));
-        tier.setTotalPrice(scaleMoney(request.getSellPrice().add(shippingCost)));
+        tier.setTotalPrice(scaleMoney(request.getProductPrice().add(shippingCost)));
         return tier;
     }
 
@@ -3709,6 +3718,7 @@ public class RFQService {
         snapshot.put("sourceTierSplitId", tierSplit.getId());
         snapshot.put("supplierId", tierSplit.getSupplier() == null ? null : tierSplit.getSupplier().getId());
         snapshot.put("quantity", tierSplit.getQuantity());
+        snapshot.put("productPrice", tierSplit.getProductPrice());
         snapshot.put("sellPrice", tierSplit.getSellPrice());
         snapshot.put("commission", tierSplit.getCommission());
         snapshot.put("currency", tierSplit.getCurrency() == null ? null : tierSplit.getCurrency().name());

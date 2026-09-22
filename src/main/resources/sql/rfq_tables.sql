@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS rfq_tier_split (
     rfq_detail_id BIGINT NOT NULL,
     supplier_id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_vi_0900_ai_ci DEFAULT NULL,
     quantity DECIMAL(18,0) NOT NULL,
+    product_price DECIMAL(18,4) NOT NULL,
     sell_price DECIMAL(18,4) NOT NULL,
     commission DECIMAL(18,4) DEFAULT NULL,
     currency VARCHAR(10) DEFAULT NULL,

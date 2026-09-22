@@ -10,6 +10,7 @@ public class RfqDetailHistoryTierSplitDto {
     private Long sourceTierSplitId;
     private String supplierId;
     private BigDecimal quantity;
+    private BigDecimal productPrice;
     private BigDecimal sellPrice;
     private BigDecimal commission;
     private Currency currency;

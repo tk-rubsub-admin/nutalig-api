@@ -46,6 +46,9 @@ public class RfqTierSplitEntity extends AuditDateEntity {
     @ToString.Include
     private BigDecimal quantity;
 
+    @Column(name = "product_price", precision = 18, scale = 4, nullable = false)
+    private BigDecimal productPrice;
+
     @Column(name = "sell_price", precision = 18, scale = 4, nullable = false)
     private BigDecimal sellPrice;
 

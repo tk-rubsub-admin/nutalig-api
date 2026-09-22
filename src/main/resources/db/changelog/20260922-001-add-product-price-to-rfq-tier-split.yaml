@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260922-001-add-product-price-to-rfq-tier-split
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier_split
+                columnName: product_price
+      changes:
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: product_price
+                  type: DECIMAL(18,4)
+                  remarks: Product price separated from selling price
+
+  - changeSet:
+      id: 20260922-002-backfill-rfq-tier-split-product-price
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_tier_split
+            columnName: product_price
+      changes:
+        - sql:
+            sql: |
+              UPDATE rfq_tier_split
+              SET product_price = sell_price
+              WHERE product_price IS NULL;
+
+  - changeSet:
+      id: 20260922-003-require-rfq-tier-split-product-price
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_tier_split
+            columnName: product_price
+      changes:
+        - addNotNullConstraint:
+            tableName: rfq_tier_split
+            columnName: product_price
+            columnDataType: DECIMAL(18,4)

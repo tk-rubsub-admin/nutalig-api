@@ -41,6 +41,7 @@ CREATE TABLE rfq_tier_split (
     rfq_detail_id BIGINT NOT NULL,
     supplier_id VARCHAR(255) NULL,
     quantity DECIMAL(18,0) NOT NULL,
+    product_price DECIMAL(18,4) NOT NULL,
     sell_price DECIMAL(18,4) NOT NULL,
     commission DECIMAL(18,4) NULL,
     currency VARCHAR(10) NULL,

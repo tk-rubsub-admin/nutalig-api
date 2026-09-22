@@ -46,6 +46,7 @@ public class CreateRequestPriceDetailRequest {
     public static class CreateRequestPriceTierSplitRequest {
         private String supplierId;
         private BigDecimal quantity;
+        private BigDecimal productPrice;
         private BigDecimal sellPrice;
         private BigDecimal commission;
         private Currency currency;
