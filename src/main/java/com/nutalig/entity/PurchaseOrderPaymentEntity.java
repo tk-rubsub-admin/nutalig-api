@@ -134,9 +134,9 @@ public class PurchaseOrderPaymentEntity extends AuditDateEntity {
     @OneToMany(mappedBy = "purchaseOrderPayment", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder asc, id asc")
     @ToString.Exclude
-    private Set<PurchaseOrderPaymentAttachmentEntity> attachments = new LinkedHashSet<>();
+    private Set<PurchaseOrderAttachmentEntity> attachments = new LinkedHashSet<>();
 
-    public void addAttachment(PurchaseOrderPaymentAttachmentEntity attachment) {
+    public void addAttachment(PurchaseOrderAttachmentEntity attachment) {
         if (attachment == null) return;
         attachments.add(attachment);
         attachment.setPurchaseOrderPayment(this);

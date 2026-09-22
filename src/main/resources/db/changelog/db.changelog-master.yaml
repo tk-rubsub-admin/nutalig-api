@@ -3056,3 +3056,9 @@ databaseChangeLog:
       file: db/changelog/20260920-002-add-purchase-order-payment-schedules.yaml
   - include:
       file: db/changelog/20260922-001-add-product-price-to-rfq-tier-split.yaml
+  - include:
+      file: db/changelog/20260922-002-add-supplier-attachments.yaml
+  - include:
+      file: db/changelog/20260922-003-add-purchase-order-attachment-document-type.yaml
+  - include:
+      file: db/changelog/20260922-004-move-po-payment-attachments.yaml

@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260922-003-add-purchase-order-attachment-document-type
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: purchase_order_attachment
+                columnName: document_type
+      changes:
+        - addColumn:
+            tableName: purchase_order_attachment
+            columns:
+              - column:
+                  name: document_type
+                  type: VARCHAR(30)
+                  defaultValue: OTHER
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: purchase_order_attachment
+            indexName: idx_po_attachment_document_type
+            columns:
+              - column:
+                  name: document_type

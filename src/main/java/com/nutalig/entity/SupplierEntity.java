@@ -87,6 +87,10 @@ public class SupplierEntity extends AuditDateEntity {
     @OrderBy("productFamilyCode ASC, productMaterialCode ASC")
     private List<SupplierCapabilityEntity> capabilities = new ArrayList<>();
 
+    @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<SupplierAttachmentEntity> attachments = new ArrayList<>();
+
 
     public void addContact(SupplierContactEntity contact) {
         contacts.add(contact);
@@ -96,6 +100,11 @@ public class SupplierEntity extends AuditDateEntity {
     public void addCapability(SupplierCapabilityEntity capability) {
         capabilities.add(capability);
         capability.setSupplier(this);
+    }
+
+    public void addAttachment(SupplierAttachmentEntity attachment) {
+        attachments.add(attachment);
+        attachment.setSupplier(this);
     }
 
 }

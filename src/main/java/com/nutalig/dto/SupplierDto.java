@@ -26,5 +26,6 @@ public class SupplierDto {
     private String additional;
     private List<SupplierContactDto> contacts;
     private List<SupplierCapabilityDto> capabilities;
+    private List<SupplierAttachmentDto> attachments;
 
 }

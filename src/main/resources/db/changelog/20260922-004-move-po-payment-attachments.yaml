@@ -1,0 +1,76 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260922-004-move-po-payment-attachments
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: purchase_order_payment_attachment
+        - tableExists:
+            tableName: purchase_order_attachment
+        - columnExists:
+            tableName: purchase_order_attachment
+            columnName: document_type
+        - not:
+            - columnExists:
+                tableName: purchase_order_attachment
+                columnName: purchase_order_payment_id
+      changes:
+        - addColumn:
+            tableName: purchase_order_attachment
+            columns:
+              - column:
+                  name: purchase_order_payment_id
+                  type: BIGINT
+        - createIndex:
+            tableName: purchase_order_attachment
+            indexName: idx_po_attachment_payment_id
+            columns:
+              - column:
+                  name: purchase_order_payment_id
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_attachment
+            baseColumnNames: purchase_order_payment_id
+            referencedTableName: purchase_order_payment
+            referencedColumnNames: id
+            constraintName: fk_po_attachment_payment
+            onDelete: SET NULL
+        - sql:
+            splitStatements: false
+            sql: |
+              INSERT INTO purchase_order_attachment (
+                  purchase_order_no,
+                  purchase_order_payment_id,
+                  document_type,
+                  file_name,
+                  original_file_name,
+                  file_url,
+                  content_type,
+                  file_size,
+                  sort_order,
+                  active,
+                  created_by,
+                  updated_by,
+                  created_date,
+                  updated_date
+              )
+              SELECT
+                  payment.purchase_order_no,
+                  old_attachment.purchase_order_payment_id,
+                  'PAYMENT_SLIP',
+                  old_attachment.file_name,
+                  old_attachment.original_file_name,
+                  old_attachment.file_url,
+                  old_attachment.content_type,
+                  old_attachment.file_size,
+                  old_attachment.sort_order,
+                  b'1',
+                  payment.created_by,
+                  payment.updated_by,
+                  old_attachment.created_date,
+                  old_attachment.updated_date
+              FROM purchase_order_payment_attachment old_attachment
+              INNER JOIN purchase_order_payment payment
+                  ON payment.id = old_attachment.purchase_order_payment_id;
+        - dropTable:
+            tableName: purchase_order_payment_attachment

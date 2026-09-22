@@ -46,6 +46,7 @@ import java.util.*;
 
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.PURCHASE_ORDER_PREFIX;
 import static com.nutalig.repository.specification.PurchaseOrderSpecification.*;
+import static com.nutalig.utils.ShippingMethodUtil.getShippingMethodLabel;
 
 @Slf4j
 @Service
@@ -257,7 +258,7 @@ public class PurchaseOrderService {
         purchaseOrderPaymentService.initializePaymentSummary(entity);
         purchaseOrderPaymentScheduleService.initializeSchedules(entity, now);
         purchaseOrderCbmService.recalculateTotal(entity);
-        attachFiles(entity, attachments, user, now);
+        attachFiles(entity, attachments, PurchaseOrderAttachmentDocumentType.OTHER, user, now);
 
         // PurchaseOrder uses an assigned String ID, so save() delegates to EntityManager.merge().
         // Always continue with the managed instance returned by save(); reusing the original
@@ -363,8 +364,6 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
-
-        ensureEditableStatus(entity);
 
         Integer oldRevNo = entity.getRevNo();
         Map<String, Object> before = buildPurchaseOrderSnapshot(entity);
@@ -492,7 +491,12 @@ public class PurchaseOrderService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public PurchaseOrderDto addAttachments(String purchaseOrderNo, List<MultipartFile> attachments, String userId)
+    public PurchaseOrderDto addAttachments(
+            String purchaseOrderNo,
+            List<MultipartFile> attachments,
+            PurchaseOrderAttachmentDocumentType documentType,
+            String userId
+    )
             throws Exception {
         if (attachments == null || attachments.isEmpty()) {
             throw new InvalidRequestException("Attachments are required");
@@ -502,10 +506,11 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
-        ensureEditableStatus(entity);
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
-        attachFiles(entity, attachments, user, now);
+        PurchaseOrderAttachmentDocumentType resolvedDocumentType = Optional.ofNullable(documentType)
+                .orElse(PurchaseOrderAttachmentDocumentType.OTHER);
+        attachFiles(entity, attachments, resolvedDocumentType, user, now);
 
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);
@@ -519,7 +524,10 @@ public class PurchaseOrderService {
                 ActivityAction.UPDATE,
                 ActivitySource.WEB,
                 "เพิ่มไฟล์แนบของใบสั่งซื้อเลขที่ " + entity.getPurchaseOrderNo(),
-                null
+                Map.of(
+                        "documentType", resolvedDocumentType.name(),
+                        "attachmentCount", attachments.size()
+                )
         );
 
         return mapToDto(entity);
@@ -527,12 +535,11 @@ public class PurchaseOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderDto deleteAttachment(String purchaseOrderNo, Long attachmentId, String userId)
-            throws DataNotFoundException, InvalidRequestException {
+            throws DataNotFoundException {
         PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
-        ensureEditableStatus(entity);
 
         PurchaseOrderAttachmentEntity attachment = purchaseOrderAttachmentRepository
                 .findByIdAndPurchaseOrderPurchaseOrderNoAndActiveTrue(attachmentId, purchaseOrderNo)
@@ -543,6 +550,16 @@ public class PurchaseOrderService {
         attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         purchaseOrderAttachmentRepository.save(attachment);
 
+        Map<String, Object> activityDetail = new LinkedHashMap<>();
+        activityDetail.put("attachmentId", attachment.getId());
+        activityDetail.put("fileName", attachment.getFileName());
+        activityDetail.put("originalFileName", attachment.getOriginalFileName());
+        activityDetail.put("documentType", Optional.ofNullable(attachment.getDocumentType())
+                .orElse(PurchaseOrderAttachmentDocumentType.OTHER));
+        activityDetail.put("purchaseOrderPaymentId", attachment.getPurchaseOrderPayment() == null
+                ? null
+                : attachment.getPurchaseOrderPayment().getId());
+
         activityHistoryService.record(
                 ActivityEntityType.PURCHASE_ORDER,
                 entity.getPurchaseOrderNo(),
@@ -551,11 +568,7 @@ public class PurchaseOrderService {
                 ActivityAction.UPDATE,
                 ActivitySource.WEB,
                 "ลบไฟล์แนบของใบสั่งซื้อเลขที่ " + entity.getPurchaseOrderNo(),
-                Map.of(
-                        "attachmentId", attachment.getId(),
-                        "fileName", attachment.getFileName(),
-                        "originalFileName", attachment.getOriginalFileName()
-                )
+                activityDetail
         );
 
         return mapToDto(entity);
@@ -666,12 +679,6 @@ public class PurchaseOrderService {
         }
     }
 
-    private void ensureEditableStatus(PurchaseOrderEntity entity) throws InvalidRequestException {
-        if (entity.getStatus() != PurchaseOrderStatus.CREATED) {
-            throw new InvalidRequestException("Only created purchase orders can be edited");
-        }
-    }
-
     private String generatePurchaseOrderNo() {
         for (int attempt = 0; attempt < 10_000; attempt++) {
             String purchaseOrderNo = generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 4);
@@ -733,6 +740,7 @@ public class PurchaseOrderService {
     private void attachFiles(
             PurchaseOrderEntity entity,
             List<MultipartFile> attachments,
+            PurchaseOrderAttachmentDocumentType documentType,
             UserEntity user,
             ZonedDateTime now
     ) throws Exception {
@@ -753,6 +761,8 @@ public class PurchaseOrderService {
 
             UploadFileResponse upload = fileStorageService.uploadFile(attachment);
             PurchaseOrderAttachmentEntity attachmentEntity = new PurchaseOrderAttachmentEntity();
+            attachmentEntity.setDocumentType(Optional.ofNullable(documentType)
+                    .orElse(PurchaseOrderAttachmentDocumentType.OTHER));
             attachmentEntity.setFileName(upload.getFileName());
             attachmentEntity.setOriginalFileName(StringUtils.trimToNull(attachment.getOriginalFilename()));
             attachmentEntity.setFileUrl(upload.getUrl());
@@ -824,6 +834,18 @@ public class PurchaseOrderService {
         dto.setSubTotal(defaultIfNull(purchaseOrderEntity.getSubTotal()));
         dto.setVat(BigDecimal.ZERO);
         dto.setGrandTotal(defaultIfNull(purchaseOrderEntity.getGrandTotal()));
+        dto.setPaymentTerm(buildPaymentTermLabel(purchaseOrderEntity.getPaymentTerm().getId().getCode()));
+        dto.setDepositAmount(
+                purchaseOrderEntity.getPaymentSchedules().stream()
+                        .filter(Objects::nonNull)
+                        .min(Comparator.comparing(
+                                PurchaseOrderPaymentScheduleEntity::getInstallmentNo,
+                                Comparator.nullsLast(Integer::compareTo)
+                        ))
+                        .map(PurchaseOrderPaymentScheduleEntity::getExpectedAmount)
+                        .map(this::defaultIfNull)
+                        .orElse(BigDecimal.ZERO)
+        );
         dto.setSalesId(
                 purchaseOrderEntity.getSalesOrder() != null && purchaseOrderEntity.getSalesOrder().getSales() != null
                         ? purchaseOrderEntity.getSalesOrder().getSales().getEmployeeId()
@@ -834,6 +856,7 @@ public class PurchaseOrderService {
                         ? purchaseOrderEntity.getSupplierShipping().getShippingMethod().name()
                         : null
         );
+        dto.setShippingLabel(getShippingMethodLabel(purchaseOrderEntity.getShippingMethodSnapshot()));
         dto.setShippingLocation(resolveShippingLocation(purchaseOrderEntity));
         dto.setShippingAddress(resolveShippingAddress(purchaseOrderEntity));
         dto.setShippingRemark(purchaseOrderEntity.getSupplierShipping().getRemark());
@@ -1077,6 +1100,11 @@ public class PurchaseOrderService {
             PurchaseOrderAttachmentDto attachmentDto = new PurchaseOrderAttachmentDto();
             attachmentDto.setId(attachment.getId());
             attachmentDto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
+            attachmentDto.setPurchaseOrderPaymentId(attachment.getPurchaseOrderPayment() == null
+                    ? null
+                    : attachment.getPurchaseOrderPayment().getId());
+            attachmentDto.setDocumentType(Optional.ofNullable(attachment.getDocumentType())
+                    .orElse(PurchaseOrderAttachmentDocumentType.OTHER));
             attachmentDto.setFileName(attachment.getFileName());
             attachmentDto.setOriginalFileName(attachment.getOriginalFileName());
             attachmentDto.setFileUrl(attachment.getFileUrl());
@@ -1305,5 +1333,15 @@ public class PurchaseOrderService {
                 summary,
                 detail
         );
+    }
+
+    private String buildPaymentTermLabel(String code) {
+        if (code.startsWith("DEP_50")) {
+            return "Dep 50%";
+        } else if (code.startsWith("DEP_30")) {
+            return "Dep 30%";
+        } else {
+            return null;
+        }
     }
 }

@@ -23,11 +23,14 @@ public class PurchaseOrderDocumentDto extends DefaultDocumentDto {
     private BigDecimal subTotal;
     private BigDecimal vat;
     private BigDecimal grandTotal;
+    private BigDecimal depositAmount;
     private String thaiBahtText;
 
+    private String paymentTerm;
     private String coSalesId;
     private String salesId;
     private String shippingType;
+    private String shippingLabel;
     private String shippingLocation;
     private String shippingAddress;
     private String shippingRemark;

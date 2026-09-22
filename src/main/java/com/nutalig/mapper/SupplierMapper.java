@@ -15,6 +15,7 @@ import org.mapstruct.MappingConstants;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface SupplierMapper {
 
+    @Mapping(target = "attachments", ignore = true)
     SupplierDto toDto(SupplierEntity entity);
 
     com.nutalig.dto.SupplierContactDto toDto(SupplierContactEntity entity);
@@ -27,5 +28,6 @@ public interface SupplierMapper {
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "contacts", ignore = true)
     @Mapping(target = "capabilities", ignore = true)
+    @Mapping(target = "attachments", ignore = true)
     SupplierEntity toEntity(CreateSupplierRequest request);
 }

@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260922-002-create-supplier-attachment-table
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: supplier_attachment
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE supplier_attachment (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  supplier_id VARCHAR(50) NOT NULL,
+                  file_name VARCHAR(255) NOT NULL,
+                  original_file_name VARCHAR(255) DEFAULT NULL,
+                  file_url VARCHAR(500) NOT NULL,
+                  content_type VARCHAR(100) DEFAULT NULL,
+                  file_size BIGINT DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  active BIT(1) NOT NULL DEFAULT b'1',
+                  created_by VARCHAR(100) DEFAULT NULL,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_supplier_attachment_supplier (supplier_id),
+                  CONSTRAINT fk_supplier_attachment_supplier FOREIGN KEY (supplier_id) REFERENCES supplier (id),
+                  CONSTRAINT fk_supplier_attachment_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_supplier_attachment_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

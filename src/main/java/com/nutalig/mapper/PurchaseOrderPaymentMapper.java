@@ -2,7 +2,7 @@ package com.nutalig.mapper;
 
 import com.nutalig.dto.PurchaseOrderPaymentAttachmentDto;
 import com.nutalig.dto.PurchaseOrderPaymentDto;
-import com.nutalig.entity.PurchaseOrderPaymentAttachmentEntity;
+import com.nutalig.entity.PurchaseOrderAttachmentEntity;
 import com.nutalig.entity.PurchaseOrderPaymentEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -51,10 +51,11 @@ public class PurchaseOrderPaymentMapper {
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
         dto.setUpdatedDate(entity.getUpdatedDate());
         dto.setAttachments(entity.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
                 .sorted(Comparator.comparing(
-                        PurchaseOrderPaymentAttachmentEntity::getSortOrder,
+                        PurchaseOrderAttachmentEntity::getSortOrder,
                         Comparator.nullsLast(Integer::compareTo)
-                ).thenComparing(PurchaseOrderPaymentAttachmentEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                ).thenComparing(PurchaseOrderAttachmentEntity::getId, Comparator.nullsLast(Long::compareTo)))
                 .map(this::toAttachmentDto)
                 .toList());
         return dto;
@@ -67,7 +68,7 @@ public class PurchaseOrderPaymentMapper {
         return result;
     }
 
-    private PurchaseOrderPaymentAttachmentDto toAttachmentDto(PurchaseOrderPaymentAttachmentEntity entity) {
+    private PurchaseOrderPaymentAttachmentDto toAttachmentDto(PurchaseOrderAttachmentEntity entity) {
         PurchaseOrderPaymentAttachmentDto dto = new PurchaseOrderPaymentAttachmentDto();
         dto.setId(entity.getId());
         dto.setFileName(entity.getFileName());

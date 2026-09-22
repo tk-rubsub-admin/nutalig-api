@@ -1,5 +1,6 @@
 package com.nutalig.entity;
 
+import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +25,15 @@ public class PurchaseOrderAttachmentEntity extends AuditDateEntity {
     @JoinColumn(name = "purchase_order_no", referencedColumnName = "purchase_order_no", nullable = false)
     @ToString.Exclude
     private PurchaseOrderEntity purchaseOrder;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "purchase_order_payment_id", referencedColumnName = "id")
+    @ToString.Exclude
+    private PurchaseOrderPaymentEntity purchaseOrderPayment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false, length = 30)
+    private PurchaseOrderAttachmentDocumentType documentType = PurchaseOrderAttachmentDocumentType.OTHER;
 
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;

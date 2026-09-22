@@ -10,20 +10,20 @@ import java.util.Objects;
 @Getter
 @Setter
 @Entity
-@Table(name = "purchase_order_payment_attachment")
+@Table(name = "supplier_attachment")
 @ToString(onlyExplicitlyIncluded = true)
-public class PurchaseOrderPaymentAttachmentEntity extends AuditDateEntity {
+public class SupplierAttachmentEntity extends AuditDateEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
+    @Column(name = "id")
     @ToString.Include
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "purchase_order_payment_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "supplier_id", referencedColumnName = "id", nullable = false)
     @ToString.Exclude
-    private PurchaseOrderPaymentEntity purchaseOrderPayment;
+    private SupplierEntity supplier;
 
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
@@ -43,10 +43,23 @@ public class PurchaseOrderPaymentAttachmentEntity extends AuditDateEntity {
     @Column(name = "sort_order")
     private Integer sortOrder;
 
+    @Column(name = "active", nullable = false)
+    private Boolean active = Boolean.TRUE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", referencedColumnName = "id")
+    @ToString.Exclude
+    private UserEntity createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by", referencedColumnName = "id")
+    @ToString.Exclude
+    private UserEntity updatedBy;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof PurchaseOrderPaymentAttachmentEntity that)) return false;
+        if (!(o instanceof SupplierAttachmentEntity that)) return false;
         return id != null && id.equals(that.id);
     }
 

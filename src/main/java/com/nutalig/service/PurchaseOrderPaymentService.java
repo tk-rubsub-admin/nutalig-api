@@ -6,8 +6,8 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
 import com.nutalig.dto.PurchaseOrderPaymentDto;
+import com.nutalig.entity.PurchaseOrderAttachmentEntity;
 import com.nutalig.entity.PurchaseOrderEntity;
-import com.nutalig.entity.PurchaseOrderPaymentAttachmentEntity;
 import com.nutalig.entity.PurchaseOrderPaymentEntity;
 import com.nutalig.entity.PurchaseOrderPaymentScheduleEntity;
 import com.nutalig.entity.UserEntity;
@@ -120,9 +120,9 @@ public class PurchaseOrderPaymentService {
         payment.setUpdatedBy(user);
         payment.setCreatedDate(now);
         payment.setUpdatedDate(now);
-        addAttachments(payment, attachments, user, now, purchaseOrderNo);
         purchaseOrder.addPayment(payment);
         assignSchedule(payment, schedule);
+        addAttachments(payment, attachments, user, now, purchaseOrderNo);
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
@@ -529,19 +529,30 @@ public class PurchaseOrderPaymentService {
             String purchaseOrderNo
     ) throws Exception {
         if (attachments == null) return;
-        int sortOrder = payment.getAttachments().size();
+        PurchaseOrderEntity purchaseOrder = payment.getPurchaseOrder();
+        int sortOrder = purchaseOrder.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
+                .map(PurchaseOrderAttachmentEntity::getSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
         for (MultipartFile file : attachments) {
             if (file == null || file.isEmpty()) continue;
             UploadFileResponse uploaded = fileStorageService.uploadFile(file, "purchase-orders/" + purchaseOrderNo + "/payments");
-            PurchaseOrderPaymentAttachmentEntity attachment = new PurchaseOrderPaymentAttachmentEntity();
+            PurchaseOrderAttachmentEntity attachment = new PurchaseOrderAttachmentEntity();
+            attachment.setDocumentType(PurchaseOrderAttachmentDocumentType.PAYMENT_SLIP);
             attachment.setFileName(uploaded.getFileName());
             attachment.setOriginalFileName(StringUtils.trimToNull(file.getOriginalFilename()));
             attachment.setFileUrl(uploaded.getUrl());
             attachment.setContentType(StringUtils.trimToNull(uploaded.getContentType()));
             attachment.setFileSize(file.getSize());
             attachment.setSortOrder(sortOrder++);
+            attachment.setActive(Boolean.TRUE);
+            attachment.setCreatedBy(user);
+            attachment.setUpdatedBy(user);
             attachment.setCreatedDate(now);
             attachment.setUpdatedDate(now);
+            purchaseOrder.addAttachment(attachment);
             payment.addAttachment(attachment);
         }
     }

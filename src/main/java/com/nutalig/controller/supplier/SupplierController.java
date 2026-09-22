@@ -14,7 +14,11 @@ import com.nutalig.service.SupplierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 import static com.nutalig.constant.ResponseStatus.SUCCESS;
 
@@ -44,6 +48,33 @@ public class SupplierController {
         SupplierDto response = supplierService.getSupplierById(supplierId);
 
         log.info("=== End get supplier {} ===", supplierId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping(
+            path = "/v1/suppliers/{supplierId}/attachments",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public GeneralResponse<SupplierDto> addSupplierAttachments(
+            @PathVariable String supplierId,
+            @RequestPart("attachments") List<MultipartFile> attachments,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        log.info("=== Start add supplier attachments {} count {} ===", supplierId, attachments.size());
+        SupplierDto response = supplierService.addSupplierAttachments(supplierId, attachments, userId);
+        log.info("=== End add supplier attachments {} ===", supplierId);
+        return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @DeleteMapping("/v1/suppliers/{supplierId}/attachments/{attachmentId}")
+    public GeneralResponse<SupplierDto> deleteSupplierAttachment(
+            @PathVariable String supplierId,
+            @PathVariable Long attachmentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        log.info("=== Start delete supplier attachment {} {} ===", supplierId, attachmentId);
+        SupplierDto response = supplierService.deleteSupplierAttachment(supplierId, attachmentId, userId);
+        log.info("=== End delete supplier attachment {} {} ===", supplierId, attachmentId);
         return new GeneralResponse<>(SUCCESS, response);
     }
 

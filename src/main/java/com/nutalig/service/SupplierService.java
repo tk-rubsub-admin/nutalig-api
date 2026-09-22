@@ -1,6 +1,7 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.Status;
+import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
 import com.nutalig.controller.supplier.request.*;
@@ -14,6 +15,7 @@ import com.nutalig.mapper.ProductFamilyMapper;
 import com.nutalig.mapper.ProductMaterialMapper;
 import com.nutalig.mapper.SupplierMapper;
 import com.nutalig.repository.*;
+import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -24,7 +26,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.ZonedDateTime;
 import java.util.*;
 
 import static com.nutalig.repository.specification.SupplierSpecification.*;
@@ -35,6 +39,7 @@ import static com.nutalig.repository.specification.SupplierSpecification.*;
 public class SupplierService {
 
     private final SupplierRepository supplierRepository;
+    private final SupplierAttachmentRepository supplierAttachmentRepository;
     private final SupplierCapabilityRepository supplierCapabilityRepository;
     private final SupplierShippingRepository supplierShippingRepository;
     private final LeadTimeConfigRepository leadTimeConfigRepository;
@@ -43,6 +48,8 @@ public class SupplierService {
     private final ProductFamilyMapper productFamilyMapper;
     private final ProductMaterialMapper productMaterialMapper;
     private final SupplierMapper supplierMapper;
+    private final FileStorageService fileStorageService;
+    private final UserRepository userRepository;
 
     @Transactional
     public String createSupplier(CreateSupplierRequest request) throws InvalidRequestException {
@@ -103,6 +110,84 @@ public class SupplierService {
                 .orElseThrow(() -> new DataNotFoundException("Supplier " + supplierId + " not found."));
 
         return buildSupplierDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SupplierDto addSupplierAttachments(
+            String supplierId,
+            List<MultipartFile> attachments,
+            String userId
+    ) throws Exception {
+        SupplierEntity supplier = validateSupplierExists(supplierId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+
+        List<MultipartFile> imageFiles = attachments == null
+                ? List.of()
+                : attachments.stream()
+                .filter(Objects::nonNull)
+                .filter(file -> !file.isEmpty())
+                .toList();
+        if (imageFiles.isEmpty()) {
+            throw new InvalidRequestException("At least one supplier image is required.");
+        }
+        for (MultipartFile imageFile : imageFiles) {
+            if (!StringUtils.startsWithIgnoreCase(
+                    StringUtils.trimToEmpty(imageFile.getContentType()),
+                    "image/"
+            )) {
+                throw new InvalidRequestException("Only image files are allowed.");
+            }
+        }
+
+        int nextSortOrder = supplier.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
+                .map(SupplierAttachmentEntity::getSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        for (MultipartFile imageFile : imageFiles) {
+            UploadFileResponse upload = fileStorageService.uploadFile(
+                    imageFile,
+                    "suppliers/" + supplierId + "/attachments"
+            );
+            SupplierAttachmentEntity attachment = new SupplierAttachmentEntity();
+            attachment.setFileName(upload.getFileName());
+            attachment.setOriginalFileName(StringUtils.trimToNull(imageFile.getOriginalFilename()));
+            attachment.setFileUrl(upload.getUrl());
+            attachment.setContentType(StringUtils.trimToNull(upload.getContentType()));
+            attachment.setFileSize(imageFile.getSize());
+            attachment.setSortOrder(nextSortOrder++);
+            attachment.setActive(Boolean.TRUE);
+            attachment.setCreatedBy(user);
+            attachment.setUpdatedBy(user);
+            attachment.setCreatedDate(now);
+            attachment.setUpdatedDate(now);
+            supplier.addAttachment(attachment);
+        }
+
+        return buildSupplierDto(supplierRepository.save(supplier));
+    }
+
+    @Transactional
+    public SupplierDto deleteSupplierAttachment(String supplierId, Long attachmentId, String userId)
+            throws DataNotFoundException {
+        SupplierEntity supplier = validateSupplierExists(supplierId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        SupplierAttachmentEntity attachment = supplierAttachmentRepository
+                .findByIdAndSupplier_IdAndActiveTrue(attachmentId, supplierId)
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Supplier attachment " + attachmentId + " not found."
+                ));
+
+        attachment.setActive(Boolean.FALSE);
+        attachment.setUpdatedBy(user);
+        attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        supplierAttachmentRepository.save(attachment);
+        return buildSupplierDto(supplier);
     }
 
     @Transactional(readOnly = true)
@@ -440,6 +525,28 @@ public class SupplierService {
     private SupplierDto buildSupplierDto(SupplierEntity entity) {
         SupplierDto dto = supplierMapper.toDto(entity);
         dto.setCapabilities(buildCapabilityDtos(entity.getCapabilities()));
+        dto.setAttachments(entity.getAttachments() == null
+                ? List.of()
+                : entity.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
+                .sorted(Comparator
+                        .comparing(SupplierAttachmentEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(SupplierAttachmentEntity::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(this::buildSupplierAttachmentDto)
+                .toList());
+        return dto;
+    }
+
+    private SupplierAttachmentDto buildSupplierAttachmentDto(SupplierAttachmentEntity entity) {
+        SupplierAttachmentDto dto = new SupplierAttachmentDto();
+        dto.setId(entity.getId());
+        dto.setSupplierId(entity.getSupplier() == null ? null : entity.getSupplier().getId());
+        dto.setFileName(entity.getFileName());
+        dto.setOriginalFileName(entity.getOriginalFileName());
+        dto.setFileUrl(entity.getFileUrl());
+        dto.setContentType(entity.getContentType());
+        dto.setFileSize(entity.getFileSize());
+        dto.setSortOrder(entity.getSortOrder());
         return dto;
     }
 

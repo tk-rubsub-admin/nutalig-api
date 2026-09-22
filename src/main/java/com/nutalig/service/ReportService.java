@@ -240,7 +240,7 @@ public class ReportService {
     public Object getPurchaseOrderDocument(PurchaseOrderDocumentDto dto, ExportFileFormat format) throws Exception {
         Map<String, Object> parameters = new HashMap<>();
 
-        parameters.put("logo", loadResource(isReportV2() ? NUTALIG_LOGO_V2 : NUTALIG_LOGO));
+        parameters.put("logo", loadResource(NUTALIG_LOGO_V2));
         parameters.put("supplierName", dto.getSupplierName());
         parameters.put("supplierAddress", dto.getSupplierAddress());
         parameters.put("supplierContact", dto.getSupplierContact());
@@ -257,12 +257,15 @@ public class ReportService {
         parameters.put("discount", dto.getDiscount());
         parameters.put("freight", dto.getFreight());
         parameters.put("subTotal", dto.getSubTotal());
+        parameters.put("depositAmount", dto.getDepositAmount());
+        parameters.put("paymentTerm", dto.getPaymentTerm());
         parameters.put("vat", dto.getVat());
         parameters.put("grandTotal", dto.getGrandTotal());
         parameters.put("thaiBahtText", dto.getThaiBahtText());
         parameters.put("coSalesId", dto.getCoSalesId());
         parameters.put("salesId", dto.getSalesId());
         parameters.put("shippingType", dto.getShippingType());
+        parameters.put("shippingLabel", dto.getShippingLabel());
         parameters.put("shippingLocation", dto.getShippingLocation());
         parameters.put("shippingAddress", dto.getShippingAddress());
         parameters.put("shippingRemark", dto.getShippingRemark());

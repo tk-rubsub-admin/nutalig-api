@@ -1,6 +1,7 @@
 package com.nutalig.controller.purchaseorder;
 
 import com.nutalig.constant.ExportFileFormat;
+import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderPaymentDecisionRequest;
@@ -127,9 +128,14 @@ public class PurchaseOrderController {
     public GeneralResponse<PurchaseOrderDto> addAttachments(
             @PathVariable("id") String id,
             @RequestPart("attachments") List<MultipartFile> attachments,
+            @RequestParam(value = "documentType", defaultValue = "OTHER")
+            PurchaseOrderAttachmentDocumentType documentType,
             @RequestHeader("userId") String userId
     ) throws Exception {
-        return new GeneralResponse<>(SUCCESS, purchaseOrderService.addAttachments(id, attachments, userId));
+        return new GeneralResponse<>(
+                SUCCESS,
+                purchaseOrderService.addAttachments(id, attachments, documentType, userId)
+        );
     }
 
     @DeleteMapping("/{id}/attachments/{attachmentId}")
