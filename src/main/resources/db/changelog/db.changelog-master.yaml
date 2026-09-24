@@ -3062,3 +3062,5 @@ databaseChangeLog:
       file: db/changelog/20260922-003-add-purchase-order-attachment-document-type.yaml
   - include:
       file: db/changelog/20260922-004-move-po-payment-attachments.yaml
+  - include:
+      file: db/changelog/20260924-001-add-tier-split-document-references.yaml

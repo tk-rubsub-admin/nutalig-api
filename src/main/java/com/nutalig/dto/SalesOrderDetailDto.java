@@ -22,6 +22,7 @@ public class SalesOrderDetailDto {
     private String rfqId;
     private Long rfqDetailId;
     private Long rfqTierId;
+    private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
     private Currency supplierCurrency;

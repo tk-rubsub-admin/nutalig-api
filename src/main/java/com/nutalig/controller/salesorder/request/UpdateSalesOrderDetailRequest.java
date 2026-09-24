@@ -19,6 +19,7 @@ public class UpdateSalesOrderDetailRequest {
     private String imageUrl;
     private Long rfqDetailId;
     private Long rfqTierId;
+    private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
     private Currency supplierCurrency;

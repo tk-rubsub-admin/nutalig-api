@@ -10,6 +10,7 @@ public class LinkRfqSalesOrderRequest {
     private String saleOrderId;
     private Long detailId;
     private Long tierId;
+    private Long tierSplitId;
     private String shippingMethod;
     private BigDecimal price;
     private List<Selection> selections;
@@ -18,6 +19,7 @@ public class LinkRfqSalesOrderRequest {
     public static class Selection {
         private Long detailId;
         private Long tierId;
+        private Long tierSplitId;
         private String shippingMethod;
         private BigDecimal price;
     }

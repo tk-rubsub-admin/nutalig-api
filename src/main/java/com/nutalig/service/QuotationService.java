@@ -218,6 +218,7 @@ public class QuotationService {
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
             detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setTierSplitId(itemRequest.getTierSplitId());
             detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
@@ -451,6 +452,7 @@ public class QuotationService {
             detailEntity.setSize(itemRequest.getSize());
             detailEntity.setSpec(itemRequest.getSpec());
             detailEntity.setTierId(itemRequest.getTierId());
+            detailEntity.setTierSplitId(itemRequest.getTierSplitId());
             detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
 
@@ -491,6 +493,7 @@ public class QuotationService {
             item.setAmount(detail.getAmount());
             item.setImagePreview(detail.getImageUrl());
             item.setTierId(detail.getTierId());
+            item.setTierSplitId(detail.getTierSplitId());
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
             itemRequests.add(item);
@@ -1085,6 +1088,7 @@ public class QuotationService {
             QuotationItemRequestDto item = new QuotationItemRequestDto();
             item.setId(detail.getId() != null ? detail.getId().toString() : null);
             item.setTierId(detail.getTierId());
+            item.setTierSplitId(detail.getTierSplitId());
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
             item.setName(detail.getName());

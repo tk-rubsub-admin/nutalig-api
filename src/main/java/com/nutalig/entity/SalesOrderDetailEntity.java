@@ -68,6 +68,9 @@ public class SalesOrderDetailEntity {
     @Column(name = "rfq_tier_id")
     private Long rfqTierId;
 
+    @Column(name = "rfq_tier_split_id")
+    private Long rfqTierSplitId;
+
     @Column(name = "quotation_detail_id")
     private Long quotationDetailId;
 

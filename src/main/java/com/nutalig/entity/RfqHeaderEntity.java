@@ -239,6 +239,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "confirmed_tier_id")
     private Long confirmedTierId;
 
+    @Column(name = "confirmed_tier_split_id")
+    private Long confirmedTierSplitId;
+
     @Column(name = "confirmed_supplier_quote_id", length = 255)
     private String confirmedSupplierQuoteId;
 

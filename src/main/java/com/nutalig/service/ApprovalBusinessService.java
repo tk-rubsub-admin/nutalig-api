@@ -204,6 +204,7 @@ public class ApprovalBusinessService {
         clearedSalesOrderConfirmation.put("saleOrderId", rfq.getSaleOrderId());
         clearedSalesOrderConfirmation.put("confirmedDetailId", rfq.getConfirmedDetailId());
         clearedSalesOrderConfirmation.put("confirmedTierId", rfq.getConfirmedTierId());
+        clearedSalesOrderConfirmation.put("confirmedTierSplitId", rfq.getConfirmedTierSplitId());
         clearedSalesOrderConfirmation.put("confirmedSupplierQuoteId", rfq.getConfirmedSupplierQuoteId());
         clearedSalesOrderConfirmation.put("confirmedShippingMethod", rfq.getConfirmedShippingMethod());
         clearedSalesOrderConfirmation.put("confirmedPrice", rfq.getConfirmedPrice());
@@ -215,6 +216,7 @@ public class ApprovalBusinessService {
         rfq.setSaleOrderId(null);
         rfq.setConfirmedDetailId(null);
         rfq.setConfirmedTierId(null);
+        rfq.setConfirmedTierSplitId(null);
         rfq.setConfirmedSupplierQuoteId(null);
         rfq.setConfirmedShippingMethod(null);
         rfq.setConfirmedPrice(null);

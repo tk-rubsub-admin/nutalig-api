@@ -1200,8 +1200,17 @@ public class RFQService {
 
         entity.setSaleOrderId(request.getSaleOrderId().trim());
         entity.setConfirmedDetailId(primarySelection.getDetail().getId());
-        entity.setConfirmedTierId(primarySelection.getTier().getId());
-        entity.setConfirmedSupplierQuoteId(resolveConfirmedSupplierQuoteId(entity.getId(), primarySelection.getTier()));
+        entity.setConfirmedTierId(
+                primarySelection.getTier() != null ? primarySelection.getTier().getId() : null
+        );
+        entity.setConfirmedTierSplitId(
+                primarySelection.getTierSplit() != null ? primarySelection.getTierSplit().getId() : null
+        );
+        entity.setConfirmedSupplierQuoteId(
+                primarySelection.getTier() != null
+                        ? resolveConfirmedSupplierQuoteId(entity.getId(), primarySelection.getTier())
+                        : null
+        );
         entity.setConfirmedShippingMethod(primarySelection.getShippingMethod());
         entity.setConfirmedPrice(scaleMoney(primarySelection.getConfirmedPrice()));
         entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -1214,6 +1223,7 @@ public class RFQService {
         activityDetail.put("saleOrderId", entity.getSaleOrderId());
         activityDetail.put("detailId", entity.getConfirmedDetailId());
         activityDetail.put("tierId", entity.getConfirmedTierId());
+        activityDetail.put("tierSplitId", entity.getConfirmedTierSplitId());
         activityDetail.put("supplierQuoteId", entity.getConfirmedSupplierQuoteId());
         activityDetail.put("shippingMethod", entity.getConfirmedShippingMethod());
         activityDetail.put("price", entity.getConfirmedPrice());
@@ -1221,7 +1231,14 @@ public class RFQService {
         activityDetail.put("selections", selections.stream().map(selection -> {
             Map<String, Object> selectionDetail = new LinkedHashMap<>();
             selectionDetail.put("detailId", selection.getDetail().getId());
-            selectionDetail.put("tierId", selection.getTier().getId());
+            selectionDetail.put(
+                    "tierId",
+                    selection.getTier() != null ? selection.getTier().getId() : null
+            );
+            selectionDetail.put(
+                    "tierSplitId",
+                    selection.getTierSplit() != null ? selection.getTierSplit().getId() : null
+            );
             selectionDetail.put("shippingMethod", selection.getShippingMethod());
             selectionDetail.put("price", selection.getConfirmedPrice());
             return selectionDetail;
@@ -1265,6 +1282,7 @@ public class RFQService {
         activityDetail.put("previousStatus", previousStatus);
         activityDetail.put("previousConfirmedDetailId", entity.getConfirmedDetailId());
         activityDetail.put("previousConfirmedTierId", entity.getConfirmedTierId());
+        activityDetail.put("previousConfirmedTierSplitId", entity.getConfirmedTierSplitId());
         activityDetail.put("previousConfirmedSupplierQuoteId", entity.getConfirmedSupplierQuoteId());
         activityDetail.put("previousConfirmedShippingMethod", entity.getConfirmedShippingMethod());
         activityDetail.put("previousConfirmedPrice", entity.getConfirmedPrice());
@@ -1275,6 +1293,7 @@ public class RFQService {
         entity.setSaleOrderId(null);
         entity.setConfirmedDetailId(null);
         entity.setConfirmedTierId(null);
+        entity.setConfirmedTierSplitId(null);
         entity.setConfirmedSupplierQuoteId(null);
         entity.setConfirmedShippingMethod(null);
         entity.setConfirmedPrice(null);
@@ -1309,11 +1328,12 @@ public class RFQService {
 
         if (requestedSelections.isEmpty()
                 && request.getDetailId() != null
-                && request.getTierId() != null
+                && (request.getTierId() != null || request.getTierSplitId() != null)
                 && StringUtils.isNotBlank(request.getShippingMethod())) {
             LinkRfqSalesOrderRequest.Selection fallbackSelection = new LinkRfqSalesOrderRequest.Selection();
             fallbackSelection.setDetailId(request.getDetailId());
             fallbackSelection.setTierId(request.getTierId());
+            fallbackSelection.setTierSplitId(request.getTierSplitId());
             fallbackSelection.setShippingMethod(request.getShippingMethod());
             fallbackSelection.setPrice(request.getPrice());
             requestedSelections.add(fallbackSelection);
@@ -1329,26 +1349,43 @@ public class RFQService {
             if (selection.getDetailId() == null) {
                 throw new InvalidRequestException("detailId is required");
             }
-            if (selection.getTierId() == null) {
-                throw new InvalidRequestException("tierId is required");
+            if (selection.getTierId() == null && selection.getTierSplitId() == null) {
+                throw new InvalidRequestException("tierId or tierSplitId is required");
+            }
+            if (selection.getTierId() != null && selection.getTierSplitId() != null) {
+                throw new InvalidRequestException("tierId and tierSplitId cannot be specified together");
             }
 
             RfqDetailEntity detail = getDetailFromHeader(entity, selection.getDetailId());
-            RfqTierEntity tier = detail.getTiers().stream()
-                    .filter(item -> Objects.equals(item.getId(), selection.getTierId()))
-                    .findFirst()
-                    .orElseThrow(() -> new DataNotFoundException("Tier " + selection.getTierId() + " not found."));
+            RfqTierEntity tier = null;
+            RfqTierSplitEntity tierSplit = null;
+            if (selection.getTierId() != null) {
+                tier = detail.getTiers().stream()
+                        .filter(item -> Objects.equals(item.getId(), selection.getTierId()))
+                        .findFirst()
+                        .orElseThrow(() -> new DataNotFoundException(
+                                "Tier " + selection.getTierId() + " not found."
+                        ));
+            } else {
+                tierSplit = detail.getTierSplits().stream()
+                        .filter(item -> Objects.equals(item.getId(), selection.getTierSplitId()))
+                        .findFirst()
+                        .orElseThrow(() -> new DataNotFoundException(
+                                "Tier split " + selection.getTierSplitId() + " not found."
+                        ));
+            }
 
             String shippingMethod = normalizeTierShippingMethod(selection.getShippingMethod());
 
             BigDecimal confirmedPrice = selection.getPrice();
             if (confirmedPrice == null) {
-                confirmedPrice = tier.getTotalPrice();
+                confirmedPrice = tier != null ? tier.getTotalPrice() : tierSplit.getSellPrice();
             }
 
             resolvedSelections.add(new ResolvedLinkSelection(
                     detail,
                     tier,
+                    tierSplit,
                     shippingMethod,
                     confirmedPrice
             ));
@@ -1370,6 +1407,7 @@ public class RFQService {
     private static class ResolvedLinkSelection {
         private final RfqDetailEntity detail;
         private final RfqTierEntity tier;
+        private final RfqTierSplitEntity tierSplit;
         private final String shippingMethod;
         private final BigDecimal confirmedPrice;
     }

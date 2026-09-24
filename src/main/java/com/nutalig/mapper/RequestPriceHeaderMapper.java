@@ -57,6 +57,7 @@ public interface RequestPriceHeaderMapper {
     @Mapping(target = "procurementRemark", ignore = true)
     @Mapping(target = "confirmedDetailId", ignore = true)
     @Mapping(target = "confirmedTierId", ignore = true)
+    @Mapping(target = "confirmedTierSplitId", ignore = true)
     @Mapping(target = "confirmedSupplierQuoteId", ignore = true)
     @Mapping(target = "confirmedShippingMethod", ignore = true)
     @Mapping(target = "confirmedPrice", ignore = true)

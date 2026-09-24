@@ -17,6 +17,7 @@ public class QuotationItemRequestDto {
     private BigDecimal amount;
     private String imagePreview;
     private String tierId;
+    private Long tierSplitId;
     private Long rfqDetailId;
     private String sourceRfqId;
 }

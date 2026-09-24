@@ -1,0 +1,96 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260924-001-add-quotation-tier-split-reference
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: quotation_detail
+        - not:
+            - columnExists:
+                tableName: quotation_detail
+                columnName: tier_split_id
+      changes:
+        - addColumn:
+            tableName: quotation_detail
+            columns:
+              - column:
+                  name: tier_split_id
+                  type: BIGINT
+        - createIndex:
+            tableName: quotation_detail
+            indexName: idx_quotation_detail_tier_split_id
+            columns:
+              - column:
+                  name: tier_split_id
+        - addForeignKeyConstraint:
+            baseTableName: quotation_detail
+            baseColumnNames: tier_split_id
+            referencedTableName: rfq_tier_split
+            referencedColumnNames: id
+            constraintName: fk_quotation_detail_tier_split
+            onDelete: SET NULL
+
+  - changeSet:
+      id: 20260924-002-add-sales-order-tier-split-reference
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: sales_order_detail
+        - not:
+            - columnExists:
+                tableName: sales_order_detail
+                columnName: rfq_tier_split_id
+      changes:
+        - addColumn:
+            tableName: sales_order_detail
+            columns:
+              - column:
+                  name: rfq_tier_split_id
+                  type: BIGINT
+        - createIndex:
+            tableName: sales_order_detail
+            indexName: idx_sales_order_detail_tier_split_id
+            columns:
+              - column:
+                  name: rfq_tier_split_id
+        - addForeignKeyConstraint:
+            baseTableName: sales_order_detail
+            baseColumnNames: rfq_tier_split_id
+            referencedTableName: rfq_tier_split
+            referencedColumnNames: id
+            constraintName: fk_sales_order_detail_tier_split
+            onDelete: SET NULL
+
+  - changeSet:
+      id: 20260924-003-add-rfq-confirmed-tier-split-reference
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: rfq_header
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: confirmed_tier_split_id
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: confirmed_tier_split_id
+                  type: BIGINT
+        - createIndex:
+            tableName: rfq_header
+            indexName: idx_rfq_header_confirmed_tier_split_id
+            columns:
+              - column:
+                  name: confirmed_tier_split_id
+        - addForeignKeyConstraint:
+            baseTableName: rfq_header
+            baseColumnNames: confirmed_tier_split_id
+            referencedTableName: rfq_tier_split
+            referencedColumnNames: id
+            constraintName: fk_rfq_header_confirmed_tier_split
+            onDelete: SET NULL

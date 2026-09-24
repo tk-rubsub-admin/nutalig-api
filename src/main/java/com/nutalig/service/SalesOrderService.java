@@ -824,6 +824,7 @@ public class SalesOrderService {
         detail.setImageUrl(request.getImageUrl());
         detail.setRfqDetailId(request.getRfqDetailId());
         detail.setRfqTierId(request.getRfqTierId());
+        detail.setRfqTierSplitId(request.getRfqTierSplitId());
         detail.setQuotationDetailId(request.getQuotationDetailId());
         detail.setShippingMethod(normalizeShippingType(request.getShippingMethod()));
         detail.setSupplierCurrency(request.getSupplierCurrency());
@@ -876,6 +877,7 @@ public class SalesOrderService {
             detail.setImageUrl(itemRequest.getImageUrl());
             detail.setRfqDetailId(itemRequest.getRfqDetailId());
             detail.setRfqTierId(itemRequest.getRfqTierId());
+            detail.setRfqTierSplitId(itemRequest.getRfqTierSplitId());
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(normalizeShippingType(itemRequest.getShippingMethod()));
             detail.setSupplierCurrency(itemRequest.getSupplierCurrency());
@@ -905,6 +907,7 @@ public class SalesOrderService {
             request.setImageUrl(item.getImageUrl());
             request.setRfqDetailId(item.getRfqDetailId());
             request.setRfqTierId(item.getRfqTierId());
+            request.setRfqTierSplitId(item.getRfqTierSplitId());
             request.setQuotationDetailId(item.getQuotationDetailId());
             request.setShippingMethod(item.getShippingMethod());
             request.setSupplierCurrency(item.getSupplierCurrency());
@@ -1364,6 +1367,7 @@ public class SalesOrderService {
             item.setRfqId(rfqIdByDetailId.get(detail.getRfqDetailId()));
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setRfqTierId(detail.getRfqTierId());
+            item.setRfqTierSplitId(detail.getRfqTierSplitId());
             item.setQuotationDetailId(detail.getQuotationDetailId());
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierCurrency(detail.getSupplierCurrency());

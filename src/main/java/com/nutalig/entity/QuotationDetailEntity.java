@@ -63,6 +63,9 @@ public class QuotationDetailEntity {
     @Column(name = "tier_id")
     private String tierId;
 
+    @Column(name = "tier_split_id")
+    private Long tierSplitId;
+
     @Column(name = "rfq_detail_id")
     private Long rfqDetailId;
 
