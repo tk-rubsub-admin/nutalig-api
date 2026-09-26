@@ -31,4 +31,5 @@ public class PurchaseOrderDetailDto {
     private String shippingMethod;
     private Long supplierQuoteTierId;
     private List<PurchaseOrderPackageSnapshotDto> packages;
+    private List<PurchaseOrderDetailComponentDto> components;
 }

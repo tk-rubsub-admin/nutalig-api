@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260926-001-add-purchase-order-start-run-permission
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`)
+              VALUES ('PERM_PURCHASE_ORDER_START_RUN', 'เริ่มรันงานใบสั่งซื้อ', 'Start purchase order run', 'document')
+              ON DUPLICATE KEY UPDATE name_th = VALUES(name_th), name_en = VALUES(name_en), `group` = VALUES(`group`);
+              INSERT IGNORE INTO role_permission (role_code, permission_code) VALUES
+                ('SUPER_ADMIN', 'PERM_PURCHASE_ORDER_START_RUN'),
+                ('PROCUREMENT', 'PERM_PURCHASE_ORDER_START_RUN'),
+                ('PROCUREMENT_ADMIN', 'PERM_PURCHASE_ORDER_START_RUN'),
+                ('PROCUREMENT_MANAGER', 'PERM_PURCHASE_ORDER_START_RUN');

@@ -103,6 +103,18 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "remark", length = 2000)
     private String remark;
 
+    @Column(name = "late_start_reason", length = 2000)
+    private String lateStartReason;
+
+    @Column(name = "production_started_date")
+    private LocalDate productionStartedDate;
+
+    @Column(name = "production_expected_end_date")
+    private LocalDate productionExpectedEndDate;
+
+    @Column(name = "production_completed_date")
+    private LocalDate productionCompletedDate;
+
     @Column(name = "rev_no")
     private Integer revNo;
 

@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.time.LocalDate;
 
 @Data
 public class PurchaseOrderDto {
@@ -32,6 +33,10 @@ public class PurchaseOrderDto {
     private BigDecimal outstandingTotalThb;
     private BigDecimal totalCbm;
     private String remark;
+    private String lateStartReason;
+    private LocalDate productionStartedDate;
+    private LocalDate productionExpectedEndDate;
+    private LocalDate productionCompletedDate;
     private Integer revNo;
     private String supplierNameSnapshot;
     private String supplierAddressSnapshot;

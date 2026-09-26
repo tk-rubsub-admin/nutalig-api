@@ -7,6 +7,7 @@ import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.PurchaseOrderDetailComponentRequest;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pageable;
@@ -19,6 +20,7 @@ import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.SupplierMapper;
+import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
@@ -65,6 +67,7 @@ public class PurchaseOrderService {
     private final SupplierShippingRepository supplierShippingRepository;
     private final UserRepository userRepository;
     private final SupplierMapper supplierMapper;
+    private final CustomerMapper customerMapper;
     private final SystemConfigMapper systemConfigMapper;
     private final UserMapper userMapper;
     private final ActivityHistoryService activityHistoryService;
@@ -73,6 +76,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderCbmService purchaseOrderCbmService;
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
+    private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -159,6 +163,7 @@ public class PurchaseOrderService {
         entity.setStatus(PurchaseOrderStatus.CREATED);
         entity.setCurrency(currency);
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        entity.setLateStartReason(StringUtils.trimToNull(request.getLateStartReason()));
         entity.setRevNo(0);
         entity.setSupplierNameSnapshot(supplier.getSupplierName());
         String supplierContactNumber = resolveSupplierContactNumber(supplier);
@@ -223,6 +228,11 @@ public class PurchaseOrderService {
             detail.setShippingMethod(sourceItem.getShippingMethod());
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
             purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
+            if (requestedItem != null && requestedItem.getComponents() != null) {
+                replaceComponents(detail, requestedItem.getComponents());
+            } else {
+                snapshotComponentsFromSupplierQuote(detail);
+            }
             entity.addItem(detail);
 
             subTotal = subTotal.add(amountSupplierCurrency);
@@ -245,6 +255,9 @@ public class PurchaseOrderService {
             detail.setAmountSupplierCurrency(amountSupplierCurrency);
             detail.setAmountThb(amountSupplierCurrency);
             detail.setShippingMethod(supplierShipping.getShippingMethod().name());
+            if (requestedItem.getComponents() != null) {
+                replaceComponents(detail, requestedItem.getComponents());
+            }
             entity.addItem(detail);
 
             subTotal = subTotal.add(amountSupplierCurrency);
@@ -362,6 +375,10 @@ public class PurchaseOrderService {
             throws DataNotFoundException, InvalidRequestException {
         PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        if (entity.getStatus() != PurchaseOrderStatus.CREATED
+                && entity.getStatus() != PurchaseOrderStatus.AWAITING_PAYMENT) {
+            throw new InvalidRequestException("Purchase order cannot be edited in status " + entity.getStatus());
+        }
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
@@ -375,6 +392,9 @@ public class PurchaseOrderService {
         entity.setShippingLeadTimeDay(request.getShippingLeadTimeDay());
         if (request.getRemark() != null) {
             entity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        }
+        if (request.getLateStartReason() != null) {
+            entity.setLateStartReason(StringUtils.trimToNull(request.getLateStartReason()));
         }
         if (request.getItems() != null && !request.getItems().isEmpty()) {
             replacePurchaseOrderItems(entity, request.getItems());
@@ -390,6 +410,97 @@ public class PurchaseOrderService {
         recordUpdatePurchaseOrderActivity(entity, userId, before);
 
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto startRun(String purchaseOrderNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        return startRun(purchaseOrderNo, userId, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto startRun(String purchaseOrderNo, String userId, String lateStartReason)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+
+        if (entity.getStatus() == PurchaseOrderStatus.PRODUCTION_RUNNING) {
+            return mapToDto(entity);
+        }
+        if (entity.getStatus() == PurchaseOrderStatus.CANCELLED || entity.getStatus() == PurchaseOrderStatus.CLOSED) {
+            throw new InvalidRequestException("Purchase order cannot start run in status " + entity.getStatus());
+        }
+
+        boolean lateStart = isLateStart(entity);
+        if (lateStart && StringUtils.isBlank(lateStartReason)) {
+            throw new InvalidRequestException("lateStartReason is required when starting a late purchase order");
+        }
+
+        PurchaseOrderPaymentScheduleEntity firstSchedule = entity.getPaymentSchedules().stream()
+                .filter(schedule -> Objects.equals(schedule.getInstallmentNo(), 1))
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException("First payment schedule not found"));
+        if (firstSchedule.getStatus() != PurchaseOrderPaymentScheduleStatus.PAID) {
+            throw new InvalidRequestException("First installment must be paid and approved before starting run");
+        }
+        boolean hasApprovedFirstPayment = firstSchedule.getPayments().stream()
+                .anyMatch(payment -> payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED
+                        && payment.getAmount() != null && payment.getAmount().signum() > 0);
+        if (!hasApprovedFirstPayment) {
+            throw new InvalidRequestException("Approved payment for first installment not found");
+        }
+
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        PurchaseOrderStatus previousStatus = entity.getStatus();
+        entity.setStatus(PurchaseOrderStatus.PRODUCTION_RUNNING);
+        LocalDate productionStartedDate = LocalDate.now(DateUtil.getTimeZone());
+        entity.setProductionStartedDate(productionStartedDate);
+        entity.setProductionExpectedEndDate(productionStartedDate.plusDays(
+                Math.max(0, Optional.ofNullable(entity.getProductionLeadTimeDay()).orElse(0))
+        ));
+        if (lateStart) {
+            entity.setLateStartReason(StringUtils.trimToNull(lateStartReason));
+        }
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        purchaseOrderRepository.saveAndFlush(entity);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("purchaseOrderNo", purchaseOrderNo);
+        detail.put("previousStatus", previousStatus != null ? previousStatus.name() : null);
+        detail.put("status", PurchaseOrderStatus.PRODUCTION_RUNNING.name());
+        detail.put("installmentNo", firstSchedule.getInstallmentNo());
+        detail.put("scheduleId", firstSchedule.getId());
+        detail.put("paidAmount", firstSchedule.getPaidAmount());
+        detail.put("lateStart", lateStart);
+        detail.put("lateStartReason", entity.getLateStartReason());
+        activityHistoryService.record(
+                ActivityEntityType.PURCHASE_ORDER,
+                purchaseOrderNo,
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "เริ่มรันงานใบสั่งซื้อเลขที่ " + purchaseOrderNo,
+                detail
+        );
+        return mapToDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isLateStart(String purchaseOrderNo) throws DataNotFoundException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        return isLateStart(entity);
+    }
+
+    private boolean isLateStart(PurchaseOrderEntity entity) {
+        if (entity.getDocDate() == null) {
+            return false;
+        }
+        LocalDate cutoffDate = entity.getDocDate().plusDays(resolvePurchaseOrderDueDateDays());
+        return LocalDate.now(DateUtil.getTimeZone()).isAfter(cutoffDate);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -592,10 +703,138 @@ public class PurchaseOrderService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderProductionCalendarDto> getProductionCalendar(
+            String userId, LocalDate start, LocalDate end
+    ) throws DataNotFoundException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        String role = user.getUserRoleEntity() != null ? user.getUserRoleEntity().getRoleCode() : null;
+        boolean unrestricted = Set.of("SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_MANAGE")
+                .contains(role);
+        String salesId = null;
+        if (!unrestricted && StringUtils.equals(role, "SALES")) {
+            salesId = user.getEmployeeEntity() != null ? user.getEmployeeEntity().getEmployeeId() : null;
+            if (StringUtils.isBlank(salesId)) return List.of();
+        } else if (!unrestricted) {
+            return List.of();
+        }
+
+        LocalDate rangeStart = start != null ? start : LocalDate.now(DateUtil.getTimeZone()).minusMonths(1);
+        LocalDate rangeEnd = end != null ? end : LocalDate.now(DateUtil.getTimeZone()).plusMonths(2);
+        Specification<PurchaseOrderEntity> criteria = Specification.<PurchaseOrderEntity>where(null)
+                .and(salesIdEqual(salesId));
+        return purchaseOrderRepository.findAll(criteria).stream()
+                .filter(po -> po.getProductionExpectedEndDate() != null)
+                .filter(po -> !po.getProductionExpectedEndDate().isBefore(rangeStart)
+                        && !po.getProductionExpectedEndDate().isAfter(rangeEnd))
+                .map(this::toProductionCalendarDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseOrderTimelineDto getProductionTimeline(String purchaseOrderNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(entity, userId);
+        PurchaseOrderTimelineDto result = new PurchaseOrderTimelineDto();
+        result.setPurchaseOrderNo(entity.getPurchaseOrderNo());
+        result.setCustomer(entity.getSalesOrder() != null
+                ? customerMapper.toDto(entity.getSalesOrder().getCustomer()) : null);
+        result.setProductionLeadTimeDay(entity.getProductionLeadTimeDay());
+        result.setProductionStartedDate(entity.getProductionStartedDate());
+        result.setProductionExpectedEndDate(entity.getProductionExpectedEndDate());
+        result.setProductionCompletedDate(entity.getProductionCompletedDate());
+        result.setOverdue(isProductionOverdue(entity));
+        List<PurchaseOrderTimelineDto.Event> events = new ArrayList<>();
+        addTimelineEvent(events, "CREATED", "สร้าง PO", entity.getDocDate(), true);
+        if (entity.getProductionStartedDate() != null) {
+            addTimelineEvent(events, "PRODUCTION_STARTED", "เริ่มรันงาน", entity.getProductionStartedDate(), true);
+            addTimelineEvent(events, "PRODUCTION_EXPECTED_END", "คาดว่าจะผลิตเสร็จ",
+                    entity.getProductionExpectedEndDate(), entity.getProductionCompletedDate() != null);
+        }
+        if (entity.getProductionCompletedDate() != null) {
+            addTimelineEvent(events, "PRODUCTION_COMPLETED", "ผลิตเสร็จจริง", entity.getProductionCompletedDate(), true);
+        }
+        result.setEvents(events);
+        return result;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto completeProduction(String purchaseOrderNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(entity, userId);
+        if (entity.getProductionStartedDate() == null) {
+            throw new InvalidRequestException("Purchase order production has not started.");
+        }
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        entity.setProductionCompletedDate(LocalDate.now(DateUtil.getTimeZone()));
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        purchaseOrderRepository.saveAndFlush(entity);
+        activityHistoryService.record(
+                ActivityEntityType.PURCHASE_ORDER, purchaseOrderNo, userId, ActivityActorType.USER,
+                ActivityAction.UPDATE, ActivitySource.API,
+                "บันทึกผลิตเสร็จสำหรับใบสั่งซื้อเลขที่ " + purchaseOrderNo, null
+        );
+        return mapToDto(entity);
+    }
+
+    private void validateProductionVisibility(PurchaseOrderEntity entity, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        String role = user.getUserRoleEntity() != null ? user.getUserRoleEntity().getRoleCode() : null;
+        if (Set.of("SUPER_ADMIN", "ADMIN", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_MANAGE").contains(role)) return;
+        String employeeId = user.getEmployeeEntity() != null ? user.getEmployeeEntity().getEmployeeId() : null;
+        String salesId = entity.getSalesOrder() != null && entity.getSalesOrder().getSales() != null
+                ? entity.getSalesOrder().getSales().getEmployeeId() : null;
+        if (!StringUtils.equals(role, "SALES") || !StringUtils.equals(employeeId, salesId)) {
+            throw new InvalidRequestException("You do not have access to this purchase order timeline.");
+        }
+    }
+
+    private PurchaseOrderProductionCalendarDto toProductionCalendarDto(PurchaseOrderEntity entity) {
+        PurchaseOrderProductionCalendarDto dto = new PurchaseOrderProductionCalendarDto();
+        dto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
+        dto.setSalesOrderNo(entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);
+        dto.setSalesName(entity.getSalesOrder() != null && entity.getSalesOrder().getSales() != null
+                ? entity.getSalesOrder().getSales().getNickName() : null);
+        dto.setSupplierName(StringUtils.defaultIfBlank(entity.getSupplierNameSnapshot(),
+                entity.getSupplier() != null ? entity.getSupplier().getSupplierName() : null));
+        dto.setCustomer(entity.getSalesOrder() != null
+                ? customerMapper.toDto(entity.getSalesOrder().getCustomer()) : null);
+        dto.setStartDate(entity.getProductionStartedDate());
+        dto.setExpectedFinishDate(entity.getProductionExpectedEndDate());
+        dto.setActualFinishDate(entity.getProductionCompletedDate());
+        dto.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
+        dto.setOverdue(isProductionOverdue(entity));
+        return dto;
+    }
+
+    private boolean isProductionOverdue(PurchaseOrderEntity entity) {
+        return entity.getProductionExpectedEndDate() != null
+                && entity.getProductionCompletedDate() == null
+                && LocalDate.now(DateUtil.getTimeZone()).isAfter(entity.getProductionExpectedEndDate());
+    }
+
+    private void addTimelineEvent(List<PurchaseOrderTimelineDto.Event> events, String type, String label,
+                                  LocalDate date, boolean completed) {
+        if (date == null) return;
+        PurchaseOrderTimelineDto.Event event = new PurchaseOrderTimelineDto.Event();
+        event.setType(type); event.setLabel(label); event.setDate(date); event.setCompleted(completed);
+        events.add(event);
+    }
+
     private Specification<PurchaseOrderEntity> buildSearchCriteria(SearchPurchaseOrderRequest request) {
         return Specification.<PurchaseOrderEntity>where(null)
                 .and(purchaseOrderNoEqual(request.getPurchaseOrderNo()))
                 .and(salesOrderNoEqual(request.getSalesOrderNo()))
+                .and(salesIdEqual(request.getSalesId()))
                 .and(supplierIdEqual(request.getSupplierId()))
                 .and(statusEqual(request.getStatus()))
                 .and(statusIn(request.getStatuses()))
@@ -690,7 +929,7 @@ public class PurchaseOrderService {
         throw new IllegalStateException("Cannot generate an unused purchase order number");
     }
 
-    private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests) {
+    private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests) throws InvalidRequestException {
         Map<Long, PurchaseOrderDetailEntity> existingById = new HashMap<>();
         for (PurchaseOrderDetailEntity item : entity.getItems()) {
             if (item.getId() != null) {
@@ -728,6 +967,13 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            if (itemRequest.getComponents() != null) {
+                replaceComponents(detail, itemRequest.getComponents());
+            } else if (previousItem != null) {
+                copyComponents(previousItem, detail);
+            } else {
+                snapshotComponentsFromSupplierQuote(detail);
+            }
             if (previousItem != null && Objects.equals(previousItem.getSupplierQuoteTierId(), detail.getSupplierQuoteTierId())) {
                 purchaseOrderCbmService.copyAndRecalculateSnapshots(previousItem, detail);
             } else {
@@ -735,6 +981,111 @@ public class PurchaseOrderService {
             }
             entity.addItem(detail);
         }
+    }
+
+    private void replaceComponents(PurchaseOrderDetailEntity detail, List<PurchaseOrderDetailComponentRequest> requests) throws InvalidRequestException {
+        if (requests == null) return;
+        int index = 0;
+        for (PurchaseOrderDetailComponentRequest request : requests) {
+            if (request == null) continue;
+            String name = StringUtils.trimToNull(request.getComponentName());
+            BigDecimal quantity = request.getQuantityPerItem();
+            if (name == null) throw new InvalidRequestException("componentName is required");
+            if (quantity == null || quantity.signum() <= 0) throw new InvalidRequestException("quantityPerItem must be greater than zero");
+            PurchaseOrderDetailComponentEntity component = new PurchaseOrderDetailComponentEntity();
+            component.setSourceQuoteDetailPackageId(request.getSourceQuoteDetailPackageId());
+            component.setComponentCode(StringUtils.trimToNull(request.getComponentCode()));
+            component.setComponentName(name);
+            component.setSpecification(StringUtils.trimToNull(request.getSpecification()));
+            component.setQuantityPerItem(quantity);
+            component.setUnit(StringUtils.defaultIfBlank(StringUtils.trimToNull(request.getUnit()), "pcs"));
+            component.setRemark(StringUtils.trimToNull(request.getRemark()));
+            component.setSortOrder(request.getSortOrder() == null ? index : request.getSortOrder());
+            detail.addComponent(component);
+            index++;
+        }
+    }
+
+    private void copyComponents(PurchaseOrderDetailEntity source, PurchaseOrderDetailEntity target) {
+        for (PurchaseOrderDetailComponentEntity old : source.getComponents()) {
+            PurchaseOrderDetailComponentEntity component = new PurchaseOrderDetailComponentEntity();
+            component.setSourceQuoteDetailPackageId(old.getSourceQuoteDetailPackageId());
+            component.setComponentCode(old.getComponentCode());
+            component.setComponentName(old.getComponentName());
+            component.setSpecification(old.getSpecification());
+            component.setQuantityPerItem(old.getQuantityPerItem());
+            component.setUnit(old.getUnit());
+            component.setRemark(old.getRemark());
+            component.setSortOrder(old.getSortOrder());
+            target.addComponent(component);
+        }
+    }
+
+    private void snapshotComponentsFromSupplierQuote(PurchaseOrderDetailEntity detail) {
+        if (detail.getSupplierQuoteTierId() == null) {
+            log.warn("Cannot snapshot PO components: supplierQuoteTierId is null");
+            return;
+        }
+        rfqSupplierQuoteTierRepository.findById(detail.getSupplierQuoteTierId())
+                .map(RfqSupplierQuoteTierEntity::getQuoteDetail)
+                .ifPresent(quoteDetail -> {
+                    if (quoteDetail.getPackages() != null && !quoteDetail.getPackages().isEmpty()) {
+                        snapshotComponentsFromDetailPackages(detail, quoteDetail.getPackages());
+                        return;
+                    }
+                    List<RfqSupplierQuotePackageEntity> quotePackages = quoteDetail.getSupplierQuote().getPackages();
+                    if (quotePackages == null || quotePackages.isEmpty()) {
+                        log.warn("Cannot snapshot PO components: no packages for supplierQuoteTierId {}",
+                                detail.getSupplierQuoteTierId());
+                        return;
+                    }
+                    int index = 0;
+                    for (RfqSupplierQuotePackageEntity source : quotePackages) {
+                        addComponentSnapshot(detail, source.getId(), source.getPackageName(),
+                                source.getPackageDimension(), source.getPackageWeight(),
+                                source.getPackageCapacity(), source.getSortOrder(), index++);
+                    }
+                });
+    }
+
+    private void snapshotComponentsFromDetailPackages(
+            PurchaseOrderDetailEntity detail,
+            List<RfqSupplierQuoteDetailPackageEntity> sources
+    ) {
+        int index = 0;
+        for (RfqSupplierQuoteDetailPackageEntity source : sources) {
+            addComponentSnapshot(detail, source.getId(), source.getPackageName(),
+                    source.getPackageDimension(), source.getPackageWeight(),
+                    source.getPackageCapacity(), source.getSortOrder(), index++);
+        }
+    }
+
+    private void addComponentSnapshot(
+            PurchaseOrderDetailEntity detail,
+            Long sourceId,
+            String name,
+            String dimension,
+            String weight,
+            String capacity,
+            Integer sortOrder,
+            int fallbackSortOrder
+    ) {
+        PurchaseOrderDetailComponentEntity component = new PurchaseOrderDetailComponentEntity();
+        component.setSourceQuoteDetailPackageId(sourceId);
+        component.setComponentName(StringUtils.defaultIfBlank(StringUtils.trimToNull(name), "ไม่ระบุชื่อชิ้นส่วน"));
+        component.setSpecification(null);
+        component.setQuantityPerItem(BigDecimal.ONE);
+        component.setUnit("pcs");
+        component.setSortOrder(sortOrder == null ? fallbackSortOrder : sortOrder);
+        detail.addComponent(component);
+    }
+
+    private String joinSourcePackageSpecification(String dimension, String weight, String capacity) {
+        List<String> values = new ArrayList<>();
+        if (StringUtils.isNotBlank(dimension)) values.add("ขนาด: " + dimension);
+        if (StringUtils.isNotBlank(weight)) values.add("น้ำหนัก: " + weight);
+        if (StringUtils.isNotBlank(capacity)) values.add("ความจุ: " + capacity);
+        return values.isEmpty() ? null : String.join("; ", values);
     }
 
     private void attachFiles(
@@ -1081,6 +1432,10 @@ public class PurchaseOrderService {
         dto.setOutstandingTotalThb(entity.getOutstandingTotalThb());
         dto.setTotalCbm(entity.getTotalCbm());
         dto.setRemark(entity.getRemark());
+        dto.setLateStartReason(entity.getLateStartReason());
+        dto.setProductionStartedDate(entity.getProductionStartedDate());
+        dto.setProductionExpectedEndDate(entity.getProductionExpectedEndDate());
+        dto.setProductionCompletedDate(entity.getProductionCompletedDate());
         dto.setRevNo(entity.getRevNo());
         dto.setSupplierNameSnapshot(entity.getSupplierNameSnapshot());
         dto.setSupplierAddressSnapshot(entity.getSupplierAddressSnapshot());
@@ -1154,6 +1509,20 @@ public class PurchaseOrderService {
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());
             item.setPackages(detail.getPackages().stream().map(purchaseOrderCbmService::toDto).toList());
+            item.setComponents(detail.getComponents().stream().map(component -> {
+                PurchaseOrderDetailComponentDto componentDto = new PurchaseOrderDetailComponentDto();
+                componentDto.setId(component.getId());
+                componentDto.setSourceQuoteDetailPackageId(component.getSourceQuoteDetailPackageId());
+                componentDto.setComponentCode(component.getComponentCode());
+                componentDto.setComponentName(component.getComponentName());
+                componentDto.setSpecification(component.getSpecification());
+                componentDto.setQuantityPerItem(component.getQuantityPerItem());
+                componentDto.setTotalQuantity(defaultIfNull(detail.getQuantity()).multiply(defaultIfNull(component.getQuantityPerItem())));
+                componentDto.setUnit(component.getUnit());
+                componentDto.setRemark(component.getRemark());
+                componentDto.setSortOrder(component.getSortOrder());
+                return componentDto;
+            }).toList());
             items.add(item);
         }
         dto.setItems(items);
@@ -1210,6 +1579,7 @@ public class PurchaseOrderService {
         snapshot.put("outstandingTotal", entity.getOutstandingTotal());
         snapshot.put("totalCbm", entity.getTotalCbm());
         snapshot.put("remark", entity.getRemark());
+        snapshot.put("lateStartReason", entity.getLateStartReason());
         snapshot.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
         return snapshot;
     }

@@ -1,0 +1,65 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260925-001-add-purchase-order-detail-components
+      author: codex
+      changes:
+        - createTable:
+            tableName: purchase_order_detail_component
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: purchase_order_detail_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_quote_detail_package_id
+                  type: BIGINT
+              - column:
+                  name: component_code
+                  type: VARCHAR(100)
+              - column:
+                  name: component_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: specification
+                  type: TEXT
+              - column:
+                  name: quantity_per_item
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit
+                  type: VARCHAR(50)
+                  defaultValue: pcs
+                  constraints:
+                    nullable: false
+              - column:
+                  name: remark
+                  type: TEXT
+              - column:
+                  name: sort_order
+                  type: INT
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_detail_component
+            baseColumnNames: purchase_order_detail_id
+            referencedTableName: purchase_order_detail
+            referencedColumnNames: id
+            constraintName: fk_po_detail_component_detail
+            onDelete: CASCADE
+        - createIndex:
+            tableName: purchase_order_detail_component
+            indexName: idx_po_detail_component_detail
+            columns:
+              - column:
+                  name: purchase_order_detail_id

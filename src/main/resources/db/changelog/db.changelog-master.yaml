@@ -1,4 +1,8 @@
 databaseChangeLog:
+  - include:
+      file: db/changelog/20260926-003-add-purchase-order-production-dates.yaml
+  - include:
+      file: db/changelog/20260926-004-rename-purchase-order-running-status.yaml
   - changeSet:
       id: 20260723-004-create-rfq-supplier-quote-package-table
       author: codex
@@ -3064,3 +3068,9 @@ databaseChangeLog:
       file: db/changelog/20260922-004-move-po-payment-attachments.yaml
   - include:
       file: db/changelog/20260924-001-add-tier-split-document-references.yaml
+  - include:
+      file: db/changelog/20260925-001-add-purchase-order-detail-components.yaml
+  - include:
+      file: db/changelog/20260926-001-add-purchase-order-start-run-permission.yaml
+  - include:
+      file: db/changelog/20260926-002-add-purchase-order-late-start-reason.yaml

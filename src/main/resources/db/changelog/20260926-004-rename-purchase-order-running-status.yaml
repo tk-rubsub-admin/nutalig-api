@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260926-004-rename-purchase-order-running-status
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: purchase_order
+        - columnExists:
+            tableName: purchase_order
+            columnName: status
+      changes:
+        - update:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: status
+                  value: PRODUCTION_RUNNING
+            where: status = 'RUNNING'
+      rollback:
+        - update:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: status
+                  value: RUNNING
+            where: status = 'PRODUCTION_RUNNING'

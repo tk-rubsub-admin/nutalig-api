@@ -114,7 +114,11 @@ public class PurchaseOrderPaymentService {
                 request.getRemark(),
                 purchaseOrder.getCurrency()
         );
-        payment.setStatus(PurchaseOrderPaymentStatus.PENDING);
+        // A confirmed payment entry is approved immediately. The approve/reject
+        // endpoints remain available for legacy payments that are still PENDING.
+        payment.setStatus(PurchaseOrderPaymentStatus.APPROVED);
+        payment.setApprovedBy(user);
+        payment.setApprovedDate(now);
         payment.setRequestKey(requestKey);
         payment.setCreatedBy(user);
         payment.setUpdatedBy(user);
@@ -123,12 +127,14 @@ public class PurchaseOrderPaymentService {
         purchaseOrder.addPayment(payment);
         assignSchedule(payment, schedule);
         addAttachments(payment, attachments, user, now, purchaseOrderNo);
+        recalculatePaymentSummary(purchaseOrder);
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
 
         recordActivity(purchaseOrder, payment, userId, ActivityAction.CREATE,
-                "บันทึกรายการชำระเงินของใบสั่งซื้อเลขที่ " + purchaseOrderNo, null);
+                "บันทึกและอนุมัติรายการชำระเงินของใบสั่งซื้อเลขที่ " + purchaseOrderNo,
+                Map.of("autoApproved", true));
         return purchaseOrderPaymentMapper.toDto(payment);
     }
 
@@ -253,6 +259,11 @@ public class PurchaseOrderPaymentService {
         PurchaseOrderEntity purchaseOrder = getPurchaseOrderForUpdate(purchaseOrderNo);
         PurchaseOrderPaymentEntity payment = getPayment(purchaseOrderNo, paymentId);
         requireStatus(payment, PurchaseOrderPaymentStatus.APPROVED);
+        if (purchaseOrder.getStatus() == PurchaseOrderStatus.PRODUCTION_RUNNING
+                && payment.getSchedule() != null
+                && Objects.equals(payment.getSchedule().getInstallmentNo(), 1)) {
+            throw new InvalidRequestException("First installment payment cannot be voided after purchase order starts running");
+        }
 
         UserEntity user = getUser(userId);
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
@@ -340,7 +351,8 @@ public class PurchaseOrderPaymentService {
         }
 
         if (purchaseOrder.getStatus() != PurchaseOrderStatus.CANCELLED
-                && purchaseOrder.getStatus() != PurchaseOrderStatus.CLOSED) {
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.CLOSED
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING) {
             purchaseOrder.setStatus(purchaseOrder.getPaymentStatus() == PurchaseOrderPaymentLifecycleStatus.PAID
                     ? PurchaseOrderStatus.PAID
                     : PurchaseOrderStatus.AWAITING_PAYMENT);
@@ -506,7 +518,9 @@ public class PurchaseOrderPaymentService {
     ) {
         BigDecimal normalizedRate = currency == Currency.THB ? BigDecimal.ONE : exchangeRate;
         payment.setPaymentType(paymentType);
-        payment.setInstallmentNo(paymentType == PurchaseOrderPaymentType.INSTALLMENT ? installmentNo : null);
+        // A deposit payment is commonly used for installment 1. Preserve the
+        // schedule installment number even when paymentType is DEPOSIT.
+        payment.setInstallmentNo(installmentNo);
         payment.setPaymentDate(paymentDate);
         payment.setAmount(amount.setScale(5, RoundingMode.HALF_UP));
         payment.setCurrency(currency);

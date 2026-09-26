@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260926-002-add-purchase-order-late-start-reason
+      author: codex
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: late_start_reason
+                  type: VARCHAR(2000)

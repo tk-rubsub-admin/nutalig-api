@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260926-003-add-purchase-order-production-dates
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: purchase_order
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: production_started_date
+                  type: DATE
+              - column:
+                  name: production_expected_end_date
+                  type: DATE
+              - column:
+                  name: production_completed_date
+                  type: DATE

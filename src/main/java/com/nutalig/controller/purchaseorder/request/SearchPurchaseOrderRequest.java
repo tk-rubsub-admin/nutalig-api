@@ -10,6 +10,7 @@ import java.util.List;
 public class SearchPurchaseOrderRequest {
     private String purchaseOrderNo;
     private String salesOrderNo;
+    private String salesId;
     private String supplierId;
     private LocalDate docDateStart;
     private LocalDate docDateEnd;

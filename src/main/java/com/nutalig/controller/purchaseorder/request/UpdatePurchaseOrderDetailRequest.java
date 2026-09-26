@@ -4,6 +4,7 @@ import com.nutalig.constant.Currency;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class UpdatePurchaseOrderDetailRequest {
@@ -25,4 +26,5 @@ public class UpdatePurchaseOrderDetailRequest {
     private Long quotationDetailId;
     private String shippingMethod;
     private Long supplierQuoteTierId;
+    private List<PurchaseOrderDetailComponentRequest> components;
 }

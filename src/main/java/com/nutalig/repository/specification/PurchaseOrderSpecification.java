@@ -33,6 +33,16 @@ public class PurchaseOrderSpecification {
         return (root, query, cb) -> cb.equal(root.join("salesOrder", JoinType.LEFT).get("salesOrderNo"), salesOrderNo.trim());
     }
 
+    public static Specification<PurchaseOrderEntity> salesIdEqual(String salesId) {
+        if (StringUtils.isBlank(salesId)) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(
+                root.join("salesOrder", JoinType.LEFT).join("sales", JoinType.LEFT).get("employeeId"),
+                salesId.trim()
+        );
+    }
+
     public static Specification<PurchaseOrderEntity> supplierIdEqual(String supplierId) {
         if (StringUtils.isBlank(supplierId)) {
             return null;

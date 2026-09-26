@@ -8,6 +8,7 @@ import com.nutalig.controller.purchaseorder.request.PurchaseOrderPaymentDecision
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.StartPurchaseOrderRunRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.response.CreatePurchaseOrderResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -47,6 +48,34 @@ public class PurchaseOrderController {
     private final com.nutalig.service.PurchaseOrderCbmService purchaseOrderCbmService;
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
+
+    @GetMapping("/production-calendar")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_TRACKING')")
+    public GeneralResponse<List<com.nutalig.dto.PurchaseOrderProductionCalendarDto>> productionCalendar(
+            @RequestHeader("userId") String userId,
+            @RequestParam(required = false) java.time.LocalDate start,
+            @RequestParam(required = false) java.time.LocalDate end
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.getProductionCalendar(userId, start, end));
+    }
+
+    @GetMapping("/{id}/production-timeline")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_VIEW')")
+    public GeneralResponse<com.nutalig.dto.PurchaseOrderTimelineDto> productionTimeline(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.getProductionTimeline(id, userId));
+    }
+
+    @PatchMapping("/{id}/production-complete")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> productionComplete(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.completeProduction(id, userId));
+    }
 
     @PostMapping("/cbm-preview")
     public GeneralResponse<PurchaseOrderCbmPreviewDto> previewCbm(
@@ -106,6 +135,26 @@ public class PurchaseOrderController {
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.updatePurchaseOrder(id, request, userId));
+    }
+
+    @PostMapping("/{id}/start-run")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> startRun(
+            @PathVariable("id") String id,
+            @RequestHeader("userId") String userId,
+            @RequestBody(required = false) StartPurchaseOrderRunRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.startRun(
+                id,
+                userId,
+                request != null ? request.getLateStartReason() : null
+        ));
+    }
+
+    @GetMapping("/{id}/late-start-check")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<Boolean> checkLateStart( @PathVariable("id") String id) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.isLateStart(id));
     }
 
     @PatchMapping("/{id}/cancel")

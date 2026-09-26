@@ -96,9 +96,18 @@ public class PurchaseOrderDetailEntity {
     @OrderBy("sortOrder asc, id asc")
     private List<PurchaseOrderDetailPackageEntity> packages = new ArrayList<>();
 
+    @OneToMany(mappedBy = "purchaseOrderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder asc, id asc")
+    private List<PurchaseOrderDetailComponentEntity> components = new ArrayList<>();
+
     public void addPackage(PurchaseOrderDetailPackageEntity packageEntity) {
         packages.add(packageEntity);
         packageEntity.setPurchaseOrderDetail(this);
+    }
+
+    public void addComponent(PurchaseOrderDetailComponentEntity component) {
+        components.add(component);
+        component.setPurchaseOrderDetail(this);
     }
 
     @Override

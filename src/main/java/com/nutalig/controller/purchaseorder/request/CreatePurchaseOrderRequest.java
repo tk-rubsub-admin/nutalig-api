@@ -22,6 +22,7 @@ public class CreatePurchaseOrderRequest {
     private String supplierContactNoSnapshot;
     private String supplierAddressSnapshot;
     private String remark;
+    private String lateStartReason;
     private List<Item> items;
 
     @Data
@@ -33,5 +34,6 @@ public class CreatePurchaseOrderRequest {
         private Currency supplierCurrency;
         private BigDecimal supplierUnitPrice;
         private BigDecimal supplierShippingCost;
+        private List<PurchaseOrderDetailComponentRequest> components;
     }
 }

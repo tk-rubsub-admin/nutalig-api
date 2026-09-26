@@ -11,5 +11,6 @@ public class UpdatePurchaseOrderRequest {
     private Integer productionLeadTimeDay;
     private Integer shippingLeadTimeDay;
     private String remark;
+    private String lateStartReason;
     private List<UpdatePurchaseOrderDetailRequest> items;
 }
