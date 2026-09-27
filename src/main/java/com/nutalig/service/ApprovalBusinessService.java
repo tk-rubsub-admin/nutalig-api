@@ -7,6 +7,7 @@ import com.nutalig.entity.ApprovalRequestEntity;
 import com.nutalig.entity.RfqHeaderEntity;
 import com.nutalig.entity.InvoiceEntity;
 import com.nutalig.entity.SalesOrderEntity;
+import com.nutalig.entity.PurchaseOrderProofEntity;
 import com.nutalig.entity.UserEntity;
 import com.nutalig.entity.UserTodoEntity;
 import com.nutalig.exception.DataNotFoundException;
@@ -15,6 +16,8 @@ import com.nutalig.repository.CustomerRepository;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.repository.SalesOrderRepository;
+import com.nutalig.repository.PurchaseOrderProofRepository;
+import com.nutalig.repository.PurchaseOrderProofRevisionRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,10 +41,13 @@ public class ApprovalBusinessService {
     private final ObjectMapper objectMapper;
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
+    private final PurchaseOrderProofRepository purchaseOrderProofRepository;
+    private final PurchaseOrderProofRevisionRepository purchaseOrderProofRevisionRepository;
     private final UserRepository userRepository;
     private final ActivityHistoryService activityHistoryService;
     private final UserTodoService userTodoService;
     private final UserProfileService userProfileService;
+    private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
 
     @Transactional
     public void handleApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source)
@@ -60,6 +66,10 @@ public class ApprovalBusinessService {
         }
         if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) {
             handleRfqCustomerTransferApproved(approvalRequest, actorUserId, source);
+            return;
+        }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF) {
+            handlePurchaseOrderProofApproved(approvalRequest, actorUserId, source);
             return;
         }
 
@@ -86,6 +96,10 @@ public class ApprovalBusinessService {
             return;
         }
         if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) { handleRfqCustomerTransferRejected(approvalRequest, actorUserId, source, reason); return; }
+        if (approvalRequest.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF) {
+            handlePurchaseOrderProofChangesRequested(approvalRequest, actorUserId, source, reason);
+            return;
+        }
 
         log.info("No business rejection handler for requestType={}", approvalRequest.getRequestType());
     }
@@ -101,7 +115,115 @@ public class ApprovalBusinessService {
             return "/invoice/" + approvalRequest.getReferenceId();
         }
         if (approvalRequest.getRequestType() == ApprovalRequestType.RFQ_CUSTOMER_TRANSFER) return "/price-inquiry/" + approvalRequest.getReferenceId();
+        if (approvalRequest.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF) return "/purchase-order-proof/" + approvalRequest.getReferenceId();
         return null;
+    }
+
+    private void handlePurchaseOrderProofApproved(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source
+    ) throws DataNotFoundException {
+        long proofId = parseProofId(approvalRequest);
+        var proof = purchaseOrderProofRepository.findDetailedById(proofId)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order proof " + proofId + " not found."));
+        var revision = proof.getRevisions().stream()
+                .filter(item -> item.getApprovalRequest() != null
+                        && java.util.Objects.equals(item.getApprovalRequest().getId(), approvalRequest.getId()))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Purchase order proof revision not found."));
+        UserEntity actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        revision.setStatus(PurchaseOrderProofStatus.APPROVED);
+        revision.setActedByUser(actor);
+        revision.setActedAt(now);
+        revision.setUpdatedBy(actorUserId);
+        proof.setStatus(PurchaseOrderProofStatus.APPROVED);
+        proof.setUpdatedBy(actorUserId);
+        purchaseOrderProofRevisionRepository.save(revision);
+        purchaseOrderProofRepository.save(proof);
+        purchaseOrderMilestoneService.markProofStatus(
+                proof.getPurchaseOrder(), proofTypeCode(proof),
+                PurchaseOrderMilestoneStatus.COMPLETED,
+                revision.getSalesComment(), actorUserId
+        );
+
+        activityHistoryService.record(ActivityEntityType.PURCHASE_ORDER,
+                proof.getPurchaseOrder().getPurchaseOrderNo(), actorUserId, ActivityActorType.USER,
+                ActivityAction.APPROVE,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "อนุมัติงานพรูฟ " + proofTypeLabel(proof) + " Revision " + revision.getRevisionNo(),
+                Map.of("proofId", proof.getId(), "revisionId", revision.getId(),
+                        "revisionNo", revision.getRevisionNo(), "proofType", proofTypeCode(proof)));
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private void handlePurchaseOrderProofChangesRequested(
+            ApprovalRequestEntity approvalRequest,
+            String actorUserId,
+            ApprovalSource source,
+            String reason
+    ) throws DataNotFoundException {
+        long proofId = parseProofId(approvalRequest);
+        var proof = purchaseOrderProofRepository.findDetailedById(proofId)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order proof " + proofId + " not found."));
+        var revision = proof.getRevisions().stream()
+                .filter(item -> item.getApprovalRequest() != null
+                        && java.util.Objects.equals(item.getApprovalRequest().getId(), approvalRequest.getId()))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Purchase order proof revision not found."));
+        UserEntity actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new DataNotFoundException("User " + actorUserId + " not found."));
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+
+        revision.setStatus(PurchaseOrderProofStatus.CHANGES_REQUESTED);
+        revision.setActedByUser(actor);
+        revision.setActedAt(now);
+        revision.setChangeReason(StringUtils.trimToNull(reason));
+        revision.setUpdatedBy(actorUserId);
+        proof.setStatus(PurchaseOrderProofStatus.CHANGES_REQUESTED);
+        proof.setUpdatedBy(actorUserId);
+        purchaseOrderProofRevisionRepository.save(revision);
+        purchaseOrderProofRepository.save(proof);
+        purchaseOrderMilestoneService.markProofStatus(
+                proof.getPurchaseOrder(), proofTypeCode(proof),
+                PurchaseOrderMilestoneStatus.CHANGES_REQUESTED,
+                reason, actorUserId
+        );
+
+        activityHistoryService.record(ActivityEntityType.PURCHASE_ORDER,
+                proof.getPurchaseOrder().getPurchaseOrderNo(), actorUserId, ActivityActorType.USER,
+                ActivityAction.REJECT,
+                source == ApprovalSource.LINE_POSTBACK ? ActivitySource.LINE : ActivitySource.API,
+                "ขอแก้ไขงานพรูฟ " + proofTypeLabel(proof) + " Revision " + revision.getRevisionNo(),
+                Map.of("proofId", proof.getId(), "revisionId", revision.getId(),
+                        "revisionNo", revision.getRevisionNo(), "proofType", proofTypeCode(proof),
+                        "reason", StringUtils.defaultString(reason)));
+        completeApprovalTodos(approvalRequest.getId(), actorUserId);
+    }
+
+    private long parseProofId(ApprovalRequestEntity approvalRequest) throws DataNotFoundException {
+        try {
+            return Long.parseLong(approvalRequest.getReferenceId());
+        } catch (NumberFormatException exception) {
+            throw new DataNotFoundException("Invalid purchase order proof reference.");
+        }
+    }
+
+    private String proofTypeCode(PurchaseOrderProofEntity proof) {
+        return proof.getProofType() != null && proof.getProofType().getId() != null
+                ? proof.getProofType().getId().getCode()
+                : "-";
+    }
+
+    private String proofTypeLabel(PurchaseOrderProofEntity proof) {
+        if (proof.getProofType() == null) return "-";
+        return StringUtils.defaultIfBlank(
+                proof.getProofType().getNameTh(),
+                StringUtils.defaultIfBlank(proof.getProofType().getNameEn(), proofTypeCode(proof))
+        );
     }
 
     private void handleInvoicePaymentTermApproved(

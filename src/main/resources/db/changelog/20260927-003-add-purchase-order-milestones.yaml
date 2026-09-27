@@ -1,0 +1,103 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260927-003-add-purchase-order-milestones
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_milestone (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  milestone_code VARCHAR(50) NOT NULL,
+                  status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                  planned_date DATE DEFAULT NULL,
+                  actual_at DATETIME(6) DEFAULT NULL,
+                  note TEXT DEFAULT NULL,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_po_milestone_po_code (purchase_order_no, milestone_code),
+                  KEY idx_po_milestone_status (status),
+                  CONSTRAINT fk_po_milestone_po FOREIGN KEY (purchase_order_no)
+                      REFERENCES purchase_order (purchase_order_no) ON DELETE CASCADE
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT INTO purchase_order_milestone
+                  (purchase_order_no, milestone_code, status, planned_date, actual_at, created_date, updated_date)
+              SELECT po.purchase_order_no, codes.milestone_code, 'PENDING', NULL, NULL, NOW(6), NOW(6)
+              FROM purchase_order po
+              CROSS JOIN (
+                  SELECT 'PO_CREATED' milestone_code UNION ALL
+                  SELECT 'JOB_STARTED' UNION ALL
+                  SELECT 'DIGITAL_PROOF' UNION ALL
+                  SELECT 'ON_PRESS_COLOR_CHECK' UNION ALL
+                  SELECT 'PRODUCTION_STARTED' UNION ALL
+                  SELECT 'PRODUCTION_EXPECTED_END' UNION ALL
+                  SELECT 'PRODUCTION_COMPLETED' UNION ALL
+                  SELECT 'ARRIVED_AT_CARRIER' UNION ALL
+                  SELECT 'IN_TRANSIT' UNION ALL
+                  SELECT 'WAREHOUSE_RECEIVED'
+              ) codes;
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order po ON po.purchase_order_no = milestone.purchase_order_no
+              SET milestone.status = 'COMPLETED',
+                  milestone.actual_at = COALESCE(po.created_date, TIMESTAMP(po.doc_date))
+              WHERE milestone.milestone_code = 'PO_CREATED';
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order po ON po.purchase_order_no = milestone.purchase_order_no
+              SET milestone.status = 'COMPLETED',
+                  milestone.actual_at = TIMESTAMP(po.production_started_date)
+              WHERE milestone.milestone_code IN ('JOB_STARTED', 'PRODUCTION_STARTED')
+                AND po.production_started_date IS NOT NULL;
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order po ON po.purchase_order_no = milestone.purchase_order_no
+              SET milestone.status = 'COMPLETED',
+                  milestone.planned_date = po.production_expected_end_date,
+                  milestone.actual_at = COALESCE(
+                      TIMESTAMP(po.production_started_date),
+                      TIMESTAMP(po.production_completed_date)
+                  )
+              WHERE milestone.milestone_code = 'PRODUCTION_EXPECTED_END'
+                AND po.production_expected_end_date IS NOT NULL;
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order po ON po.purchase_order_no = milestone.purchase_order_no
+              SET milestone.status = 'COMPLETED',
+                  milestone.actual_at = TIMESTAMP(po.production_completed_date)
+              WHERE milestone.milestone_code = 'PRODUCTION_COMPLETED'
+                AND po.production_completed_date IS NOT NULL;
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order_proof proof
+                ON proof.purchase_order_no = milestone.purchase_order_no
+               AND proof.proof_type = milestone.milestone_code
+              SET milestone.status = CASE proof.status
+                      WHEN 'APPROVED' THEN 'COMPLETED'
+                      WHEN 'PENDING_APPROVAL' THEN 'IN_PROGRESS'
+                      WHEN 'DRAFT' THEN 'IN_PROGRESS'
+                      WHEN 'CHANGES_REQUESTED' THEN 'CHANGES_REQUESTED'
+                      WHEN 'CANCELLED' THEN 'CANCELLED'
+                      ELSE 'PENDING'
+                  END,
+                  milestone.actual_at = COALESCE(proof.updated_date, proof.created_date),
+                  milestone.updated_by = proof.updated_by,
+                  milestone.updated_date = COALESCE(proof.updated_date, NOW(6))
+              WHERE milestone.milestone_code IN ('DIGITAL_PROOF', 'ON_PRESS_COLOR_CHECK');
+
+              UPDATE purchase_order_milestone milestone
+              JOIN purchase_order po ON po.purchase_order_no = milestone.purchase_order_no
+              LEFT JOIN purchase_order_proof proof
+                ON proof.purchase_order_no = milestone.purchase_order_no
+               AND proof.proof_type = milestone.milestone_code
+              SET milestone.status = 'SKIPPED',
+                  milestone.actual_at = TIMESTAMP(po.production_completed_date),
+                  milestone.note = 'ข้ามอัตโนมัติจากข้อมูลการผลิตเดิมก่อนเริ่มใช้ Timeline'
+              WHERE milestone.milestone_code IN ('DIGITAL_PROOF', 'ON_PRESS_COLOR_CHECK')
+                AND milestone.status = 'PENDING'
+                AND po.production_completed_date IS NOT NULL
+                AND proof.id IS NULL;

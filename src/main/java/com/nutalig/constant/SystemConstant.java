@@ -25,6 +25,7 @@ public enum SystemConstant {
     SALES_TYPE,
     POSITION,
     PURCHASE_ORDER,
+    PURCHASE_ORDER_PROOF_TYPE,
     TEAM,
     VAT,
     UNIT

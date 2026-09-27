@@ -1,0 +1,55 @@
+{
+  "type": "flex",
+  "altText": "${altText}",
+  "contents": {
+    "type": "bubble",
+    "header": {
+      "type": "box",
+      "layout": "vertical",
+      "backgroundColor": "#1E3A5F",
+      "paddingAll": "20px",
+      "contents": [
+        { "type": "text", "text": "มีงานตัวอย่างรอพรูฟ", "weight": "bold", "size": "xl", "color": "#FFFFFF" },
+        { "type": "text", "text": "${proofType}", "size": "sm", "color": "#D8E6F3", "margin": "sm" }
+      ]
+    },
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "20px",
+      "spacing": "md",
+      "contents": [
+        { "type": "text", "text": "${requestNo}", "weight": "bold", "size": "lg" },
+        { "type": "text", "text": "ใบยืนยันสั่งซื้อ: ${salesOrderId}", "size": "sm", "wrap": true },
+        { "type": "text", "text": "ลูกค้า: ${customerName}", "size": "sm", "wrap": true },
+        { "type": "text", "text": "Revision: ${revisionNo}", "size": "sm" },
+        { "type": "text", "text": "ไฟล์แนบ: ${attachmentCount} ไฟล์", "size": "sm" },
+        { "type": "text", "text": "ผู้ส่ง: ${requesterName}", "size": "sm", "wrap": true },
+        {
+          "type": "box",
+          "layout": "vertical",
+          "backgroundColor": "#FFF7E6",
+          "cornerRadius": "md",
+          "paddingAll": "10px",
+          "contents": [
+            { "type": "text", "text": "รายละเอียด", "size": "sm", "weight": "bold" },
+            { "type": "text", "text": "${urgentReason}", "size": "sm", "wrap": true, "margin": "sm" }
+          ]
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "20px",
+      "contents": [
+        {
+          "type": "button",
+          "style": "primary",
+          "color": "#2563EB",
+          "action": { "type": "uri", "label": "เปิดดูและพรูฟ", "uri": "${detailUrl}" }
+        }
+      ]
+    }
+  }
+}

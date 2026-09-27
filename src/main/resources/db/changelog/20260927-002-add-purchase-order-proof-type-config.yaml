@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260927-002-add-purchase-order-proof-type-config
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO system_config (group_code, code, name_th, name_en, sort) VALUES
+                  ('PURCHASE_ORDER_PROOF_TYPE', 'DIGITAL_PROOF', 'ดิจิตอลปริ้นท์', 'Digital Proof', 1),
+                  ('PURCHASE_ORDER_PROOF_TYPE', 'ON_PRESS_COLOR_CHECK', 'พรูฟสีหน้าเครื่อง', 'On-Press Color Check', 2)
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  sort = VALUES(sort);

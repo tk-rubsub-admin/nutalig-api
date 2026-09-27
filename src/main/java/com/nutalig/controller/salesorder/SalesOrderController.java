@@ -15,11 +15,13 @@ import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
 import com.nutalig.controller.salesorder.response.CreateSalesOrderResponse;
 import com.nutalig.dto.SalesOrderDto;
+import com.nutalig.dto.PurchaseOrderTimelineDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.SalesOrderEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.SalesOrderService;
+import com.nutalig.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,7 @@ import static com.nutalig.constant.ResponseStatus.SUCCESS;
 public class SalesOrderController {
 
     private final SalesOrderService salesOrderService;
+    private final PurchaseOrderService purchaseOrderService;
 
     @PostMapping("/search")
     public GeneralResponse<Pageable<SalesOrderDto>> searchSalesOrders(
@@ -71,6 +74,15 @@ public class SalesOrderController {
 
         log.info("=== End get sales order by id {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/production-timelines")
+    public GeneralResponse<java.util.List<PurchaseOrderTimelineDto>> getProductionTimelines(
+            @PathVariable(name = "id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                purchaseOrderService.getProductionTimelinesBySalesOrder(id, userId));
     }
 
     @PatchMapping("/{id}")

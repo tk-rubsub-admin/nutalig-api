@@ -1,4 +1,10 @@
 databaseChangeLog:
+#  - include:
+#      file: db/changelog/20260927-002-add-purchase-order-proof-type-config.yaml
+  - include:
+      file: db/changelog/20260927-001-add-purchase-order-proofs.yaml
+#  - include:
+#      file: db/changelog/20260927-003-add-purchase-order-milestones.yaml
   - include:
       file: db/changelog/20260926-003-add-purchase-order-production-dates.yaml
   - include:

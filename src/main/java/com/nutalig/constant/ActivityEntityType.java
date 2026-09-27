@@ -9,5 +9,6 @@ public enum ActivityEntityType {
     INVOICE,
     RECEIPT,
     PURCHASE_ORDER,
+    PURCHASE_ORDER_PROOF,
     APPROVAL_REQUEST
 }

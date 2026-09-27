@@ -1,0 +1,14 @@
+package com.nutalig.constant;
+
+public enum PurchaseOrderMilestoneCode {
+    PO_CREATED,
+    JOB_STARTED,
+    DIGITAL_PROOF,
+    ON_PRESS_COLOR_CHECK,
+    PRODUCTION_STARTED,
+    PRODUCTION_EXPECTED_END,
+    PRODUCTION_COMPLETED,
+    ARRIVED_AT_CARRIER,
+    IN_TRANSIT,
+    WAREHOUSE_RECEIVED
+}

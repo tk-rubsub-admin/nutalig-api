@@ -7,5 +7,6 @@ public enum UserTodoType {
     SALE_ORDER,
     QUOTATION,
     CUSTOMER,
-    SUPPLIER
+    SUPPLIER,
+    PURCHASE_ORDER
 }

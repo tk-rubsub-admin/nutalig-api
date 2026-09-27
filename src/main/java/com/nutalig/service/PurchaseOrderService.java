@@ -77,6 +77,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
     private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
+    private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -277,6 +278,7 @@ public class PurchaseOrderService {
         // Always continue with the managed instance returned by save(); reusing the original
         // instance would merge transient child schedules again and insert duplicate installments.
         entity = purchaseOrderRepository.save(entity);
+        purchaseOrderMilestoneService.initializeMilestones(entity, userId);
         recordCreatePurchaseOrderActivity(entity, userId);
 
         PurchaseOrderStatus createdStatus = entity.getStatus();
@@ -454,17 +456,13 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         PurchaseOrderStatus previousStatus = entity.getStatus();
         entity.setStatus(PurchaseOrderStatus.PRODUCTION_RUNNING);
-        LocalDate productionStartedDate = LocalDate.now(DateUtil.getTimeZone());
-        entity.setProductionStartedDate(productionStartedDate);
-        entity.setProductionExpectedEndDate(productionStartedDate.plusDays(
-                Math.max(0, Optional.ofNullable(entity.getProductionLeadTimeDay()).orElse(0))
-        ));
         if (lateStart) {
             entity.setLateStartReason(StringUtils.trimToNull(lateStartReason));
         }
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         purchaseOrderRepository.saveAndFlush(entity);
+        purchaseOrderMilestoneService.markJobStarted(entity, userId);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("purchaseOrderNo", purchaseOrderNo);
@@ -545,6 +543,7 @@ public class PurchaseOrderService {
         }
 
         purchaseOrderRepository.save(entity);
+        purchaseOrderMilestoneService.cancelRemaining(entity, userId);
 
         recordPurchaseOrderStatusChangeActivity(
                 entity,
@@ -710,7 +709,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         String role = user.getUserRoleEntity() != null ? user.getUserRoleEntity().getRoleCode() : null;
-        boolean unrestricted = Set.of("SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_MANAGE")
+        boolean unrestricted = Set.of("SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_ADMIN", "PROCUREMENT_MANAGE")
                 .contains(role);
         String salesId = null;
         if (!unrestricted && StringUtils.equals(role, "SALES")) {
@@ -738,8 +737,29 @@ public class PurchaseOrderService {
         PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         validateProductionVisibility(entity, userId);
+        return toProductionTimelineDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderTimelineDto> getProductionTimelinesBySalesOrder(String salesOrderNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (!salesOrderRepository.existsById(salesOrderNo)) {
+            throw new DataNotFoundException("Sales order " + salesOrderNo + " not found.");
+        }
+        List<PurchaseOrderEntity> purchaseOrders =
+                purchaseOrderRepository.findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrderNo);
+        for (PurchaseOrderEntity purchaseOrder : purchaseOrders) {
+            validateProductionVisibility(purchaseOrder, userId);
+        }
+        return purchaseOrders.stream().map(this::toProductionTimelineDto).toList();
+    }
+
+    private PurchaseOrderTimelineDto toProductionTimelineDto(PurchaseOrderEntity entity) {
         PurchaseOrderTimelineDto result = new PurchaseOrderTimelineDto();
         result.setPurchaseOrderNo(entity.getPurchaseOrderNo());
+        result.setPurchaseOrderStatus(entity.getStatus());
+        result.setSupplierName(StringUtils.defaultIfBlank(entity.getSupplierNameSnapshot(),
+                entity.getSupplier() != null ? entity.getSupplier().getSupplierName() : null));
         result.setCustomer(entity.getSalesOrder() != null
                 ? customerMapper.toDto(entity.getSalesOrder().getCustomer()) : null);
         result.setProductionLeadTimeDay(entity.getProductionLeadTimeDay());
@@ -747,41 +767,72 @@ public class PurchaseOrderService {
         result.setProductionExpectedEndDate(entity.getProductionExpectedEndDate());
         result.setProductionCompletedDate(entity.getProductionCompletedDate());
         result.setOverdue(isProductionOverdue(entity));
-        List<PurchaseOrderTimelineDto.Event> events = new ArrayList<>();
-        addTimelineEvent(events, "CREATED", "สร้าง PO", entity.getDocDate(), true);
-        if (entity.getProductionStartedDate() != null) {
-            addTimelineEvent(events, "PRODUCTION_STARTED", "เริ่มรันงาน", entity.getProductionStartedDate(), true);
-            addTimelineEvent(events, "PRODUCTION_EXPECTED_END", "คาดว่าจะผลิตเสร็จ",
-                    entity.getProductionExpectedEndDate(), entity.getProductionCompletedDate() != null);
-        }
-        if (entity.getProductionCompletedDate() != null) {
-            addTimelineEvent(events, "PRODUCTION_COMPLETED", "ผลิตเสร็จจริง", entity.getProductionCompletedDate(), true);
-        }
-        result.setEvents(events);
+        result.setEvents(purchaseOrderMilestoneService.getTimelineEvents(entity));
         return result;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderDto completeProduction(String purchaseOrderNo, String userId)
             throws DataNotFoundException, InvalidRequestException {
+        return updateMilestone(
+                purchaseOrderNo,
+                PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
+                null,
+                null,
+                userId
+        );
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto updateMilestone(
+            String purchaseOrderNo,
+            PurchaseOrderMilestoneCode milestoneCode,
+            LocalDate plannedDate,
+            String note,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
         PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         validateProductionVisibility(entity, userId);
-        if (entity.getProductionStartedDate() == null) {
-            throw new InvalidRequestException("Purchase order production has not started.");
-        }
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
-        entity.setProductionCompletedDate(LocalDate.now(DateUtil.getTimeZone()));
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-        purchaseOrderRepository.saveAndFlush(entity);
-        activityHistoryService.record(
-                ActivityEntityType.PURCHASE_ORDER, purchaseOrderNo, userId, ActivityActorType.USER,
-                ActivityAction.UPDATE, ActivitySource.API,
-                "บันทึกผลิตเสร็จสำหรับใบสั่งซื้อเลขที่ " + purchaseOrderNo, null
+        purchaseOrderMilestoneService.completeMilestone(
+                entity, milestoneCode, plannedDate, note, userId
         );
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto updateProductionExpectedEndDate(
+            String purchaseOrderNo,
+            LocalDate expectedEndDate,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(entity, userId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        purchaseOrderMilestoneService.updateProductionExpectedEndDate(entity, expectedEndDate, userId);
+        return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderTimelineDto skipProofMilestone(
+            String purchaseOrderNo,
+            PurchaseOrderMilestoneCode milestoneCode,
+            String reason,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(entity, userId);
+        purchaseOrderMilestoneService.skipProof(entity, milestoneCode, reason, userId);
+        return toProductionTimelineDto(entity);
     }
 
     private void validateProductionVisibility(PurchaseOrderEntity entity, String userId)
@@ -789,7 +840,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         String role = user.getUserRoleEntity() != null ? user.getUserRoleEntity().getRoleCode() : null;
-        if (Set.of("SUPER_ADMIN", "ADMIN", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_MANAGE").contains(role)) return;
+        if (Set.of("SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "PROCUREMENT", "PROCUREMENT_MANAGER", "PROCUREMENT_ADMIN", "PROCUREMENT_MANAGE").contains(role)) return;
         String employeeId = user.getEmployeeEntity() != null ? user.getEmployeeEntity().getEmployeeId() : null;
         String salesId = entity.getSalesOrder() != null && entity.getSalesOrder().getSales() != null
                 ? entity.getSalesOrder().getSales().getEmployeeId() : null;
@@ -820,14 +871,6 @@ public class PurchaseOrderService {
         return entity.getProductionExpectedEndDate() != null
                 && entity.getProductionCompletedDate() == null
                 && LocalDate.now(DateUtil.getTimeZone()).isAfter(entity.getProductionExpectedEndDate());
-    }
-
-    private void addTimelineEvent(List<PurchaseOrderTimelineDto.Event> events, String type, String label,
-                                  LocalDate date, boolean completed) {
-        if (date == null) return;
-        PurchaseOrderTimelineDto.Event event = new PurchaseOrderTimelineDto.Event();
-        event.setType(type); event.setLabel(label); event.setDate(date); event.setCompleted(completed);
-        events.add(event);
     }
 
     private Specification<PurchaseOrderEntity> buildSearchCriteria(SearchPurchaseOrderRequest request) {

@@ -6,7 +6,10 @@ import com.nutalig.constant.ApprovalRequestType;
 import com.nutalig.entity.ApprovalRequestEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +26,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             List<ApprovalRequestStatus> statuses
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ApprovalRequestEntity> findFirstByEntityTypeAndReferenceIdAndRequestTypeOrderByCreatedDateDesc(
             ActivityEntityType entityType,
             String referenceId,

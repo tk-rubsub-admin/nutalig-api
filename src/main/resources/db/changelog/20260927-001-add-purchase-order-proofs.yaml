@@ -1,0 +1,102 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260927-001-add-purchase-order-proofs
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_proof (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  proof_type VARCHAR(40) NOT NULL,
+                  is_required TINYINT(1) NOT NULL DEFAULT 1,
+                  current_revision INT NOT NULL DEFAULT 0,
+                  status VARCHAR(30) NOT NULL,
+                  assigned_sales_user_id VARCHAR(100) NOT NULL,
+                  created_by VARCHAR(100) DEFAULT NULL,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_po_proof_po_type (purchase_order_no, proof_type),
+                  KEY idx_po_proof_status (status),
+                  KEY idx_po_proof_sales_user (assigned_sales_user_id),
+                  CONSTRAINT fk_po_proof_po FOREIGN KEY (purchase_order_no) REFERENCES purchase_order (purchase_order_no),
+                  CONSTRAINT fk_po_proof_sales_user FOREIGN KEY (assigned_sales_user_id) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE purchase_order_proof_revision (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  proof_id BIGINT NOT NULL,
+                  revision_no INT NOT NULL,
+                  title VARCHAR(255) NOT NULL,
+                  procurement_note TEXT DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL,
+                  requested_by_user_id VARCHAR(100) NOT NULL,
+                  requested_at DATETIME(6) NOT NULL,
+                  due_date DATETIME(6) DEFAULT NULL,
+                  acted_by_user_id VARCHAR(100) DEFAULT NULL,
+                  acted_at DATETIME(6) DEFAULT NULL,
+                  sales_comment TEXT DEFAULT NULL,
+                  change_reason TEXT DEFAULT NULL,
+                  approval_request_id BIGINT DEFAULT NULL,
+                  created_by VARCHAR(100) DEFAULT NULL,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_po_proof_revision (proof_id, revision_no),
+                  UNIQUE KEY uk_po_proof_revision_approval (approval_request_id),
+                  KEY idx_po_proof_revision_status (status),
+                  CONSTRAINT fk_po_proof_revision_proof FOREIGN KEY (proof_id) REFERENCES purchase_order_proof (id) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_proof_revision_requested_by FOREIGN KEY (requested_by_user_id) REFERENCES user (id),
+                  CONSTRAINT fk_po_proof_revision_acted_by FOREIGN KEY (acted_by_user_id) REFERENCES user (id),
+                  CONSTRAINT fk_po_proof_revision_approval FOREIGN KEY (approval_request_id) REFERENCES approval_request (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE purchase_order_proof_attachment (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  proof_revision_id BIGINT NOT NULL,
+                  file_name VARCHAR(255) NOT NULL,
+                  original_file_name VARCHAR(255) DEFAULT NULL,
+                  file_url VARCHAR(500) NOT NULL,
+                  content_type VARCHAR(100) DEFAULT NULL,
+                  file_size BIGINT DEFAULT NULL,
+                  media_type VARCHAR(20) NOT NULL,
+                  thumbnail_url VARCHAR(500) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_po_proof_attachment_revision (proof_revision_id),
+                  CONSTRAINT fk_po_proof_attachment_revision
+                      FOREIGN KEY (proof_revision_id) REFERENCES purchase_order_proof_revision (id) ON DELETE CASCADE
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at) VALUES
+                  ('PERM_PO_PROOF_VIEW', 'ดูงานพรูฟใบสั่งซื้อ', 'View purchase order proofs', 'purchase_order', NOW(6)),
+                  ('PERM_PO_PROOF_REQUEST', 'ส่งงานพรูฟใบสั่งซื้อ', 'Request purchase order proof approval', 'purchase_order', NOW(6)),
+                  ('PERM_PO_PROOF_APPROVE', 'อนุมัติงานพรูฟใบสั่งซื้อ', 'Approve purchase order proofs', 'purchase_order', NOW(6)),
+                  ('PERM_PO_PROOF_OVERRIDE', 'อนุมัติงานพรูฟแทนเซลล์', 'Override purchase order proof approval', 'purchase_order', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code) VALUES
+                  ('SUPER_ADMIN', 'PERM_PO_PROOF_VIEW'),
+                  ('SUPER_ADMIN', 'PERM_PO_PROOF_REQUEST'),
+                  ('SUPER_ADMIN', 'PERM_PO_PROOF_APPROVE'),
+                  ('SUPER_ADMIN', 'PERM_PO_PROOF_OVERRIDE'),
+                  ('PROCUREMENT', 'PERM_PO_PROOF_VIEW'),
+                  ('PROCUREMENT', 'PERM_PO_PROOF_REQUEST'),
+                  ('PROCUREMENT_ADMIN', 'PERM_PO_PROOF_VIEW'),
+                  ('PROCUREMENT_ADMIN', 'PERM_PO_PROOF_REQUEST'),
+                  ('PROCUREMENT_MANAGER', 'PERM_PO_PROOF_VIEW'),
+                  ('PROCUREMENT_MANAGER', 'PERM_PO_PROOF_REQUEST'),
+                  ('SALES', 'PERM_PO_PROOF_VIEW'),
+                  ('SALES', 'PERM_PO_PROOF_APPROVE'),
+                  ('SALES_MANAGER', 'PERM_PO_PROOF_VIEW'),
+                  ('SALES_MANAGER', 'PERM_PO_PROOF_APPROVE'),
+                  ('SALES_MANAGER', 'PERM_PO_PROOF_OVERRIDE');

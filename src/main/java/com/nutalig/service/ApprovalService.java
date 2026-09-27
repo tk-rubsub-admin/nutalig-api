@@ -43,6 +43,10 @@ public class ApprovalService {
     private static final String URGENT_READY_PO_TEMPLATE_CODE = "urgent-ready-po-approval";
     private static final String INVOICE_PAYMENT_TERM_TEMPLATE_CODE = "invoice-change-payment-term-approval";
     private static final String RFQ_CUSTOMER_TRANSFER_TEMPLATE_CODE = "rfq-transfer-customer";
+    private static final String PURCHASE_ORDER_PROOF_TEMPLATE_CODE = "purchase-order-proof";
+    private static final List<String> PURCHASE_ORDER_PROOF_OVERRIDE_ROLES = List.of(
+            RoleCode.SALES_MANAGER.name(), RoleCode.SUPER_ADMIN.name()
+    );
     private static final String CLAIM_STEP_ID = "stepId";
     private static final String CLAIM_ACTION = "action";
     private static final String CLAIM_SOURCE = "source";
@@ -379,6 +383,92 @@ public class ApprovalService {
         return toDto(request);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public ApprovalRequestDto createPurchaseOrderProofApprovalRequest(
+            PurchaseOrderProofEntity proof,
+            PurchaseOrderProofRevisionEntity revision,
+            String userId
+    ) throws Exception {
+        if (proof == null || proof.getId() == null || revision == null || proof.getAssignedSalesUser() == null) {
+            throw new InvalidRequestException("Purchase order proof, revision and assigned sales user are required.");
+        }
+
+        UserEntity approver = proof.getAssignedSalesUser();
+        if (!Status.ACTIVE.equals(approver.getStatus())) {
+            throw new InvalidRequestException("Assigned sales user is not active.");
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        String actor = userProfileService.getNameFromId(userId);
+        PurchaseOrderEntity purchaseOrder = proof.getPurchaseOrder();
+        SalesOrderEntity salesOrder = purchaseOrder.getSalesOrder();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("proofId", proof.getId());
+        payload.put("purchaseOrderNo", purchaseOrder.getPurchaseOrderNo());
+        payload.put("salesOrderNo", salesOrder != null ? salesOrder.getSalesOrderNo() : null);
+        payload.put("customerName", salesOrder != null
+                ? StringUtils.defaultIfBlank(salesOrder.getCustomerNameSnapshot(),
+                salesOrder.getCustomer() != null ? salesOrder.getCustomer().getCustomerName() : "-") : "-");
+        payload.put("proofType", proof.getProofType().getId().getCode());
+        payload.put("proofTypeName", StringUtils.defaultIfBlank(
+                proof.getProofType().getNameTh(),
+                StringUtils.defaultIfBlank(proof.getProofType().getNameEn(), proof.getProofType().getId().getCode())
+        ));
+        payload.put("revisionNo", revision.getRevisionNo());
+        payload.put("attachmentCount", revision.getAttachments().size());
+        payload.put("requesterName", actor);
+        payload.put("note", revision.getProcurementNote());
+        payload.put("dueDate", revision.getDueDate() != null ? revision.getDueDate().toString() : null);
+
+        ApprovalRequestEntity request = new ApprovalRequestEntity();
+        request.setRequestNo(generateApprovalRequestNo());
+        request.setEntityType(ActivityEntityType.PURCHASE_ORDER_PROOF);
+        request.setReferenceId(String.valueOf(proof.getId()));
+        request.setRequestType(ApprovalRequestType.PURCHASE_ORDER_PROOF);
+        request.setTemplateCode(PURCHASE_ORDER_PROOF_TEMPLATE_CODE);
+        request.setTitle("พรูฟงาน " + purchaseOrder.getPurchaseOrderNo() + " Revision " + revision.getRevisionNo());
+        request.setStatus(ApprovalRequestStatus.PENDING);
+        request.setCurrentStepNo(1);
+        request.setRequestedBy(actor);
+        request.setRequestedDate(now);
+        request.setRequestReason(StringUtils.trimToNull(revision.getProcurementNote()));
+        request.setPayloadJson(objectMapper.writeValueAsString(payload));
+        request.setCreatedBy(userId);
+        request.setUpdatedBy(userId);
+
+        ApprovalRequestStepEntity step = new ApprovalRequestStepEntity();
+        step.setStepNo(1);
+        step.setApproverUser(approver);
+        step.setApproverRoleCodes(PURCHASE_ORDER_PROOF_OVERRIDE_ROLES);
+        step.setStatus(ApprovalStepStatus.PENDING);
+        step.setCreatedBy(userId);
+        step.setUpdatedBy(userId);
+        request.addStep(step);
+
+        request = approvalRequestRepository.save(request);
+        recordAudit(request, step, ApprovalAuditEventType.REQUEST_CREATED, getUserOrNull(userId), null,
+                ApprovalSource.SYSTEM, "สร้างคำขอพรูฟงาน " + purchaseOrder.getPurchaseOrderNo(),
+                buildAuditDetail(payload), userId);
+        recordAudit(request, step, ApprovalAuditEventType.STEP_CREATED, getUserOrNull(userId), null,
+                ApprovalSource.SYSTEM, "ส่งให้ " + approver.getDisplayName() + " ตรวจพรูฟ",
+                buildAuditDetail(buildMap("approverUserId", approver.getId(), "revisionNo", revision.getRevisionNo())), userId);
+
+        createApprovalTodos(request, step, List.of(approver), userId);
+        try {
+            sendCurrentStepApprovalCard(request, step, List.of(approver), userId);
+        } catch (Exception exception) {
+            log.warn("Cannot send proof approval notification for request {}", request.getRequestNo(), exception);
+        }
+
+        activityHistoryService.record(ActivityEntityType.APPROVAL_REQUEST, String.valueOf(request.getId()), userId,
+                ActivityActorType.USER, ActivityAction.REQUEST_APPROVAL, ActivitySource.API,
+                "สร้างคำขออนุมัติงานพรูฟ " + request.getRequestNo(),
+                buildMap("proofId", proof.getId(), "purchaseOrderNo", purchaseOrder.getPurchaseOrderNo(),
+                        "revisionNo", revision.getRevisionNo()));
+        return toDto(request);
+    }
+
     @Transactional(readOnly = true)
     public ApprovalRequestDto getLatestApprovalByEntity(ActivityEntityType entityType, String referenceId)
             throws DataNotFoundException {
@@ -484,6 +574,32 @@ public class ApprovalService {
         ApprovalRequestStepEntity step = getCurrentPendingStep(request);
         validateUserCanAct(step, userId);
         return rejectStep(request, step, getUserOrThrow(userId), null, reason.trim(), ApprovalSource.WEB);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelLatestApprovalByEntityAndType(
+            ActivityEntityType entityType,
+            String referenceId,
+            ApprovalRequestType requestType,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        ApprovalRequestEntity request = getPendingRequestForEntityAndType(entityType, referenceId, requestType);
+        ApprovalRequestStepEntity step = getCurrentPendingStep(request);
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        step.setStatus(ApprovalStepStatus.SKIPPED);
+        step.setActedAt(now);
+        step.setUpdatedBy(userId);
+        approvalRequestStepRepository.save(step);
+        request.setStatus(ApprovalRequestStatus.CANCELLED);
+        request.setUpdatedBy(userId);
+        request.setUpdatedDate(now);
+        approvalRequestRepository.save(request);
+        recordAudit(request, step, ApprovalAuditEventType.CANCELLED, getUserOrNull(userId), null,
+                ApprovalSource.WEB, "ยกเลิก approval request " + request.getRequestNo(),
+                buildAuditDetail(Map.of("status", request.getStatus())), userId);
+        userTodoService.markTodosAsDone(userTodoService.findActiveTodosByTarget(
+                ActivityEntityType.APPROVAL_REQUEST.name(), String.valueOf(request.getId()),
+                List.of(UserTodoStatus.TODO, UserTodoStatus.IN_PROGRESS)), userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -817,12 +933,19 @@ public class ApprovalService {
             String userId
     ) {
         String targetPath = approvalBusinessService.buildTargetPath(request);
-        ZonedDateTime dueDate = ZonedDateTime.now(DateUtil.getTimeZone()).plusDays(1);
+        Map<String, Object> payload = parsePayload(request.getPayloadJson());
+        ZonedDateTime dueDate = parseDueDate(payload.get("dueDate"));
+        if (dueDate == null) {
+            dueDate = ZonedDateTime.now(DateUtil.getTimeZone()).plusDays(1);
+        }
+        UserTodoType todoType = request.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF
+                ? UserTodoType.PURCHASE_ORDER
+                : UserTodoType.PRICE_INQUIRY;
 
         for (UserEntity approver : approvers) {
             userTodoService.buildUserTodoEntity(
                     approver,
-                    UserTodoType.PRICE_INQUIRY,
+                    todoType,
                     request.getTitle(),
                     "มีรายการรออนุมัติ " + request.getRequestNo(),
                     UserTodoStatus.TODO,
@@ -939,7 +1062,18 @@ public class ApprovalService {
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("altText", "มีรายการรอการอนุมัติ " + StringUtils.defaultString(request.getReferenceId()));
         placeholders.put("requestTitle", "คำขออนุมัติ");
-        if (request.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
+        if (request.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF) {
+            placeholders.put("entityLabel", "งานตัวอย่างรอพรูฟ");
+            placeholders.put("requestNo", String.valueOf(payload.getOrDefault("purchaseOrderNo", "-")));
+            placeholders.put("salesOrderId", String.valueOf(payload.getOrDefault("salesOrderNo", "-")));
+            placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
+            placeholders.put("proofType", String.valueOf(
+                    payload.getOrDefault("proofTypeName", payload.getOrDefault("proofType", "-"))));
+            placeholders.put("revisionNo", String.valueOf(payload.getOrDefault("revisionNo", "-")));
+            placeholders.put("attachmentCount", String.valueOf(payload.getOrDefault("attachmentCount", "0")));
+            placeholders.put("requesterName", String.valueOf(payload.getOrDefault("requesterName", request.getRequestedBy())));
+            placeholders.put("urgentReason", String.valueOf(payload.getOrDefault("note", "-")));
+        } else if (request.getRequestType() == ApprovalRequestType.URGENT_READY_PO) {
             placeholders.put("entityLabel", "คำขอสร้างใบสั่งซื้อ");
             placeholders.put("requestNo", String.valueOf(payload.getOrDefault("salesOrderNo", request.getReferenceId())));
             placeholders.put("customerName", String.valueOf(payload.getOrDefault("customerName", "-")));
@@ -1000,6 +1134,12 @@ public class ApprovalService {
         if (request.getRequestType() == ApprovalRequestType.INVOICE_PAYMENT_TERM) {
             return UriComponentsBuilder.fromUriString(frontendBaseUrl)
                     .path("/invoice/" + request.getReferenceId())
+                    .build()
+                    .toUriString();
+        }
+        if (request.getRequestType() == ApprovalRequestType.PURCHASE_ORDER_PROOF) {
+            return UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                    .path("/purchase-order-proof/" + request.getReferenceId())
                     .build()
                     .toUriString();
         }
@@ -1089,7 +1229,9 @@ public class ApprovalService {
 
     private boolean isUserAllowedForStep(ApprovalRequestStepEntity step, UserEntity actorUser) {
         if (step.getApproverUser() != null) {
-            return StringUtils.equals(step.getApproverUser().getId(), actorUser.getId());
+            if (StringUtils.equals(step.getApproverUser().getId(), actorUser.getId())) {
+                return true;
+            }
         }
         if (!step.getApproverRoles().isEmpty()) {
             String actorRole = actorUser.getUserRoleEntity() == null ? null : actorUser.getUserRoleEntity().getRoleCode();
@@ -1100,6 +1242,18 @@ public class ApprovalService {
                     && StringUtils.equals(step.getApproverRoleCode(), actorUser.getUserRoleEntity().getRoleCode());
         }
         return false;
+    }
+
+    private ZonedDateTime parseDueDate(Object rawDueDate) {
+        if (rawDueDate == null || StringUtils.isBlank(String.valueOf(rawDueDate))) {
+            return null;
+        }
+        try {
+            return ZonedDateTime.parse(String.valueOf(rawDueDate));
+        } catch (Exception exception) {
+            log.warn("Cannot parse approval due date {}", rawDueDate);
+            return null;
+        }
     }
 
     private List<UserEntity> findApproversByRoles(List<String> roleCodes) {

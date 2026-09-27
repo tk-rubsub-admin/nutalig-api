@@ -10,6 +10,7 @@ import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewReque
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.StartPurchaseOrderRunRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderMilestoneRequest;
 import com.nutalig.controller.purchaseorder.response.CreatePurchaseOrderResponse;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
@@ -68,6 +69,39 @@ public class PurchaseOrderController {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.getProductionTimeline(id, userId));
     }
 
+    @PatchMapping("/{id}/milestones/{milestoneCode}/complete")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> completeMilestone(
+            @PathVariable("id") String id,
+            @PathVariable com.nutalig.constant.PurchaseOrderMilestoneCode milestoneCode,
+            @RequestBody(required = false) UpdatePurchaseOrderMilestoneRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateMilestone(
+                id,
+                milestoneCode,
+                request != null ? request.getPlannedDate() : null,
+                request != null ? request.getNote() : null,
+                userId
+        ));
+    }
+
+    @PatchMapping("/{id}/milestones/{milestoneCode}/skip")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<com.nutalig.dto.PurchaseOrderTimelineDto> skipMilestone(
+            @PathVariable("id") String id,
+            @PathVariable com.nutalig.constant.PurchaseOrderMilestoneCode milestoneCode,
+            @RequestBody UpdatePurchaseOrderMilestoneRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.skipProofMilestone(
+                id,
+                milestoneCode,
+                request != null ? request.getNote() : null,
+                userId
+        ));
+    }
+
     @PatchMapping("/{id}/production-complete")
     @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
     public GeneralResponse<PurchaseOrderDto> productionComplete(
@@ -75,6 +109,20 @@ public class PurchaseOrderController {
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.completeProduction(id, userId));
+    }
+
+    @PatchMapping("/{id}/production-expected-end-date")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> updateProductionExpectedEndDate(
+            @PathVariable("id") String id,
+            @RequestBody UpdatePurchaseOrderMilestoneRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateProductionExpectedEndDate(
+                id,
+                request != null ? request.getPlannedDate() : null,
+                userId
+        ));
     }
 
     @PostMapping("/cbm-preview")

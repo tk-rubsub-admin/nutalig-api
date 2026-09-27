@@ -170,6 +170,9 @@ public class FileStorageService {
             case "image/png" -> "png";
             case "image/webp" -> "webp";
             case "image/gif" -> "gif";
+            case "video/mp4" -> "mp4";
+            case "video/quicktime" -> "mov";
+            case "video/webm" -> "webm";
             case "application/pdf" -> "pdf";
             case "application/illustrator", "application/postscript" -> "ai";
             case "text/plain" -> "txt";
