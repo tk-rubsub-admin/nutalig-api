@@ -161,6 +161,9 @@ public class RfqHeaderEntity extends AuditDateEntity {
     @Column(name = "is_request_sample")
     private Boolean requestSample;
 
+    @Column(name = "is_request_sample_production", nullable = false)
+    private Boolean requestSampleProduction = Boolean.FALSE;
+
     @ToString.Include
     @Column(name = "description")
     private String description;

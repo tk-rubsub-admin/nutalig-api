@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS rfq_header (
     target_price DECIMAL(18,4) DEFAULT NULL,
     requested_moq TEXT DEFAULT NULL,
     is_request_sample BIT(1) DEFAULT b'0',
+    is_request_sample_production BIT(1) NOT NULL DEFAULT b'0',
     is_urgent_request BIT(1) DEFAULT b'0',
     urgent_request_reason TEXT DEFAULT NULL,
     urgent_request_status VARCHAR(30) DEFAULT NULL,

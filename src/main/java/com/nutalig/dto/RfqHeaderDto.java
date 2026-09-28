@@ -32,6 +32,7 @@ public class RfqHeaderDto {
     private String capacity;
     private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
+    private Boolean requestSampleProduction;
     private ApprovalRequestDto urgentApproval;
     private ApprovalRequestDto customerTransferApproval;
     private String description;

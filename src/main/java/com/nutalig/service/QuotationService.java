@@ -19,10 +19,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.RequestPriceHeaderMapper;
-import com.nutalig.repository.CustomerRepository;
-import com.nutalig.repository.EmployeeRepository;
-import com.nutalig.repository.QuotationRepository;
-import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
@@ -71,6 +68,7 @@ public class QuotationService {
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
+    private final SupplierShippingRepository supplierShippingRepository;
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
     private final RequestPriceHeaderMapper requestPriceHeaderMapper;
@@ -765,7 +763,7 @@ public class QuotationService {
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(quotationEntity.getSales().getNickName());
         dto.setShipping(quotationEntity.getShipping());
-        dto.setShippingLabel(getShippingMethodLabel(quotationEntity.getShipping()));
+        dto.setShippingLabel(getShippingCode(quotationEntity.getShipping()));
         dto.setProject(quotationEntity.getProject());
         dto.setPaymentTerm(quotationEntity.getCustomer().getCustomerPaymentTerm().getNameTh());
         dto.setCoSalesId(quotationEntity.getCoSalesId());
@@ -1104,6 +1102,35 @@ public class QuotationService {
         }
         dto.setItems(items);
         return dto;
+    }
+
+    private String getShippingCode(String shippingMethod) {
+        String normalizedShippingMethod = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod));
+        if ("AIR".equals(normalizedShippingMethod)) {
+            return "ขนส่งทางเครื่องบิน";
+        }
+
+        List<ShippingMethod> requestedMethods = switch (normalizedShippingMethod) {
+            case "LAND" -> List.of(ShippingMethod.LAND);
+            case "SEA" -> List.of(ShippingMethod.SEA);
+            case "ALL" -> List.of(ShippingMethod.LAND, ShippingMethod.SEA);
+            default -> List.of();
+        };
+        if (requestedMethods.isEmpty()) {
+            return "";
+        }
+
+        Map<ShippingMethod, String> shippingCodes = new EnumMap<>(ShippingMethod.class);
+        supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc().forEach(shipping -> {
+            if (shipping.getShippingMethod() != null && StringUtils.isNotBlank(shipping.getCarCode())) {
+                shippingCodes.putIfAbsent(shipping.getShippingMethod(), shipping.getCarCode().trim());
+            }
+        });
+
+        return String.join(", ", requestedMethods.stream()
+                .map(shippingCodes::get)
+                .filter(StringUtils::isNotBlank)
+                .toList());
     }
 
 }

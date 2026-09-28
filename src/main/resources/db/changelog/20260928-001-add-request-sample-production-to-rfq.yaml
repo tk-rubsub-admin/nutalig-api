@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260928-001-add-request-sample-production-to-rfq
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_header
+                columnName: is_request_sample_production
+      changes:
+        - addColumn:
+            tableName: rfq_header
+            columns:
+              - column:
+                  name: is_request_sample_production
+                  type: BIT(1)
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: rfq_header
+            columnName: is_request_sample_production

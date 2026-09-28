@@ -24,6 +24,7 @@ public class UpdateRequestPriceHeaderRequest {
     private String capacity;
     private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
+    private Boolean requestSampleProduction;
     private String description;
     private String project;
     private String requestInformation;

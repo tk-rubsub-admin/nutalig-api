@@ -26,6 +26,7 @@ public class CreateRequestPriceHeaderRequest {
     private String capacity;
     private List<RequestedMoqDto> requestedMoqs;
     private Boolean requestSample;
+    private Boolean requestSampleProduction;
     private Boolean urgentRequest;
     private String urgentRequestReason;
     private String description;

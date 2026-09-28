@@ -629,6 +629,8 @@ public class RFQService {
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         String actor = userProfileService.getNameFromId(userId);
 
+        entity.setRequestSample(Boolean.TRUE.equals(request.getRequestSample()));
+        entity.setRequestSampleProduction(Boolean.TRUE.equals(request.getRequestSampleProduction()));
         entity.setRequestedDate(now);
         entity.setStatus(RfqStatus.NEW);
         entity.setIsAccept(Boolean.FALSE);
@@ -2156,6 +2158,16 @@ public class RFQService {
             entity.setRequestedMoq(requestPriceHeaderMapper.mapRequestedMoqs(requestRequestedMoqs));
             editFields.add("MOQ ที่ต้องการ");
         }
+        if (request.getRequestSample() != null
+                && !Objects.equals(request.getRequestSample(), entity.getRequestSample())) {
+            entity.setRequestSample(request.getRequestSample());
+            editFields.add("ขอราคาค่าตีตัวอย่าง");
+        }
+        if (request.getRequestSampleProduction() != null
+                && !Objects.equals(request.getRequestSampleProduction(), entity.getRequestSampleProduction())) {
+            entity.setRequestSampleProduction(request.getRequestSampleProduction());
+            editFields.add("ขอตีตัวอย่าง");
+        }
         String requestDescription = normalizeRequestValue(request.getDescription());
         if (StringUtils.isNotEmpty(requestDescription) && !StringUtils.equals(requestDescription, entity.getDescription())) {
             entity.setDescription(request.getDescription());
@@ -2922,6 +2934,7 @@ public class RFQService {
         detail.put("capacity", entity.getCapacity());
         detail.put("requestedMoqs", parseRequestedMoq(entity.getRequestedMoq()));
         detail.put("requestSample", entity.getRequestSample());
+        detail.put("requestSampleProduction", entity.getRequestSampleProduction());
         detail.put("description", entity.getDescription());
         detail.put("closeReasonCode", entity.getCloseReason() != null ? entity.getCloseReason().getId().getCode() : null);
         detail.put("closeRemark", entity.getCloseRemark());
@@ -2952,6 +2965,7 @@ public class RFQService {
         detail.put("capacity", request.getCapacity());
         detail.put("requestedMoqs", request.getRequestedMoqs());
         detail.put("requestSample", request.getRequestSample());
+        detail.put("requestSampleProduction", request.getRequestSampleProduction());
         detail.put("urgentRequest", request.getUrgentRequest());
         detail.put("urgentRequestReason", request.getUrgentRequestReason());
         detail.put("description", request.getDescription());
