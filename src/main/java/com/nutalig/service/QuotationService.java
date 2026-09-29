@@ -24,6 +24,7 @@ import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.RfqAttachmentUtil;
+import com.nutalig.utils.ShippingMethodUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +50,6 @@ import static com.nutalig.constant.BusinessConstant.MessageTemplateCode.QUOTATIO
 import static com.nutalig.constant.BusinessConstant.VAT_RATE;
 import static com.nutalig.constant.SystemConstant.REPORT_ROW;
 import static com.nutalig.repository.specification.QuotationSpecification.*;
-import static com.nutalig.utils.ShippingMethodUtil.getShippingMethodLabel;
 
 @Slf4j
 @Service
@@ -763,7 +763,10 @@ public class QuotationService {
         dto.setSalesMobileNo(quotationEntity.getSales().getPhoneNumber());
         dto.setSalesNickname(quotationEntity.getSales().getNickName());
         dto.setShipping(quotationEntity.getShipping());
-        dto.setShippingLabel(getShippingCode(quotationEntity.getShipping()));
+        dto.setShippingLabel(ShippingMethodUtil.getShippingCode(
+                quotationEntity.getShipping(),
+                supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc()
+        ));
         dto.setProject(quotationEntity.getProject());
         dto.setPaymentTerm(quotationEntity.getCustomer().getCustomerPaymentTerm().getNameTh());
         dto.setCoSalesId(quotationEntity.getCoSalesId());
@@ -1102,35 +1105,6 @@ public class QuotationService {
         }
         dto.setItems(items);
         return dto;
-    }
-
-    private String getShippingCode(String shippingMethod) {
-        String normalizedShippingMethod = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod));
-        if ("AIR".equals(normalizedShippingMethod)) {
-            return "ขนส่งทางเครื่องบิน";
-        }
-
-        List<ShippingMethod> requestedMethods = switch (normalizedShippingMethod) {
-            case "LAND" -> List.of(ShippingMethod.LAND);
-            case "SEA" -> List.of(ShippingMethod.SEA);
-            case "ALL" -> List.of(ShippingMethod.LAND, ShippingMethod.SEA);
-            default -> List.of();
-        };
-        if (requestedMethods.isEmpty()) {
-            return "";
-        }
-
-        Map<ShippingMethod, String> shippingCodes = new EnumMap<>(ShippingMethod.class);
-        supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc().forEach(shipping -> {
-            if (shipping.getShippingMethod() != null && StringUtils.isNotBlank(shipping.getCarCode())) {
-                shippingCodes.putIfAbsent(shipping.getShippingMethod(), shipping.getCarCode().trim());
-            }
-        });
-
-        return String.join(", ", requestedMethods.stream()
-                .map(shippingCodes::get)
-                .filter(StringUtils::isNotBlank)
-                .toList());
     }
 
 }

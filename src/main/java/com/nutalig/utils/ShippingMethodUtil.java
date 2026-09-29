@@ -1,15 +1,55 @@
 package com.nutalig.utils;
 
+import com.nutalig.constant.ShippingMethod;
+import com.nutalig.entity.SupplierShippingEntity;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ShippingMethodUtil {
 
     public static String getShippingMethodLabel(String shippingMethod) {
         return getShippingMethodLabel(shippingMethod, "-", false, false);
+    }
+
+    public static String getShippingCode(
+            String shippingMethod,
+            List<SupplierShippingEntity> shippingEntities
+    ) {
+        String normalizedShippingMethod = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod));
+        if ("AIR".equals(normalizedShippingMethod)) {
+            return "ขนส่งทางเครื่องบิน";
+        }
+
+        List<ShippingMethod> requestedMethods = switch (normalizedShippingMethod) {
+            case "LAND" -> List.of(ShippingMethod.LAND);
+            case "SEA" -> List.of(ShippingMethod.SEA);
+            case "ALL" -> List.of(ShippingMethod.LAND, ShippingMethod.SEA);
+            default -> List.of();
+        };
+        if (requestedMethods.isEmpty()) {
+            return "";
+        }
+
+        Map<ShippingMethod, String> shippingCodes = new EnumMap<>(ShippingMethod.class);
+        if (shippingEntities != null) {
+            shippingEntities.forEach(shipping -> {
+                if (shipping.getShippingMethod() != null && StringUtils.isNotBlank(shipping.getCarCode())) {
+                    shippingCodes.putIfAbsent(shipping.getShippingMethod(), shipping.getCarCode().trim());
+                }
+            });
+        }
+
+        return String.join(" & ", requestedMethods.stream()
+                .map(shippingCodes::get)
+                .filter(StringUtils::isNotBlank)
+                .toList());
     }
 
     public static String getShippingMethodLabel(
