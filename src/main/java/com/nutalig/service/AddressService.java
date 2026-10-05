@@ -1,5 +1,6 @@
 package com.nutalig.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.dto.CountryDto;
@@ -17,8 +18,12 @@ import com.nutalig.repository.SubDistrictRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,8 +40,26 @@ public class AddressService {
     private final SubDistrictRepository subDistrictRepository;
     private final AddressMapper addressMapper;
     private final ObjectMapper objectMapper;
+    private final RestClient restClient;
+
+    @Value("${geothai.enabled:false}")
+    private boolean geothaiEnabled;
+
+    @Value("${geothai.base-url:https://geoth.thiti.dev/api}")
+    private String geothaiBaseUrl;
 
     public List<ProvinceDto> getAllProvince() {
+        if (geothaiEnabled) {
+            List<ProvinceDto> provinces = getGeoThaiResponse("/provinces/all",
+                    new ParameterizedTypeReference<List<ProvinceDto>>() {
+                    }, "provinces");
+
+            log.info("Get province size : {}", provinces.size());
+            return provinces.stream()
+                    .sorted(Comparator.comparing(ProvinceDto::getNameTh))
+                    .toList();
+        }
+
         log.info("Get Province in Thailand");
 
         List<ProvinceEntity> provinceEntities = provinceRepository.findAll();
@@ -72,6 +95,36 @@ public class AddressService {
     public List<DistrictDto> getDistrictByProvince(String provinceId) {
         log.info("Get district by province id : {}", provinceId);
 
+        if (geothaiEnabled) {
+            String normalizedProvinceId = StringUtils.trimToEmpty(provinceId);
+            List<GeoThaiProvinceWithDistricts> provinces;
+            if (normalizedProvinceId.isEmpty()) {
+                provinces = getGeoThaiResponse("/provinces-with-districts/all",
+                        new ParameterizedTypeReference<List<GeoThaiProvinceWithDistricts>>() {
+                        }, "districts");
+            } else {
+                GeoThaiProvinceWithDistricts province = getGeoThaiResponse(
+                        "/provinces-with-districts/{provinceId}",
+                        new ParameterizedTypeReference<GeoThaiProvinceWithDistricts>() {
+                        }, "districts", normalizedProvinceId);
+                provinces = List.of(province);
+            }
+
+            List<DistrictDto> districts = provinces.stream()
+                    .flatMap(province -> {
+                        if (province.districts() == null) {
+                            throw new IllegalStateException("Failed to load districts from GeoThai: missing districts");
+                        }
+                        return province.districts().stream().map(district -> {
+                            district.setProvinceId(province.id());
+                            return district;
+                        });
+                    })
+                    .toList();
+            log.info("Get district by province id : {} ,size : {}", provinceId, districts.size());
+            return districts;
+        }
+
         List<DistrictEntity> districtEntities = new ArrayList<>();
         if (StringUtils.isEmpty(provinceId)) {
             districtEntities = districtRepository.findAll();
@@ -88,6 +141,41 @@ public class AddressService {
 
     public List<SubDistrictDto> getSubDistrictByDistrict(String districtId) {
         log.info("Get SubDistrict by District id : {}", districtId);
+
+        if (geothaiEnabled) {
+            String normalizedDistrictId = StringUtils.trimToEmpty(districtId);
+            List<GeoThaiDistrictWithSubDistricts> districts;
+            if (normalizedDistrictId.isEmpty()) {
+                districts = getGeoThaiResponse("/districts-with-subdistricts/all",
+                        new ParameterizedTypeReference<List<GeoThaiDistrictWithSubDistricts>>() {
+                        }, "subdistricts");
+            } else {
+                GeoThaiDistrictWithSubDistricts district = getGeoThaiResponse(
+                        "/districts-with-subdistricts/{districtId}",
+                        new ParameterizedTypeReference<GeoThaiDistrictWithSubDistricts>() {
+                        }, "subdistricts", normalizedDistrictId);
+                districts = List.of(district);
+            }
+
+            List<SubDistrictDto> subdistricts = districts.stream()
+                    .flatMap(district -> {
+                        if (district.subdistricts() == null) {
+                            throw new IllegalStateException("Failed to load subdistricts from GeoThai: missing subdistricts");
+                        }
+                        return district.subdistricts().stream().map(subdistrict -> {
+                            SubDistrictDto dto = new SubDistrictDto();
+                            dto.setId(subdistrict.id());
+                            dto.setDistrictId(district.id());
+                            dto.setNameTh(subdistrict.nameTh());
+                            dto.setNameEn(subdistrict.nameEn());
+                            dto.setZipCode(subdistrict.zipCode());
+                            return dto;
+                        });
+                    })
+                    .toList();
+            log.info("Get SubDistrict by District id : {} ,size : {}", districtId, subdistricts.size());
+            return subdistricts;
+        }
 
         List<SubDistrictEntity> SubDistrictEntities = new ArrayList<>();
         if (StringUtils.isEmpty(districtId)) {
@@ -142,4 +230,38 @@ public class AddressService {
     }
 
     public SubDistrictDto toSubDistrictDtoFromEntity(SubDistrictEntity entity) { return addressMapper.toSubDistrictDto(entity); }
+
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GeoThaiDistrictWithSubDistricts(String id, List<GeoThaiSubDistrict> subdistricts) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GeoThaiSubDistrict(String id, String nameTh, String nameEn, String zipCode) {
+    }
+
+
+    private <T> T getGeoThaiResponse(String path, ParameterizedTypeReference<T> responseType,
+                                     String dataName, Object... uriVariables) {
+        String url = StringUtils.stripEnd(geothaiBaseUrl, "/") + path;
+        log.info("Get {} from GeoThai: {}", dataName, url);
+
+        T response = restClient.get()
+                .uri(url, uriVariables)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (request, clientResponse) -> {
+                    throw new IllegalStateException("Failed to load " + dataName + " from GeoThai: HTTP "
+                            + clientResponse.getStatusCode().value());
+                })
+                .body(responseType);
+
+        if (response == null) {
+            throw new IllegalStateException("Failed to load " + dataName + " from GeoThai: empty response");
+        }
+        return response;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GeoThaiProvinceWithDistricts(String id, List<DistrictDto> districts) {
+    }
 }

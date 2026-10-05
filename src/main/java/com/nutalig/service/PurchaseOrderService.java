@@ -49,6 +49,7 @@ import java.util.*;
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.PURCHASE_ORDER_PREFIX;
 import static com.nutalig.repository.specification.PurchaseOrderSpecification.*;
 import static com.nutalig.utils.ShippingMethodUtil.getShippingMethodLabel;
+import static java.time.ZonedDateTime.now;
 
 @Slf4j
 @Service
@@ -150,7 +151,7 @@ public class PurchaseOrderService {
         LocalDate docDate = request.getDocDate() != null
                 ? request.getDocDate()
                 : LocalDate.now(DateUtil.getTimeZone());
-        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        ZonedDateTime now = now(DateUtil.getTimeZone());
 
         PurchaseOrderEntity entity = new PurchaseOrderEntity();
         entity.setPurchaseOrderNo(generatePurchaseOrderNo());
@@ -406,7 +407,7 @@ public class PurchaseOrderService {
         purchaseOrderPaymentService.validateAndRecalculateAfterOrderTotalChange(entity);
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedBy(user);
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
 
         purchaseOrderRepository.save(entity);
         recordUpdatePurchaseOrderActivity(entity, userId, before);
@@ -459,8 +460,19 @@ public class PurchaseOrderService {
         if (lateStart) {
             entity.setLateStartReason(StringUtils.trimToNull(lateStartReason));
         }
+
+        ZonedDateTime actualAt = now();
+        LocalDate actualDate = actualAt.toLocalDate();
+        LocalDate expectedEnd = actualDate.plusDays(Math.max(0,
+                Optional.ofNullable(entity.getProductionLeadTimeDay()).orElse(0)));
+
+        if (expectedEnd.isBefore(actualDate)) {
+            throw new InvalidRequestException("plannedDate cannot be before the production start date.");
+        }
+
+        entity.setProductionExpectedEndDate(expectedEnd);
         entity.setUpdatedBy(user);
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderRepository.saveAndFlush(entity);
         purchaseOrderMilestoneService.markJobStarted(entity, userId);
 
@@ -529,7 +541,7 @@ public class PurchaseOrderService {
         ProcurementStatus beforeProcurementStatus = entity.getSalesOrder() != null
                 ? entity.getSalesOrder().getProcurementStatus()
                 : null;
-        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        ZonedDateTime now = now(DateUtil.getTimeZone());
 
         entity.setStatus(PurchaseOrderStatus.CANCELLED);
         entity.setRevNo(defaultRevNo(entity.getRevNo()) + 1);
@@ -585,7 +597,7 @@ public class PurchaseOrderService {
         entity.setStatus(PurchaseOrderStatus.CLOSED);
         entity.setRevNo(defaultRevNo(entity.getRevNo()) + 1);
         entity.setUpdatedBy(user);
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
 
         purchaseOrderRepository.save(entity);
 
@@ -617,7 +629,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
-        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        ZonedDateTime now = now(DateUtil.getTimeZone());
         PurchaseOrderAttachmentDocumentType resolvedDocumentType = Optional.ofNullable(documentType)
                 .orElse(PurchaseOrderAttachmentDocumentType.OTHER);
         attachFiles(entity, attachments, resolvedDocumentType, user, now);
@@ -657,7 +669,7 @@ public class PurchaseOrderService {
 
         attachment.setActive(Boolean.FALSE);
         attachment.setUpdatedBy(user);
-        attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        attachment.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderAttachmentRepository.save(attachment);
 
         Map<String, Object> activityDetail = new LinkedHashMap<>();
@@ -797,7 +809,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         entity.setUpdatedBy(user);
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderMilestoneService.completeMilestone(
                 entity, milestoneCode, plannedDate, note, userId
         );
@@ -816,7 +828,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         entity.setUpdatedBy(user);
-        entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderMilestoneService.updateProductionExpectedEndDate(entity, expectedEndDate, userId);
         return mapToDto(entity);
     }
