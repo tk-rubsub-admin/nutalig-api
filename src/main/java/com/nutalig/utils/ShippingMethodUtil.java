@@ -1,18 +1,43 @@
 package com.nutalig.utils;
 
 import com.nutalig.constant.ShippingMethod;
+import com.nutalig.constant.ShippingMode;
 import com.nutalig.entity.SupplierShippingEntity;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ShippingMethodUtil {
+
+    public static ShippingMethod getShippingMethodCategory(String shippingMethod) {
+        String normalized = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod), Locale.ROOT);
+        try {
+            return switch (ShippingMethod.valueOf(normalized)) {
+                case SEA_FCL_20GP, SEA_FCL_40HQ, SEA_SHARE_FCL_20GP, SEA_SHARE_FCL_40HQ -> ShippingMethod.SEA;
+                default -> ShippingMethod.valueOf(normalized);
+            };
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public static ShippingMode getShippingMode(String shippingMethod) {
+        String normalized = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod), Locale.ROOT);
+        return normalized.startsWith("SEA_FCL_") || normalized.startsWith("SEA_SHARE_FCL_")
+                ? ShippingMode.FCL : ShippingMode.STANDARD;
+    }
+
+    public static boolean matchesSupplierShipping(String shippingMethod, SupplierShippingEntity shipping) {
+        ShippingMethod category = getShippingMethodCategory(shippingMethod);
+        return shipping != null && category != null
+                && category == shipping.getShippingMethod()
+                && getShippingMode(shippingMethod) == (shipping.getShippingMode() == null
+                ? ShippingMode.STANDARD : shipping.getShippingMode());
+    }
 
     public static String getShippingMethodLabel(String shippingMethod) {
         return getShippingMethodLabel(shippingMethod, "-", false, false);
@@ -22,32 +47,21 @@ public class ShippingMethodUtil {
             String shippingMethod,
             List<SupplierShippingEntity> shippingEntities
     ) {
-        String normalizedShippingMethod = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod));
+        String normalizedShippingMethod = StringUtils.upperCase(StringUtils.trimToEmpty(shippingMethod), Locale.ROOT);
         if ("AIR".equals(normalizedShippingMethod)) {
             return "ขนส่งทางเครื่องบิน";
         }
 
-        List<ShippingMethod> requestedMethods = switch (normalizedShippingMethod) {
-            case "LAND" -> List.of(ShippingMethod.LAND);
-            case "SEA" -> List.of(ShippingMethod.SEA);
-            case "ALL" -> List.of(ShippingMethod.LAND, ShippingMethod.SEA);
-            default -> List.of();
-        };
-        if (requestedMethods.isEmpty()) {
-            return "";
-        }
-
-        Map<ShippingMethod, String> shippingCodes = new EnumMap<>(ShippingMethod.class);
-        if (shippingEntities != null) {
-            shippingEntities.forEach(shipping -> {
-                if (shipping.getShippingMethod() != null && StringUtils.isNotBlank(shipping.getCarCode())) {
-                    shippingCodes.putIfAbsent(shipping.getShippingMethod(), shipping.getCarCode().trim());
-                }
-            });
-        }
-
+        List<String> requestedMethods = "ALL".equals(normalizedShippingMethod)
+                ? List.of("LAND", "SEA") : List.of(normalizedShippingMethod);
+        List<SupplierShippingEntity> available = shippingEntities == null ? List.of() : shippingEntities;
         return String.join(" & ", requestedMethods.stream()
-                .map(shippingCodes::get)
+                .map(method -> available.stream()
+                        .filter(shipping -> matchesSupplierShipping(method, shipping))
+                        .map(SupplierShippingEntity::getCarCode)
+                        .filter(StringUtils::isNotBlank)
+                        .map(String::trim)
+                        .findFirst().orElse(""))
                 .filter(StringUtils::isNotBlank)
                 .toList());
     }

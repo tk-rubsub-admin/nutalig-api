@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class StartPurchaseOrderRunRequest {
     private String lateStartReason;
+    private String startRunOverrideReason;
 }

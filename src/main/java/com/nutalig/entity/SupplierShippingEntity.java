@@ -2,6 +2,7 @@ package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.ShippingMethod;
+import com.nutalig.constant.ShippingMode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -28,6 +29,10 @@ public class SupplierShippingEntity extends AuditDateEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "shipping_method", nullable = false, length = 20)
     private ShippingMethod shippingMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shipping_mode", nullable = false, length = 20)
+    private ShippingMode shippingMode = ShippingMode.STANDARD;
 
     @Column(name = "shipping_name", length = 255)
     private String shippingName;

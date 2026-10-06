@@ -813,7 +813,7 @@ PURCHASE ORDER]]></text>
 						<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 					</box>
 				</element>
-				<element kind="image" uuid="f5263f5f-a455-4f39-8952-a78ef1d396bd" positionType="Float" stretchType="ContainerHeight" x="31" y="1" width="109" height="59" hImageAlign="Center" vImageAlign="Middle">
+				<element kind="image" uuid="f5263f5f-a455-4f39-8952-a78ef1d396bd" positionType="Float" stretchType="ContainerHeight" x="31" y="1" width="109" height="59" hImageAlign="Center" vImageAlign="Middle" onErrorType="Blank">
 					<expression><![CDATA[$F{image}]]></expression>
 				</element>
 				<element kind="staticText" uuid="200d8647-8e8d-4fbb-b8d5-0978efa60188" stretchType="ContainerHeight" x="350" y="0" width="10" height="60" hTextAlign="Center" vTextAlign="Middle">

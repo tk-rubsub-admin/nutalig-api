@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261006-001-add-purchase-order-start-run-override-reason
+      author: codex
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: start_run_override_reason
+                  type: VARCHAR(2000)

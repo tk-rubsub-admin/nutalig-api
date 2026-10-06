@@ -20,14 +20,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -276,6 +280,10 @@ public class ReportService {
         parameters.put("dueDate", dto.getDueDate());
         parameters.put("salesOrderNo", dto.getSalesOrderNo());
 
+        for (PurchaseOrderItemDocumentDto item : dto.getItems()) {
+            item.setImage(preparePurchaseOrderImage(item.getImage(), dto.getDocNo(), item.getNo()));
+        }
+
         JasperPrint jasperPrint = buildJasperPrint(
                 PURCHASE_ORDER_TEMPLATE,
                 parameters,
@@ -291,6 +299,38 @@ public class ReportService {
         }
 
         return null;
+    }
+
+    private InputStream preparePurchaseOrderImage(InputStream image, String documentNo, Integer lineNo) {
+        if (image == null) {
+            return null;
+        }
+
+        // The PDF exporter cannot embed every format that ImageIO can decode (for example WebP).
+        try (InputStream source = image;
+             MemoryCacheImageInputStream imageInput = new MemoryCacheImageInputStream(source)) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInput);
+            if (!readers.hasNext()) {
+                log.warn("Skipping unsupported product image in purchase order {}, line {}", documentNo, lineNo);
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInput, true, true);
+                BufferedImage decoded = reader.read(0);
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                if (!ImageIO.write(decoded, "png", output)) {
+                    throw new IOException("PNG image writer is unavailable");
+                }
+                return new ByteArrayInputStream(output.toByteArray());
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException e) {
+            log.warn("Skipping unreadable product image in purchase order {}, line {}: {}",
+                    documentNo, lineNo, e.getMessage());
+            return null;
+        }
     }
 
     public Object getReceiptDocument(ReceiptDocumentDto dto, ExportFileFormat format) throws Exception {

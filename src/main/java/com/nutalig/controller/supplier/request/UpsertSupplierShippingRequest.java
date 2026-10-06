@@ -2,6 +2,7 @@ package com.nutalig.controller.supplier.request;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.ShippingMethod;
+import com.nutalig.constant.ShippingMode;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,6 +11,7 @@ import java.util.List;
 @Data
 public class UpsertSupplierShippingRequest {
     private ShippingMethod shippingMethod;
+    private ShippingMode shippingMode;
     private String shippingName;
     private String originCountryCode;
     private String originProvince;

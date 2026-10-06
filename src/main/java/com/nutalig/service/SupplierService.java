@@ -1,6 +1,8 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.Status;
+import com.nutalig.constant.ShippingMethod;
+import com.nutalig.constant.ShippingMode;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
@@ -584,6 +586,20 @@ public class SupplierService {
         if (request.getShippingMethod() == null) {
             throw new InvalidRequestException("shippingMethod is required");
         }
+        if (request.getShippingMethod() != ShippingMethod.LAND && request.getShippingMethod() != ShippingMethod.SEA) {
+            throw new InvalidRequestException("Supplier shippingMethod must be LAND or SEA");
+        }
+        ShippingMode mode = request.getShippingMode() == null ? ShippingMode.STANDARD : request.getShippingMode();
+        if (request.getShippingMethod() == ShippingMethod.LAND && mode != ShippingMode.STANDARD) {
+            throw new InvalidRequestException("LAND shipping only supports STANDARD mode");
+        }
+        if (request.getShippingMethod() == ShippingMethod.SEA) {
+            String prefix = mode == ShippingMode.FCL ? "TZ" : "TB";
+            String carCode = StringUtils.upperCase(StringUtils.trimToEmpty(request.getCarCode()), Locale.ROOT);
+            if (!carCode.startsWith(prefix) || carCode.length() <= prefix.length()) {
+                throw new InvalidRequestException("SEA " + mode + " carCode must start with " + prefix + " followed by a code");
+            }
+        }
         if (CollectionUtils.isEmpty(request.getDestinations())) {
             throw new InvalidRequestException("At least one destination is required");
         }
@@ -597,6 +613,7 @@ public class SupplierService {
 
     private void applySupplierShipping(SupplierShippingEntity shipping, UpsertSupplierShippingRequest request) {
         shipping.setShippingMethod(request.getShippingMethod());
+        shipping.setShippingMode(request.getShippingMode() == null ? ShippingMode.STANDARD : request.getShippingMode());
         shipping.setShippingName(StringUtils.trimToNull(request.getShippingName()));
         shipping.setOriginCountryCode(StringUtils.trimToNull(request.getOriginCountryCode()));
         shipping.setOriginProvince(StringUtils.trimToNull(request.getOriginProvince()));
@@ -605,7 +622,7 @@ public class SupplierService {
         shipping.setLeadTimeDayMin(request.getLeadTimeDayMin());
         shipping.setLeadTimeDayMax(request.getLeadTimeDayMax());
         shipping.setRemark(StringUtils.trimToNull(request.getRemark()));
-        shipping.setCarCode(request.getCarCode());
+        shipping.setCarCode(StringUtils.upperCase(StringUtils.trimToNull(request.getCarCode()), Locale.ROOT));
         shipping.setActive(Boolean.TRUE);
 
         List<SupplierShippingDestinationEntity> existingDestinations = new ArrayList<>(shipping.getDestinations());

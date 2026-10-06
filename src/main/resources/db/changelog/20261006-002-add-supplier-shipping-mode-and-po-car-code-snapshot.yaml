@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261006-002-add-supplier-shipping-mode-and-po-car-code-snapshot
+      author: codex
+      changes:
+        - addColumn:
+            tableName: supplier_shipping
+            columns:
+              - column:
+                  name: shipping_mode
+                  type: VARCHAR(20)
+                  defaultValue: STANDARD
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: car_code_snapshot
+                  type: VARCHAR(255)
+        - sql:
+            sql: |
+              UPDATE purchase_order
+              SET car_code_snapshot = (
+                  SELECT car_code
+                  FROM supplier_shipping
+                  WHERE supplier_shipping.id = purchase_order.supplier_shipping_id
+              )
+              WHERE car_code_snapshot IS NULL;

@@ -195,7 +195,8 @@ public class PurchaseOrderController {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.startRun(
                 id,
                 userId,
-                request != null ? request.getLateStartReason() : null
+                request != null ? request.getLateStartReason() : null,
+                request != null ? request.getStartRunOverrideReason() : null
         ));
     }
 

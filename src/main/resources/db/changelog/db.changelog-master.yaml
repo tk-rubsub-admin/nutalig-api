@@ -3082,3 +3082,7 @@ databaseChangeLog:
       file: db/changelog/20260926-001-add-purchase-order-start-run-permission.yaml
   - include:
       file: db/changelog/20260926-002-add-purchase-order-late-start-reason.yaml
+  - include:
+      file: db/changelog/20261006-001-add-purchase-order-start-run-override-reason.yaml
+  - include:
+      file: db/changelog/20261006-002-add-supplier-shipping-mode-and-po-car-code-snapshot.yaml

@@ -106,6 +106,9 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "late_start_reason", length = 2000)
     private String lateStartReason;
 
+    @Column(name = "start_run_override_reason", length = 2000)
+    private String startRunOverrideReason;
+
     @Column(name = "production_started_date")
     private LocalDate productionStartedDate;
 
@@ -135,6 +138,9 @@ public class PurchaseOrderEntity extends AuditDateEntity {
 
     @Column(name = "shipping_method_snapshot", length = 50)
     private String shippingMethodSnapshot;
+
+    @Column(name = "car_code_snapshot", length = 255)
+    private String carCodeSnapshot;
 
     @Column(name = "container_size_snapshot", length = 255)
     private String containerSizeSnapshot;

@@ -34,6 +34,7 @@ public class PurchaseOrderDto {
     private BigDecimal totalCbm;
     private String remark;
     private String lateStartReason;
+    private String startRunOverrideReason;
     private LocalDate productionStartedDate;
     private LocalDate productionExpectedEndDate;
     private LocalDate productionCompletedDate;
@@ -44,6 +45,7 @@ public class PurchaseOrderDto {
     private String supplierPhoneSnapshot;
     private String supplierContactNoSnapshot;
     private String shippingMethodSnapshot;
+    private String carCodeSnapshot;
     private String containerSizeSnapshot;
     private UserDto createdBy;
     private UserDto updatedBy;

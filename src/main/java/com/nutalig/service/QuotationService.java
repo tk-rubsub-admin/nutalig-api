@@ -180,7 +180,7 @@ public class QuotationService {
         quotationEntity.setCoSalesId(requestDto.getCoSaleId());
         quotationEntity.setRemark(requestDto.getRemark());
         quotationEntity.setRevNo(QuotationStatus.DRAFT.equals(requestDto.getStatus()) ? 0 : 1);
-        quotationEntity.setShipping(requestDto.getShipping());
+        quotationEntity.setShipping(normalizeShipping(requestDto.getShipping()));
         quotationEntity.setProject(requestDto.getProject());
         quotationEntity.setSampleLeadTime(requestDto.getSampleLeadTime());
         quotationEntity.setProductionLeadTime(requestDto.getProductionLeadTime());
@@ -350,8 +350,8 @@ public class QuotationService {
             return null;
         }
         normalized = normalized.toUpperCase(Locale.ROOT);
-        if (!List.of("ALL", "LAND", "SEA").contains(normalized)) {
-            throw new IllegalArgumentException("shipping must be ALL, LAND, or SEA");
+        if (!"ALL".equals(normalized) && ShippingMethodUtil.getShippingMethodCategory(normalized) == null) {
+            throw new IllegalArgumentException("shipping must be ALL or a supported shipping method");
         }
         return normalized;
     }

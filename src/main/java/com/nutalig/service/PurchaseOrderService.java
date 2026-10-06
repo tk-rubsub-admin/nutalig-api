@@ -28,6 +28,7 @@ import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.RfqAttachmentUtil;
+import com.nutalig.utils.ShippingMethodUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -97,6 +98,12 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new DataNotFoundException(
                         "Supplier shipping " + request.getSupplierShippingId() + " not found."
                 ));
+        String shippingMethod = StringUtils.upperCase(StringUtils.defaultIfBlank(
+                StringUtils.trimToNull(request.getShippingMethodSnapshot()), supplierShipping.getShippingMethod().name()
+        ), Locale.ROOT);
+        if (!ShippingMethodUtil.matchesSupplierShipping(shippingMethod, supplierShipping)) {
+            throw new InvalidRequestException("Supplier Shipping does not match the selected shipping method and mode");
+        }
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
@@ -179,10 +186,8 @@ public class PurchaseOrderService {
         ));
         entity.setSupplierPhoneSnapshot(snapshotOrDefault(request.getSupplierContactNoSnapshot(), supplierContactNumber));
         entity.setSupplierContactNoSnapshot(snapshotOrDefault(request.getSupplierContactNoSnapshot(), supplierContactNumber));
-        entity.setShippingMethodSnapshot(StringUtils.defaultIfBlank(
-                StringUtils.trimToNull(request.getShippingMethodSnapshot()),
-                supplierShipping.getShippingMethod().name()
-        ));
+        entity.setShippingMethodSnapshot(shippingMethod);
+        entity.setCarCodeSnapshot(StringUtils.trimToNull(supplierShipping.getCarCode()));
         entity.setContainerSizeSnapshot(StringUtils.trimToNull(request.getContainerSizeSnapshot()));
         entity.setCreatedBy(user);
         entity.setUpdatedBy(user);
@@ -424,6 +429,13 @@ public class PurchaseOrderService {
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderDto startRun(String purchaseOrderNo, String userId, String lateStartReason)
             throws DataNotFoundException, InvalidRequestException {
+        return startRun(purchaseOrderNo, userId, lateStartReason, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto startRun(String purchaseOrderNo, String userId, String lateStartReason,
+                                     String startRunOverrideReason)
+            throws DataNotFoundException, InvalidRequestException {
         PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
 
@@ -439,24 +451,31 @@ public class PurchaseOrderService {
             throw new InvalidRequestException("lateStartReason is required when starting a late purchase order");
         }
 
+        boolean hasExpectedStatus = entity.getStatus() == PurchaseOrderStatus.AWAITING_PAYMENT
+                || entity.getStatus() == PurchaseOrderStatus.PAID;
+        boolean hasApprovedFirstPayment = entity.getPayments().stream()
+                .anyMatch(payment -> Objects.equals(payment.getInstallmentNo(), 1)
+                        && payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED);
         PurchaseOrderPaymentScheduleEntity firstSchedule = entity.getPaymentSchedules().stream()
                 .filter(schedule -> Objects.equals(schedule.getInstallmentNo(), 1))
                 .findFirst()
-                .orElseThrow(() -> new InvalidRequestException("First payment schedule not found"));
-        if (firstSchedule.getStatus() != PurchaseOrderPaymentScheduleStatus.PAID) {
-            throw new InvalidRequestException("First installment must be paid and approved before starting run");
+                .orElse(null);
+        boolean firstInstallmentPartiallyPaid = firstSchedule != null
+                && firstSchedule.getStatus() == PurchaseOrderPaymentScheduleStatus.PARTIALLY_PAID;
+        boolean overrideStart = !hasExpectedStatus || !hasApprovedFirstPayment || firstInstallmentPartiallyPaid;
+        if (overrideStart && StringUtils.isBlank(startRunOverrideReason)) {
+            throw new InvalidRequestException("startRunOverrideReason is required when overriding purchase order start conditions");
         }
-        boolean hasApprovedFirstPayment = firstSchedule.getPayments().stream()
-                .anyMatch(payment -> payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED
-                        && payment.getAmount() != null && payment.getAmount().signum() > 0);
-        if (!hasApprovedFirstPayment) {
-            throw new InvalidRequestException("Approved payment for first installment not found");
+        String normalizedOverrideReason = overrideStart ? StringUtils.trimToNull(startRunOverrideReason) : null;
+        if (StringUtils.length(normalizedOverrideReason) > 2000) {
+            throw new InvalidRequestException("startRunOverrideReason must not exceed 2000 characters");
         }
 
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         PurchaseOrderStatus previousStatus = entity.getStatus();
         entity.setStatus(PurchaseOrderStatus.PRODUCTION_RUNNING);
+        entity.setStartRunOverrideReason(normalizedOverrideReason);
         if (lateStart) {
             entity.setLateStartReason(StringUtils.trimToNull(lateStartReason));
         }
@@ -480,11 +499,17 @@ public class PurchaseOrderService {
         detail.put("purchaseOrderNo", purchaseOrderNo);
         detail.put("previousStatus", previousStatus != null ? previousStatus.name() : null);
         detail.put("status", PurchaseOrderStatus.PRODUCTION_RUNNING.name());
-        detail.put("installmentNo", firstSchedule.getInstallmentNo());
-        detail.put("scheduleId", firstSchedule.getId());
-        detail.put("paidAmount", firstSchedule.getPaidAmount());
+        detail.put("installmentNo", firstSchedule == null ? null : firstSchedule.getInstallmentNo());
+        detail.put("scheduleId", firstSchedule == null ? null : firstSchedule.getId());
+        detail.put("paidAmount", firstSchedule == null ? null : firstSchedule.getPaidAmount());
+        detail.put("firstInstallmentStatus", firstSchedule == null ? null : firstSchedule.getStatus());
         detail.put("lateStart", lateStart);
         detail.put("lateStartReason", entity.getLateStartReason());
+        detail.put("overrideStart", overrideStart);
+        detail.put("hasExpectedStatus", hasExpectedStatus);
+        detail.put("hasApprovedFirstPayment", hasApprovedFirstPayment);
+        detail.put("firstInstallmentPartiallyPaid", firstInstallmentPartiallyPaid);
+        detail.put("startRunOverrideReason", entity.getStartRunOverrideReason());
         activityHistoryService.record(
                 ActivityEntityType.PURCHASE_ORDER,
                 purchaseOrderNo,
@@ -1266,7 +1291,7 @@ public class PurchaseOrderService {
         dto.setShippingLocation(resolveShippingLocation(purchaseOrderEntity));
         dto.setShippingAddress(resolveShippingAddress(purchaseOrderEntity));
         dto.setShippingRemark(purchaseOrderEntity.getSupplierShipping().getRemark());
-        dto.setCarCode(purchaseOrderEntity.getSupplierShipping() != null ? purchaseOrderEntity.getSupplierShipping().getCarCode() : null);
+        dto.setCarCode(purchaseOrderEntity.getCarCodeSnapshot());
         dto.setProcurementName(resolveProcurementName(purchaseOrderEntity));
         dto.setProcurementMobileNo(resolveProcurementMobileNo(purchaseOrderEntity));
         dto.setLeadTime(purchaseOrderEntity.getProductionLeadTimeDay() != null ? String.valueOf(purchaseOrderEntity.getProductionLeadTimeDay()) : "");
@@ -1488,6 +1513,7 @@ public class PurchaseOrderService {
         dto.setTotalCbm(entity.getTotalCbm());
         dto.setRemark(entity.getRemark());
         dto.setLateStartReason(entity.getLateStartReason());
+        dto.setStartRunOverrideReason(entity.getStartRunOverrideReason());
         dto.setProductionStartedDate(entity.getProductionStartedDate());
         dto.setProductionExpectedEndDate(entity.getProductionExpectedEndDate());
         dto.setProductionCompletedDate(entity.getProductionCompletedDate());
@@ -1498,6 +1524,7 @@ public class PurchaseOrderService {
         dto.setSupplierPhoneSnapshot(entity.getSupplierPhoneSnapshot());
         dto.setSupplierContactNoSnapshot(entity.getSupplierContactNoSnapshot());
         dto.setShippingMethodSnapshot(entity.getShippingMethodSnapshot());
+        dto.setCarCodeSnapshot(entity.getCarCodeSnapshot());
         dto.setContainerSizeSnapshot(entity.getContainerSizeSnapshot());
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
@@ -1617,6 +1644,9 @@ public class PurchaseOrderService {
         snapshot.put("salesOrderNo", entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);
         snapshot.put("supplierId", entity.getSupplier() != null ? entity.getSupplier().getId() : null);
         snapshot.put("supplierShippingId", entity.getSupplierShipping() != null ? entity.getSupplierShipping().getId() : null);
+        snapshot.put("shippingMethodSnapshot", entity.getShippingMethodSnapshot());
+        snapshot.put("shippingMode", ShippingMethodUtil.getShippingMode(entity.getShippingMethodSnapshot()));
+        snapshot.put("carCodeSnapshot", entity.getCarCodeSnapshot());
         snapshot.put("shippingMethod", entity.getSupplierShipping() != null && entity.getSupplierShipping().getShippingMethod() != null
                 ? entity.getSupplierShipping().getShippingMethod().name()
                 : null);
@@ -1635,6 +1665,7 @@ public class PurchaseOrderService {
         snapshot.put("totalCbm", entity.getTotalCbm());
         snapshot.put("remark", entity.getRemark());
         snapshot.put("lateStartReason", entity.getLateStartReason());
+        snapshot.put("startRunOverrideReason", entity.getStartRunOverrideReason());
         snapshot.put("itemCount", entity.getItems() != null ? entity.getItems().size() : 0);
         return snapshot;
     }
@@ -1645,6 +1676,9 @@ public class PurchaseOrderService {
         detail.put("salesOrderNo", entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);
         detail.put("supplierId", entity.getSupplier() != null ? entity.getSupplier().getId() : null);
         detail.put("supplierShippingId", entity.getSupplierShipping() != null ? entity.getSupplierShipping().getId() : null);
+        detail.put("shippingMethodSnapshot", entity.getShippingMethodSnapshot());
+        detail.put("shippingMode", ShippingMethodUtil.getShippingMode(entity.getShippingMethodSnapshot()));
+        detail.put("carCodeSnapshot", entity.getCarCodeSnapshot());
         detail.put("shippingMethod", entity.getSupplierShipping() != null ? entity.getSupplierShipping().getShippingMethod() : null);
         detail.put("status", entity.getStatus());
         detail.put("currency", entity.getCurrency());
