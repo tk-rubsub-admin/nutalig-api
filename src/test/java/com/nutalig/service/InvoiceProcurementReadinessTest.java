@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -111,7 +112,8 @@ class InvoiceProcurementReadinessTest {
         verify(salesOrderRepository).save(so);
         verify(activityHistoryService).record(eq(ActivityEntityType.SALES_ORDER), eq(so.getSalesOrderNo()),
                 eq("PUBLIC_TOKEN"), any(), eq(ActivityAction.STATUS_CHANGE), any(), anyString(),
-                argThat(detail -> "FIRST_INSTALLMENT_INVOICE_PAID".equals(detail.get("trigger"))));
+                argThat(detail -> detail instanceof Map<?, ?> payload
+                        && "FIRST_INSTALLMENT_INVOICE_PAID".equals(payload.get("trigger"))));
     }
 
     @Test
