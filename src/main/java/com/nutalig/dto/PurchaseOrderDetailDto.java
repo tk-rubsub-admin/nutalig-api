@@ -27,6 +27,7 @@ public class PurchaseOrderDetailDto {
     private String rfqId;
     private Long rfqDetailId;
     private Long rfqTierId;
+    private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
     private Long supplierQuoteTierId;

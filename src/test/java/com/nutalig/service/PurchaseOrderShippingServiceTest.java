@@ -50,6 +50,7 @@ class PurchaseOrderShippingServiceTest {
     @Mock private PurchaseOrderCbmService purchaseOrderCbmService;
     @Mock private PurchaseOrderMilestoneService purchaseOrderMilestoneService;
     @Mock private ActivityHistoryService activityHistoryService;
+    @Mock private SalesOrderItemShippingService salesOrderItemShippingService;
     @Mock private SystemConfigMapper systemConfigMapper;
     @Mock private UserMapper userMapper;
     @Spy private SupplierMapper supplierMapper = Mappers.getMapper(SupplierMapper.class);
@@ -58,10 +59,11 @@ class PurchaseOrderShippingServiceTest {
 
     private SupplierShippingEntity shipping;
     private CreatePurchaseOrderRequest request;
+    private SalesOrderEntity salesOrder;
 
     @BeforeEach
     void setUp() {
-        SalesOrderEntity salesOrder = new SalesOrderEntity();
+        salesOrder = new SalesOrderEntity();
         salesOrder.setSalesOrderNo("SO-TEST");
         salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
         SupplierEntity supplier = new SupplierEntity();
@@ -159,5 +161,123 @@ class PurchaseOrderShippingServiceTest {
         id.setCode("DEP_30");
         paymentTerm.setId(id);
         when(systemConfigService.getConfigEntity(SystemConstant.SUPPLIER_PAYMENT_TERM, "DEP_30")).thenReturn(paymentTerm);
+    }
+
+    @Test
+    void legacyRequestWithoutSelectedIdsStillCreatesAllMatchingSourceItems() throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_FCL_40HQ");
+        request.setItems(null);
+        SupplierEntity supplier = supplierRepository.findById("supplier").orElseThrow();
+        for (long id : List.of(1L, 2L)) {
+            SalesOrderDetailEntity item = new SalesOrderDetailEntity();
+            item.setId(id);
+            item.setSupplier(supplier);
+            item.setShippingMethod(id == 1 ? "SEA" : "SEA_FCL_40HQ");
+            item.setQuantity(BigDecimal.TEN);
+            item.setSupplierCurrency(Currency.THB);
+            item.setSupplierUnitPrice(BigDecimal.ONE);
+            item.setSupplierTotalUnitCost(BigDecimal.ONE);
+            salesOrder.addItem(item);
+        }
+        assertEquals(2, service.createPurchaseOrder(request, List.of(), "user").getItems().size());
+        verifyNoInteractions(salesOrderItemShippingService);
+    }
+
+    @Test
+    void emptyExplicitSelectionCreatesOnlyManualItemsWithoutReaddingSalesOrderItems() throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_FCL_40HQ");
+        request.setSalesOrderDetailIds(List.of());
+        SalesOrderDetailEntity excluded = new SalesOrderDetailEntity();
+        excluded.setId(1L);
+        excluded.setName("Removed SO item");
+        excluded.setSupplier(supplierRepository.findById("supplier").orElseThrow());
+        excluded.setShippingMethod("SEA");
+        salesOrder.addItem(excluded);
+
+        PurchaseOrderEntity created = service.createPurchaseOrder(request, List.of(), "user");
+        assertEquals(1, created.getItems().size());
+        assertEquals("Test product", created.getItems().iterator().next().getName());
+        assertEquals(new BigDecimal("10.00"), created.getSubTotal());
+        verifyNoInteractions(salesOrderItemShippingService);
+        assertEquals(1, salesOrder.getItems().size());
+    }
+
+    @Test
+    void explicitNormalSupplierSelectionStoresTheChosenTransportForEveryItem() throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_SHARE_FCL_40HQ");
+        request.setSalesOrderDetailIds(List.of(1L, 2L));
+        request.setItems(null);
+        SupplierEntity supplier = supplierRepository.findById("supplier").orElseThrow();
+        for (long id : List.of(1L, 2L)) {
+            SalesOrderDetailEntity item = new SalesOrderDetailEntity();
+            item.setId(id);
+            item.setSupplier(supplier);
+            item.setName("Normal item " + id);
+            item.setShippingMethod(id == 1 ? "LAND" : "SEA");
+            item.setQuantity(BigDecimal.TEN);
+            item.setSupplierCurrency(Currency.THB);
+            item.setSupplierUnitPrice(BigDecimal.ONE);
+            item.setSupplierShippingCost(BigDecimal.ZERO);
+            item.setSupplierTotalUnitCost(BigDecimal.ONE);
+            salesOrder.addItem(item);
+        }
+        when(salesOrderItemShippingService.selectItems(salesOrder.getItems(), List.of(1L, 2L), "supplier", "SEA_SHARE_FCL_40HQ"))
+                .thenCallRealMethod();
+        PurchaseOrderEntity created = service.createPurchaseOrder(request, List.of(), "user");
+        assertEquals(2, created.getItems().size());
+        assertEquals("SEA_SHARE_FCL_40HQ", created.getShippingMethodSnapshot());
+        created.getItems().forEach(item -> {
+            assertEquals("SEA_SHARE_FCL_40HQ", item.getShippingMethod());
+            assertNull(item.getRfqTierSplitId());
+        });
+        assertEquals(List.of("LAND", "SEA"), salesOrder.getItems().stream().map(SalesOrderDetailEntity::getShippingMethod).toList());
+    }
+
+    @Test
+    void explicitSelectionCreatesOnlyItsSplitAndKeepsMetadataWhenLegacyEditOmitsSplitId() throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_SHARE_FCL_40HQ");
+        request.setSalesOrderDetailIds(List.of(183L));
+        SalesOrderDetailEntity source = new SalesOrderDetailEntity();
+        source.setId(183L);
+        source.setName("Split SEA");
+        source.setQuantity(new BigDecimal("25000"));
+        source.setSupplierCurrency(Currency.THB);
+        source.setSupplierUnitPrice(new BigDecimal("6.25"));
+        source.setSupplierShippingCost(new BigDecimal("0.75"));
+        source.setSupplierTotalUnitCost(new BigDecimal("7.00"));
+        source.setRfqDetailId(689L);
+        source.setRfqTierSplitId(10L);
+        source.setShippingMethod("SEA");
+        when(salesOrderItemShippingService.selectItems(salesOrder.getItems(), List.of(183L), "supplier", "SEA_SHARE_FCL_40HQ"))
+                .thenReturn(new SalesOrderItemShippingService.Selection(List.of(source), java.util.Map.of(183L, "SEA_SHARE_FCL_40HQ")));
+        CreatePurchaseOrderRequest.Item requested = new CreatePurchaseOrderRequest.Item();
+        requested.setSalesOrderDetailId(183L);
+        request.setItems(List.of(requested));
+
+        PurchaseOrderEntity created = service.createPurchaseOrder(request, List.of(), "user");
+        assertEquals(1, created.getItems().size());
+        PurchaseOrderDetailEntity detail = created.getItems().iterator().next();
+        assertEquals(10L, detail.getRfqTierSplitId());
+        assertEquals("SEA_SHARE_FCL_40HQ", detail.getShippingMethod());
+        assertEquals(new BigDecimal("175000.00"), created.getSubTotal());
+        assertNull(detail.getSupplierQuoteTierId());
+        detail.setId(1L);
+        when(purchaseOrderRepository.findById(created.getPurchaseOrderNo())).thenReturn(Optional.of(created));
+        com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest edit = new com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest();
+        edit.setId(1L);
+        edit.setName(detail.getName());
+        edit.setQuantity(detail.getQuantity());
+        edit.setSupplierCurrency(Currency.THB);
+        edit.setSupplierUnitPrice(detail.getSupplierUnitPrice());
+        edit.setSupplierShippingCost(detail.getSupplierShippingCost());
+        edit.setRfqDetailId(689L);
+        edit.setShippingMethod(detail.getShippingMethod());
+        com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest update = new com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest();
+        update.setItems(List.of(edit));
+        assertEquals(10L, service.updatePurchaseOrder(created.getPurchaseOrderNo(), update, "user").getItems().getFirst().getRfqTierSplitId());
     }
 }

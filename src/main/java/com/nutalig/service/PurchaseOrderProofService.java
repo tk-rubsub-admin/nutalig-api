@@ -123,7 +123,8 @@ public class PurchaseOrderProofService {
             List<MultipartFile> attachments,
             String userId
     ) throws Exception {
-        PurchaseOrderProofEntity proof = getDetailedProof(proofId);
+        PurchaseOrderProofEntity proof = proofRepository.findByIdForUpdate(proofId)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order proof " + proofId + " not found."));
         validateProductionRunning(proof.getPurchaseOrder());
         validateProofNotSkipped(proof.getPurchaseOrder(), proofTypeCode(proof));
         if (proof.getStatus() != PurchaseOrderProofStatus.CHANGES_REQUESTED
@@ -244,6 +245,7 @@ public class PurchaseOrderProofService {
         revision.setDueDate(request.getDueDate() != null ? request.getDueDate() : now.plusDays(1));
         revision.setCreatedBy(userId);
         revision.setUpdatedBy(userId);
+        // Initialize the existing revision collection before inserting the new row.
         proof.addRevision(revision);
 
         int sortOrder = 0;
@@ -263,6 +265,9 @@ public class PurchaseOrderProofService {
             revision.addAttachment(attachment);
         }
 
+        // Persist this revision first. Merging a proof with a transient revision can create
+        // a managed copy, leaving the original revision without an ID and inserting it twice.
+        revision = revisionRepository.saveAndFlush(revision);
         proof.setCurrentRevision(revisionNo);
         proof.setRequired(Boolean.TRUE);
         proof.setStatus(PurchaseOrderProofStatus.PENDING_APPROVAL);

@@ -12,6 +12,7 @@ public class CreatePurchaseOrderRequest {
     private String salesOrderNo;
     private String supplierId;
     private Long supplierShippingId;
+    private List<Long> salesOrderDetailIds;
     private LocalDate docDate;
     private Integer productionLeadTimeDay;
     private Integer shippingLeadTimeDay;

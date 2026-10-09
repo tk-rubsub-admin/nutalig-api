@@ -25,6 +25,7 @@ public class SalesOrderDetailDto {
     private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
+    private String resolvedShippingMethod;
     private Currency supplierCurrency;
     private BigDecimal supplierUnitPrice;
     private BigDecimal supplierShippingCost;

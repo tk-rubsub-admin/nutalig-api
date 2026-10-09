@@ -23,6 +23,7 @@ public class UpdatePurchaseOrderDetailRequest {
     private String imageUrl;
     private Long rfqDetailId;
     private Long rfqTierId;
+    private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
     private Long supplierQuoteTierId;

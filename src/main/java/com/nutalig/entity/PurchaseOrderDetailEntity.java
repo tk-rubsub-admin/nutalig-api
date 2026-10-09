@@ -83,10 +83,13 @@ public class PurchaseOrderDetailEntity {
     @Column(name = "rfq_tier_id")
     private Long rfqTierId;
 
+    @Column(name = "rfq_tier_split_id")
+    private Long rfqTierSplitId;
+
     @Column(name = "quotation_detail_id")
     private Long quotationDetailId;
 
-    @Column(name = "shipping_method", length = 10)
+    @Column(name = "shipping_method", length = 50)
     private String shippingMethod;
 
     @Column(name = "supplier_quote_tier_id")

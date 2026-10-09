@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261007-001-add-purchase-order-tier-split-reference
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: purchase_order_detail
+        - not:
+            - columnExists:
+                tableName: purchase_order_detail
+                columnName: rfq_tier_split_id
+      changes:
+        - addColumn:
+            tableName: purchase_order_detail
+            columns:
+              - column:
+                  name: rfq_tier_split_id
+                  type: BIGINT
+        - createIndex:
+            tableName: purchase_order_detail
+            indexName: idx_purchase_order_detail_tier_split_id
+            columns:
+              - column:
+                  name: rfq_tier_split_id
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_detail
+            baseColumnNames: rfq_tier_split_id
+            referencedTableName: rfq_tier_split
+            referencedColumnNames: id
+            constraintName: fk_purchase_order_detail_tier_split
+            onDelete: SET NULL
+  - changeSet:
+      id: 20261007-002-expand-purchase-order-detail-shipping-method
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: purchase_order_detail
+            columnName: shipping_method
+      changes:
+        - modifyDataType:
+            tableName: purchase_order_detail
+            columnName: shipping_method
+            newDataType: VARCHAR(50)

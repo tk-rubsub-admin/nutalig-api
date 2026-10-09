@@ -80,6 +80,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
     private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    private final SalesOrderItemShippingService salesOrderItemShippingService;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -113,12 +114,17 @@ public class PurchaseOrderService {
             throw new InvalidRequestException("Sales order is not ready for purchase order creation");
         }
 
-        List<SalesOrderDetailEntity> sourceItems = salesOrder.getItems().stream()
+        List<CreatePurchaseOrderRequest.Item> manualItems = getManualCreateItems(request.getItems());
+        SalesOrderItemShippingService.Selection selection = request.getSalesOrderDetailIds() == null ? null
+                : request.getSalesOrderDetailIds().isEmpty() && !manualItems.isEmpty()
+                ? new SalesOrderItemShippingService.Selection(List.of(), Map.of())
+                : salesOrderItemShippingService.selectItems(salesOrder.getItems(), request.getSalesOrderDetailIds(),
+                supplier.getId(), shippingMethod);
+        List<SalesOrderDetailEntity> sourceItems = selection != null ? selection.items() : salesOrder.getItems().stream()
                 .filter(item -> item.getSupplier() != null && StringUtils.equals(item.getSupplier().getId(), supplier.getId()))
                 .filter(item -> StringUtils.containsIgnoreCase(item.getShippingMethod(), supplierShipping.getShippingMethod().name()))
                 .sorted(Comparator.comparing(item -> Optional.ofNullable(item.getLineNo()).orElse(0)))
                 .toList();
-        List<CreatePurchaseOrderRequest.Item> manualItems = getManualCreateItems(request.getItems());
         if (sourceItems.isEmpty() && manualItems.isEmpty()) {
             throw new InvalidRequestException("No sales order items found for selected supplier shipping");
         }
@@ -231,8 +237,10 @@ public class PurchaseOrderService {
             detail.setImageUrl(sourceItem.getImageUrl());
             detail.setRfqDetailId(sourceItem.getRfqDetailId());
             detail.setRfqTierId(sourceItem.getRfqTierId());
+            detail.setRfqTierSplitId(sourceItem.getRfqTierSplitId());
             detail.setQuotationDetailId(sourceItem.getQuotationDetailId());
-            detail.setShippingMethod(sourceItem.getShippingMethod());
+            detail.setShippingMethod(selection == null ? sourceItem.getShippingMethod()
+                    : selection.shippingMethods().get(sourceItem.getId()));
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
             purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
             if (requestedItem != null && requestedItem.getComponents() != null) {
@@ -1044,6 +1052,8 @@ public class PurchaseOrderService {
             detail.setImageUrl(StringUtils.trimToNull(itemRequest.getImageUrl()));
             detail.setRfqDetailId(itemRequest.getRfqDetailId());
             detail.setRfqTierId(itemRequest.getRfqTierId());
+            detail.setRfqTierSplitId(itemRequest.getRfqTierSplitId() != null ? itemRequest.getRfqTierSplitId()
+                    : previousItem != null ? previousItem.getRfqTierSplitId() : null);
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
@@ -1587,6 +1597,7 @@ public class PurchaseOrderService {
             item.setRfqId(rfqIdByDetailId.get(detail.getRfqDetailId()));
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setRfqTierId(detail.getRfqTierId());
+            item.setRfqTierSplitId(detail.getRfqTierSplitId());
             item.setQuotationDetailId(detail.getQuotationDetailId());
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());

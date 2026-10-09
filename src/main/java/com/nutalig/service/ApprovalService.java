@@ -23,6 +23,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -69,6 +74,7 @@ public class ApprovalService {
     private final UserProfileService userProfileService;
     private final ActivityHistoryService activityHistoryService;
     private final LineConfiguration lineConfiguration;
+    private final PlatformTransactionManager transactionManager;
 
     @Transactional(rollbackFor = Exception.class)
     public ApprovalRequestDto createUrgentRfqApprovalRequest(
@@ -389,7 +395,8 @@ public class ApprovalService {
             PurchaseOrderProofRevisionEntity revision,
             String userId
     ) throws Exception {
-        if (proof == null || proof.getId() == null || revision == null || proof.getAssignedSalesUser() == null) {
+        if (proof == null || proof.getId() == null || revision == null || revision.getId() == null
+                || proof.getAssignedSalesUser() == null) {
             throw new InvalidRequestException("Purchase order proof, revision and assigned sales user are required.");
         }
 
@@ -455,11 +462,11 @@ public class ApprovalService {
                 buildAuditDetail(buildMap("approverUserId", approver.getId(), "revisionNo", revision.getRevisionNo())), userId);
 
         createApprovalTodos(request, step, List.of(approver), userId);
-        try {
-            sendCurrentStepApprovalCard(request, step, List.of(approver), userId);
-        } catch (Exception exception) {
-            log.warn("Cannot send proof approval notification for request {}", request.getRequestNo(), exception);
-        }
+        // Persist the action keys with the approval before publishing links to LINE.
+        step.setApproveActionKey(generateActionKey());
+        step.setRejectActionKey(generateActionKey());
+        approvalRequestStepRepository.save(step);
+        sendProofApprovalCardAfterCommit(request.getId(), step.getId(), approver.getId(), userId);
 
         activityHistoryService.record(ActivityEntityType.APPROVAL_REQUEST, String.valueOf(request.getId()), userId,
                 ActivityActorType.USER, ActivityAction.REQUEST_APPROVAL, ActivitySource.API,
@@ -467,6 +474,36 @@ public class ApprovalService {
                 buildMap("proofId", proof.getId(), "purchaseOrderNo", purchaseOrder.getPurchaseOrderNo(),
                         "revisionNo", revision.getRevisionNo()));
         return toDto(request);
+    }
+
+    private void sendProofApprovalCardAfterCommit(Long requestId, Long stepId, String approverId, String userId) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("Proof approval notification requires an active transaction.");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    // Notification timestamps and audit rows must commit in their own transaction.
+                    TransactionTemplate notificationTransaction = new TransactionTemplate(transactionManager);
+                    notificationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                    notificationTransaction.executeWithoutResult(status -> {
+                        ApprovalRequestEntity request = approvalRequestRepository.findById(requestId).orElseThrow();
+                        ApprovalRequestStepEntity step = approvalRequestStepRepository.findById(stepId).orElseThrow();
+                        UserEntity approver = userRepository.findById(approverId).orElseThrow();
+                        try {
+                            sendCurrentStepApprovalCard(request, step, List.of(approver), userId);
+                        } catch (Exception exception) {
+                            status.setRollbackOnly();
+                            log.warn("Cannot send proof approval notification for request {}", requestId, exception);
+                        }
+                    });
+                } catch (Exception exception) {
+                    log.warn("Cannot complete proof approval notification for request {}", requestId, exception);
+                }
+            }
+        });
     }
 
     @Transactional(readOnly = true)

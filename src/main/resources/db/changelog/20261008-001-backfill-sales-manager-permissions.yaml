@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261008-001-backfill-sales-manager-permissions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT IGNORE INTO user_role (role_code, role_name_th, role_name_en)
+              VALUES ('SALES_MANAGER', 'ผู้จัดการฝ่ายขาย', 'Sales Manager');
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT 'SALES_MANAGER', permission_code
+              FROM role_permission
+              WHERE role_code = 'SALES';

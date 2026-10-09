@@ -57,10 +57,10 @@ public class DashboardService {
             "#f299c1"
     );
     private static final List<RfqStatus> IN_PROGRESS_QUEUE_STATUSES = List.of(RfqStatus.IN_PROGRESS, RfqStatus.REQUESTED_INFO);
-    private static final Set<String> RFQ_CREATE_ROLES = Set.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_ADMIN");
-    private static final List<String> SALES_VISIBLE_TO = List.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_ADMIN");
+    private static final Set<String> RFQ_CREATE_ROLES = Set.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_MANAGER", "SALES_ADMIN");
+    private static final List<String> SALES_VISIBLE_TO = List.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_MANAGER", "SALES_ADMIN");
     private static final List<String> PROCUREMENT_VISIBLE_TO = List.of("SUPER_ADMIN", "ADMIN", "PROCUREMENT", "PROCUREMENT_ADMIN");
-    private static final List<String> ALL_RFQ_VISIBLE_TO = List.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_ADMIN", "PROCUREMENT", "PROCUREMENT_ADMIN");
+    private static final List<String> ALL_RFQ_VISIBLE_TO = List.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_MANAGER", "SALES_ADMIN", "PROCUREMENT", "PROCUREMENT_ADMIN");
     private static final String RFQ_MANAGEMENT_PATH = "/rfq-management";
     private static final String PRICE_INQUIRY_MANAGEMENT_PATH = "/price-inquiry-management";
     private static final String RFQ_CREATE_PATH = "/rfq-create";

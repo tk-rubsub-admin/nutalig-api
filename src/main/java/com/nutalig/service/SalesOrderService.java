@@ -90,6 +90,7 @@ public class SalesOrderService {
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
     private final SalesOrderAttachmentRepository salesOrderAttachmentRepository;
+    private final SalesOrderItemShippingService salesOrderItemShippingService;
 
     record SalesOrderSummary(
             BigDecimal subTotal,
@@ -1349,6 +1350,7 @@ public class SalesOrderService {
                         rfqDetail -> rfqDetail.getRequestPriceHeader().getId()
                 ));
 
+        Map<Long, String> resolvedShippingMethods = salesOrderItemShippingService.resolveShippingMethods(entity.getItems());
         List<SalesOrderDetailDto> items = new ArrayList<>();
         for (SalesOrderDetailEntity detail : entity.getItems()) {
             SalesOrderDetailDto item = new SalesOrderDetailDto();
@@ -1370,6 +1372,7 @@ public class SalesOrderService {
             item.setRfqTierSplitId(detail.getRfqTierSplitId());
             item.setQuotationDetailId(detail.getQuotationDetailId());
             item.setShippingMethod(detail.getShippingMethod());
+            item.setResolvedShippingMethod(resolvedShippingMethods.get(detail.getId()));
             item.setSupplierCurrency(detail.getSupplierCurrency());
             item.setSupplierUnitPrice(detail.getSupplierUnitPrice());
             item.setSupplierShippingCost(detail.getSupplierShippingCost());
