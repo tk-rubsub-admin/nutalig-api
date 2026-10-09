@@ -80,8 +80,14 @@ public class PurchaseOrderMilestoneService {
     ) {
         PurchaseOrderMilestoneCode code = proofCode(proofTypeCode);
         if (code == null) return;
+        if (RESOLVED_PROOF_STATUSES.contains(status)) {
+            purchaseOrder = lockPurchaseOrder(purchaseOrder);
+        }
         initializeMilestones(purchaseOrder, userId);
         mark(purchaseOrder, code, status, null, now(), note, userId);
+        if (RESOLVED_PROOF_STATUSES.contains(status)) {
+            startProductionIfProofsResolved(purchaseOrder, userId);
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -97,6 +103,7 @@ public class PurchaseOrderMilestoneService {
         if (StringUtils.isBlank(reason)) {
             throw new InvalidRequestException("note is required when skipping a proof milestone.");
         }
+        purchaseOrder = lockPurchaseOrder(purchaseOrder);
         initializeMilestones(purchaseOrder, userId);
         Map<PurchaseOrderMilestoneCode, PurchaseOrderMilestoneEntity> milestones = milestoneMap(purchaseOrder);
         requireCompleted(milestones, PurchaseOrderMilestoneCode.JOB_STARTED,
@@ -114,6 +121,7 @@ public class PurchaseOrderMilestoneService {
         }
         PurchaseOrderMilestoneEntity milestone = milestones.get(code);
         if (milestone != null && milestone.getStatus() == PurchaseOrderMilestoneStatus.SKIPPED) {
+            startProductionIfProofsResolved(purchaseOrder, userId);
             return;
         }
         if (milestone != null && milestone.getStatus() == PurchaseOrderMilestoneStatus.COMPLETED) {
@@ -128,6 +136,7 @@ public class PurchaseOrderMilestoneService {
         mark(purchaseOrder, code, PurchaseOrderMilestoneStatus.SKIPPED,
                 null, now(), reason.trim(), userId);
         record(purchaseOrder, userId, "ข้ามขั้นตอน " + label(code), code, reason.trim());
+        startProductionIfProofsResolved(purchaseOrder, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -169,12 +178,7 @@ public class PurchaseOrderMilestoneService {
                 if (expectedEnd.isBefore(actualDate)) {
                     throw new InvalidRequestException("plannedDate cannot be before the production start date.");
                 }
-                purchaseOrder.setProductionStartedDate(actualDate);
-                purchaseOrder.setProductionExpectedEndDate(expectedEnd);
-                mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
-                        PurchaseOrderMilestoneStatus.COMPLETED, null, actualAt, note, userId);
-                mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END,
-                        PurchaseOrderMilestoneStatus.COMPLETED, expectedEnd, actualAt, null, userId);
+                startProduction(purchaseOrder, expectedEnd, actualAt, note, userId);
             }
             case PRODUCTION_COMPLETED -> {
                 requireCompleted(milestones, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
@@ -210,6 +214,62 @@ public class PurchaseOrderMilestoneService {
 
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
         record(purchaseOrder, userId, "บันทึกขั้นตอน " + label(code), code, note);
+    }
+
+    private PurchaseOrderEntity lockPurchaseOrder(PurchaseOrderEntity purchaseOrder) {
+        return purchaseOrderRepository.findByIdForUpdate(purchaseOrder.getPurchaseOrderNo())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Purchase order " + purchaseOrder.getPurchaseOrderNo() + " not found."));
+    }
+
+    private void startProductionIfProofsResolved(PurchaseOrderEntity purchaseOrder, String userId) {
+        if (purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING
+                || purchaseOrder.getProductionStartedDate() != null
+                || purchaseOrder.getProductionCompletedDate() != null) {
+            return;
+        }
+        Map<PurchaseOrderMilestoneCode, PurchaseOrderMilestoneEntity> milestones = milestoneMap(purchaseOrder);
+        boolean jobStarted = Optional.ofNullable(milestones.get(PurchaseOrderMilestoneCode.JOB_STARTED))
+                .map(PurchaseOrderMilestoneEntity::getStatus)
+                .filter(PurchaseOrderMilestoneStatus.COMPLETED::equals)
+                .isPresent();
+        boolean proofsResolved = PROOF_CODES.stream().allMatch(code ->
+                Optional.ofNullable(milestones.get(code))
+                        .map(PurchaseOrderMilestoneEntity::getStatus)
+                        .filter(RESOLVED_PROOF_STATUSES::contains)
+                        .isPresent());
+        PurchaseOrderMilestoneStatus productionStatus = Optional.ofNullable(
+                        milestones.get(PurchaseOrderMilestoneCode.PRODUCTION_STARTED))
+                .map(PurchaseOrderMilestoneEntity::getStatus)
+                .orElse(PurchaseOrderMilestoneStatus.PENDING);
+        if (!jobStarted || !proofsResolved || isTerminal(productionStatus)) return;
+
+        ZonedDateTime actualAt = now();
+        // Keep the existing schedule, including overdue dates, rather than postponing it
+        // when proof approval happens later than the planned production end date.
+        LocalDate expectedEnd = Optional.ofNullable(purchaseOrder.getProductionExpectedEndDate())
+                .orElseGet(() -> actualAt.toLocalDate().plusDays(Math.max(0,
+                        Optional.ofNullable(purchaseOrder.getProductionLeadTimeDay()).orElse(0))));
+        String note = "เริ่มผลิตอัตโนมัติเมื่อพรูฟดิจิตอลปริ้นท์และพรูฟสีหน้าเครื่องอนุมัติหรือข้ามครบแล้ว";
+        startProduction(purchaseOrder, expectedEnd, actualAt, note, userId);
+        purchaseOrder.setUpdatedDate(actualAt);
+        purchaseOrderRepository.saveAndFlush(purchaseOrder);
+        record(purchaseOrder, userId, "เริ่มผลิตอัตโนมัติ", PurchaseOrderMilestoneCode.PRODUCTION_STARTED, note);
+    }
+
+    private void startProduction(
+            PurchaseOrderEntity purchaseOrder,
+            LocalDate expectedEnd,
+            ZonedDateTime actualAt,
+            String note,
+            String userId
+    ) {
+        purchaseOrder.setProductionStartedDate(actualAt.toLocalDate());
+        purchaseOrder.setProductionExpectedEndDate(expectedEnd);
+        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
+                PurchaseOrderMilestoneStatus.COMPLETED, null, actualAt, note, userId);
+        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END,
+                PurchaseOrderMilestoneStatus.COMPLETED, expectedEnd, actualAt, null, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)

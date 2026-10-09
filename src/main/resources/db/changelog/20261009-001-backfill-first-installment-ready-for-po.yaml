@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261009-001-backfill-first-installment-ready-for-po
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE sales_order so
+              SET procurement_status = 'READY_FOR_PO', updated_date = CURRENT_TIMESTAMP
+              WHERE so.procurement_status = 'NOT_READY'
+                AND so.status NOT IN ('CANCELLED', 'REJECTED')
+                AND EXISTS (
+                  SELECT 1 FROM invoice i
+                  WHERE i.sales_order_no = so.sales_order_no
+                    AND i.status = 'PAID'
+                    AND i.grand_total > 0
+                    AND ROUND(i.amount, 2) = ROUND(
+                      GREATEST(COALESCE(i.subtotal, 0) - COALESCE(i.discount, 0), 0)
+                      * CASE TRIM(COALESCE(i.customer_payment_term, ''))
+                          WHEN 'DEP50' THEN 50
+                          WHEN 'DEP30_BBS' THEN 30
+                          WHEN 'DEP35_35_30_BBS' THEN 35
+                          ELSE 100
+                        END / 100, 2)
+                    AND ROUND(i.amount, 2) > 0
+                    AND COALESCE((
+                      SELECT SUM(p.amount) FROM invoice_payment p
+                      WHERE p.invoice_no = i.invoice_no AND p.status = 'APPROVE'
+                    ), 0) >= i.grand_total
+                    AND i.invoice_no = (
+                      SELECT first_invoice.invoice_no FROM invoice first_invoice
+                      WHERE first_invoice.sales_order_no = so.sales_order_no
+                        AND first_invoice.status IN ('ISSUED', 'AWAITING_VALIDATION', 'PARTIALLY_PAID', 'PAID')
+                      ORDER BY first_invoice.created_date IS NULL,
+                               first_invoice.created_date, first_invoice.invoice_no
+                      LIMIT 1
+                    )
+                );

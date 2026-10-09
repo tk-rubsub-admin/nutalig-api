@@ -339,7 +339,7 @@ public class InvoiceService {
         invoice.setUpdatedBy(null);
         invoice.setUpdatedDate(now);
 
-        markSalesOrderReadyForProcurementIfDepositPaid(invoice, PUBLIC_TOKEN_ACTOR);
+        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, PUBLIC_TOKEN_ACTOR);
         InvoiceEntity saved = invoiceRepository.save(invoice);
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         recordAwaitingValidationDecisionActivity(
@@ -544,7 +544,7 @@ public class InvoiceService {
         invoice.setStatus(InvoiceStatus.AWAITING_VALIDATION);
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
-        markSalesOrderReadyForProcurementIfDepositPaid(invoice, userId);
+        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, userId);
 
         invoice.addPayment(payment);
         InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
@@ -859,13 +859,24 @@ public class InvoiceService {
         return revNo == null ? 0 : revNo;
     }
 
-    private void markSalesOrderReadyForProcurementIfDepositPaid(InvoiceEntity invoice, String userId) {
-        if (invoice == null || invoice.getStatus() != InvoiceStatus.PAID || !isDepositInvoice(invoice)) {
+    private void markSalesOrderReadyForProcurementIfFirstInstallmentPaid(InvoiceEntity invoice, String userId) {
+        if (invoice == null || invoice.getStatus() != InvoiceStatus.PAID) {
             return;
         }
 
         SalesOrderEntity salesOrder = invoice.getSalesOrder();
-        if (salesOrder == null || salesOrder.getProcurementStatus() == ProcurementStatus.READY_FOR_PO) {
+        if (salesOrder == null || salesOrder.getProcurementStatus() != ProcurementStatus.NOT_READY
+                || salesOrder.getStatus() == SalesOrderStatus.CANCELLED
+                || salesOrder.getStatus() == SalesOrderStatus.REJECTED
+                || !isFirstInstallmentInvoice(invoice)) {
+            return;
+        }
+        BigDecimal approvedPaid = invoice.getPayments().stream()
+                .filter(payment -> payment.getStatus() == InvoicePaymentStatus.APPROVE)
+                .map(payment -> defaultIfNull(payment.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal invoiceTotal = defaultIfNull(invoice.getGrandTotal());
+        if (invoiceTotal.signum() <= 0 || approvedPaid.compareTo(invoiceTotal) < 0) {
             return;
         }
 
@@ -875,22 +886,36 @@ public class InvoiceService {
         recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
     }
 
-    private boolean isDepositInvoice(InvoiceEntity invoice) {
-        if (invoice == null) {
+    private boolean isFirstInstallmentInvoice(InvoiceEntity invoice) {
+        BigDecimal remainingAmount = defaultIfNull(invoice.getSubTotal())
+                .subtract(defaultIfNull(invoice.getDiscount())).max(BigDecimal.ZERO);
+        String paymentTerm = invoice.getCustomerPaymentTerm() != null
+                && invoice.getCustomerPaymentTerm().getId() != null
+                ? StringUtils.trimToEmpty(invoice.getCustomerPaymentTerm().getId().getCode()) : "";
+        // Match the installment schedule used on the invoice creation screen.
+        int firstInstallmentPercent = switch (paymentTerm) {
+            case "DEP50" -> 50;
+            case "DEP30_BBS" -> 30;
+            case "DEP35_35_30_BBS" -> 35;
+            default -> 100;
+        };
+        BigDecimal expectedFirstAmount = remainingAmount.multiply(BigDecimal.valueOf(firstInstallmentPercent))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal actualAmount = defaultIfNull(invoice.getAmount()).setScale(2, RoundingMode.HALF_UP);
+        if (expectedFirstAmount.signum() <= 0 || actualAmount.compareTo(expectedFirstAmount) != 0) {
             return false;
         }
-
-        BigDecimal remainingAmount = defaultIfNull(invoice.getSubTotal())
-                .subtract(defaultIfNull(invoice.getDiscount()));
-        if (remainingAmount.compareTo(BigDecimal.ZERO) < 0) {
-            remainingAmount = BigDecimal.ZERO;
-        }
-
-        BigDecimal expectedDepositAmount = remainingAmount
-                .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
-        BigDecimal actualAmount = defaultIfNull(invoice.getAmount()).setScale(2, RoundingMode.HALF_UP);
-
-        return actualAmount.compareTo(expectedDepositAmount) == 0;
+        // There is no installment number on invoices; use the first issued invoice,
+        // excluding drafts and cancelled/void documents, as the first installment.
+        return invoiceRepository.findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(
+                        invoice.getSalesOrder().getSalesOrderNo()).stream()
+                .filter(item -> Set.of(InvoiceStatus.ISSUED, InvoiceStatus.AWAITING_VALIDATION,
+                        InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.PAID).contains(item.getStatus()))
+                .min(Comparator.comparing(InvoiceEntity::getCreatedDate,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(InvoiceEntity::getInvoiceNo))
+                .map(first -> Objects.equals(first.getInvoiceNo(), invoice.getInvoiceNo()))
+                .orElse(false);
     }
 
     private void recordReadyForProcurementActivity(
@@ -907,7 +932,7 @@ public class InvoiceService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("before", before);
         detail.put("after", after);
-        detail.put("trigger", "DEPOSIT_INVOICE_PAID");
+        detail.put("trigger", "FIRST_INSTALLMENT_INVOICE_PAID");
 
         activityHistoryService.record(
                 ActivityEntityType.SALES_ORDER,

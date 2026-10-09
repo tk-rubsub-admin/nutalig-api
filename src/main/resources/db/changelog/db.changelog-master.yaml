@@ -3090,3 +3090,5 @@ databaseChangeLog:
       file: db/changelog/20261007-001-add-purchase-order-tier-split-reference.yaml
   - include:
       file: db/changelog/20261008-001-backfill-sales-manager-permissions.yaml
+  - include:
+      file: db/changelog/20261009-001-backfill-first-installment-ready-for-po.yaml

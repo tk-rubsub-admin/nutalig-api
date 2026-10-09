@@ -391,8 +391,8 @@ public class PurchaseOrderService {
             throws DataNotFoundException, InvalidRequestException {
         PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
-        if (entity.getStatus() != PurchaseOrderStatus.CREATED
-                && entity.getStatus() != PurchaseOrderStatus.AWAITING_PAYMENT) {
+        if (entity.getStatus() == PurchaseOrderStatus.CANCELLED
+                || entity.getStatus() == PurchaseOrderStatus.CLOSED) {
             throw new InvalidRequestException("Purchase order cannot be edited in status " + entity.getStatus());
         }
         UserEntity user = userRepository.findById(userId)

@@ -147,9 +147,7 @@ public class PurchaseOrderController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             @RequestHeader("userId") String userId
     ) throws Exception {
-//        PurchaseOrderEntity entity = purchaseOrderService.createPurchaseOrder(request, attachments, userId);
-        PurchaseOrderEntity entity = new PurchaseOrderEntity();
-        entity.setPurchaseOrderNo("TEST");
+        PurchaseOrderEntity entity = purchaseOrderService.createPurchaseOrder(request, attachments, userId);
         return new GeneralResponse<>(SUCCESS, new CreatePurchaseOrderResponse(entity.getPurchaseOrderNo()));
     }
 

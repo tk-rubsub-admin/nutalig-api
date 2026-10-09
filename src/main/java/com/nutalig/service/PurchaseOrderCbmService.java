@@ -229,7 +229,7 @@ public class PurchaseOrderCbmService {
 
     private void calculateSnapshot(PurchaseOrderPackageSnapshotDto dto, BigDecimal quantity) {
         if (dto.getWidthCm() == null || dto.getLengthCm() == null || dto.getHeightCm() == null || dto.getCapacityQty() == null || quantity == null || quantity.signum() <= 0) return;
-        long cartons = quantity.divide(dto.getCapacityQty(), 0, RoundingMode.CEILING).longValue();
+        long cartons = quantity.divide(dto.getCapacityQty(), 0, RoundingMode.FLOOR).longValue();
         BigDecimal perCarton = dto.getWidthCm().multiply(dto.getLengthCm()).multiply(dto.getHeightCm())
                 .divide(CUBIC_CENTIMETERS_PER_CBM, 6, RoundingMode.HALF_UP);
         dto.setCartonCount(cartons);

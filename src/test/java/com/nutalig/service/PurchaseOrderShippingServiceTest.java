@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutalig.constant.*;
 import com.nutalig.constant.Currency;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.*;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
@@ -149,6 +151,50 @@ class PurchaseOrderShippingServiceTest {
             assertTrue(text.split("TZ001", -1).length - 1 >= 2, "Both original and copy should retain the snapshot code");
             assertFalse(text.contains("TZ999"));
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PurchaseOrderStatus.class, names = {"CREATED", "AWAITING_PAYMENT", "PAID", "PRODUCTION_RUNNING"})
+    void editsActiveStatusesAndStillValidatesPayments(PurchaseOrderStatus status) throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_FCL_40HQ");
+        PurchaseOrderEntity created = service.createPurchaseOrder(request, List.of(), "user");
+        created.setStatus(status);
+        when(purchaseOrderRepository.findById(created.getPurchaseOrderNo())).thenReturn(Optional.of(created));
+        UpdatePurchaseOrderRequest update = new UpdatePurchaseOrderRequest();
+        update.setRemark("Updated remark");
+
+        var result = service.updatePurchaseOrder(created.getPurchaseOrderNo(), update, "user");
+
+        assertEquals("Updated remark", result.getRemark());
+        assertEquals(1, result.getRevNo());
+        assertEquals(status, result.getStatus());
+        assertEquals(new BigDecimal("10.00"), created.getGrandTotal());
+        verify(purchaseOrderPaymentService).validateAndRecalculateAfterOrderTotalChange(created);
+        verify(purchaseOrderRepository, times(2)).save(created);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PurchaseOrderStatus.class, names = {"CANCELLED", "CLOSED"})
+    void cannotEditTerminalStatuses(PurchaseOrderStatus status) throws Exception {
+        prepareSuccessfulCreate();
+        request.setShippingMethodSnapshot("SEA_FCL_40HQ");
+        PurchaseOrderEntity created = service.createPurchaseOrder(request, List.of(), "user");
+        created.setStatus(status);
+        when(purchaseOrderRepository.findById(created.getPurchaseOrderNo())).thenReturn(Optional.of(created));
+        clearInvocations(userRepository, purchaseOrderRepository, purchaseOrderPaymentService);
+        UpdatePurchaseOrderRequest update = new UpdatePurchaseOrderRequest();
+        update.setRemark("Must not be saved");
+
+        InvalidRequestException error = assertThrows(InvalidRequestException.class,
+                () -> service.updatePurchaseOrder(created.getPurchaseOrderNo(), update, "user"));
+
+        assertTrue(error.getMessage().contains(status.name()));
+        assertEquals(status, created.getStatus());
+        assertEquals(0, created.getRevNo());
+        assertNull(created.getRemark());
+        verify(purchaseOrderRepository, never()).save(any());
+        verifyNoInteractions(userRepository, purchaseOrderPaymentService);
     }
 
     private void prepareSuccessfulCreate() {
