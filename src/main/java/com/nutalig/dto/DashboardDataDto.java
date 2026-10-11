@@ -16,6 +16,7 @@ public class DashboardDataDto {
     private List<DashboardTrendChartDto> trendCharts;
     private DashboardTrendChartDto acceptWorkDurationChart;
     private DashboardTrendChartDto supplierQuoteDurationChart;
+    private DashboardTrendChartDto procurementKpiChart;
     private DashboardDistributionChartDto salesCountChart;
     private DashboardDistributionChartDto customerTypeCountChart;
     private List<DashboardDistributionChartDto> distributionCharts;

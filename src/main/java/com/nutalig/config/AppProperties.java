@@ -37,6 +37,7 @@ public class AppProperties {
         private LocalTime startTime = LocalTime.of(17, 0);
         private LocalTime endTime = LocalTime.of(17, 0);
         private LocalTime cutoffTime = LocalTime.of(17, 0);
+        private LocalTime nextDayStartTime = LocalTime.of(9, 0);
     }
 
     @Getter

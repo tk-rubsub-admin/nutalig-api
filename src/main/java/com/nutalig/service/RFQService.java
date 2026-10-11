@@ -1828,13 +1828,13 @@ public class RFQService {
 
         SlaConfigDto sla = slaConfigService.getSlaConfigById(SLA);
         entity.setSlaDate(slaConfigService.calculateSlaDate(sla, entity.getRequestedDate()));
+        AppProperties.RfqPendingAcceptance acceptanceConfig = appProperties.getRfqPendingAcceptance();
         entity.setAcceptWorkDurationMinutes(
                 businessDurationService.calculateBusinessDurationMinutesWithCutoff(
                         entity.getRequestedDate(),
                         now,
-                        appProperties.getRfqPendingAcceptance() != null
-                                ? appProperties.getRfqPendingAcceptance().getCutoffTime()
-                                : null
+                        acceptanceConfig != null ? acceptanceConfig.getCutoffTime() : null,
+                        acceptanceConfig != null ? acceptanceConfig.getNextDayStartTime() : null
                 )
         );
         entity.setStatus(RfqStatus.IN_PROGRESS);

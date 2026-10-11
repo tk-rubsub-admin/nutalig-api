@@ -25,6 +25,8 @@ import com.nutalig.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +53,20 @@ public class SalesOrderController {
 
         log.info("=== End search sales orders ===");
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> exportSalesOrders(
+            @RequestBody(required = false) SearchSalesOrderRequest request
+    ) {
+        log.info("=== Start export sales orders ===");
+        byte[] content = salesOrderService.exportSalesOrders(request);
+        log.info("=== End export sales orders ===");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"sales-order-export.xlsx\"")
+                .body(content);
     }
 
     @PostMapping

@@ -62,13 +62,14 @@ public class BusinessDurationService {
     public long calculateBusinessDurationMinutesWithCutoff(
             ZonedDateTime requestedDateTime,
             ZonedDateTime endDateTime,
-            LocalTime cutoffTime
+            LocalTime cutoffTime,
+            LocalTime nextDayStartTime
     ) {
         if (requestedDateTime == null || endDateTime == null) {
             return 0L;
         }
 
-        ZonedDateTime adjustedStartDateTime = adjustStartDateTimeByCutoff(requestedDateTime, cutoffTime);
+        ZonedDateTime adjustedStartDateTime = adjustStartDateTimeByCutoff(requestedDateTime, cutoffTime, nextDayStartTime);
         return calculateBusinessDurationMinutes(adjustedStartDateTime, endDateTime);
     }
 
@@ -121,7 +122,9 @@ public class BusinessDurationService {
                 && date.getDayOfWeek() != java.time.DayOfWeek.SUNDAY;
     }
 
-    private ZonedDateTime adjustStartDateTimeByCutoff(ZonedDateTime requestedDateTime, LocalTime cutoffTime) {
+    private ZonedDateTime adjustStartDateTimeByCutoff(
+            ZonedDateTime requestedDateTime, LocalTime cutoffTime, LocalTime nextDayStartTime
+    ) {
         ZonedDateTime normalizedRequestedDateTime = requestedDateTime.withZoneSameInstant(DateUtil.getTimeZone());
         if (cutoffTime == null) {
             return normalizedRequestedDateTime;
@@ -131,7 +134,8 @@ public class BusinessDurationService {
             return normalizedRequestedDateTime
                     .toLocalDate()
                     .plusDays(1)
-                    .atStartOfDay(DateUtil.getTimeZone());
+                    .atTime(nextDayStartTime != null ? nextDayStartTime : LocalTime.of(9, 0))
+                    .atZone(DateUtil.getTimeZone());
         }
 
         return normalizedRequestedDateTime;

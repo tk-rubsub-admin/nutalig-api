@@ -10,5 +10,6 @@ public class DashboardDistributionChartDto {
     private String title;
     private String subtitle;
     private List<DashboardDistributionItemDto> items;
+    private List<DashboardSeriesDto> series;
     private List<String> visibleTo;
 }

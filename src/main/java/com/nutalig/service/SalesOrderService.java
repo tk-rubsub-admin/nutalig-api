@@ -27,12 +27,20 @@ import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import com.nutalig.utils.DocumentStatusResolver;
+import com.nutalig.utils.ExcelUtil;
 import com.nutalig.utils.PdfMergeUtil;
 import com.nutalig.utils.RfqAttachmentUtil;
 import com.nutalig.utils.ThaiBahtText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -42,6 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
@@ -461,6 +471,89 @@ public class SalesOrderService {
         response.setRecords(page.getContent());
         response.setPagination(Pagination.build(page));
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportSalesOrders(SearchSalesOrderRequest request) {
+        SearchSalesOrderRequest criteria = Optional.ofNullable(request).orElseGet(SearchSalesOrderRequest::new);
+        List<SalesOrderEntity> records = salesOrderRepository.findAll(
+                buildSearchCriteria(criteria),
+                Sort.by(Sort.Direction.DESC, "docDate", "salesOrderNo")
+        );
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Sales Orders");
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            CellStyle moneyStyle = workbook.createCellStyle();
+            moneyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00#####"));
+
+            String[] headers = {
+                    "เลขที่ใบยืนยันสั่งซื้อ", "วันที่เอกสาร", "วันที่หมดอายุ", "สถานะ", "เลขที่ใบเสนอราคา",
+                    "รหัสลูกค้า", "ชื่อลูกค้า", "Customer Tier", "รหัสเซลล์", "ชื่อเซลล์", "การขนส่ง",
+                    "สถานะจัดซื้อ", "สถานะชำระเงิน", "สกุลเงิน", "ยอดก่อนส่วนลด", "ส่วนลด", "ค่าขนส่ง",
+                    "ภาษีมูลค่าเพิ่ม", "ยอดรวมสุทธิ", "ยอดเรียกเก็บ", "ยอดชำระแล้ว", "ยอดค้างชำระ",
+                    "วันที่นัดชำระเงิน", "หมายเหตุ"
+            };
+            Row header = sheet.createRow(0);
+            for (int column = 0; column < headers.length; column++) {
+                Cell cell = header.createCell(column);
+                cell.setCellValue(headers[column]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIndex = 1;
+            for (SalesOrderEntity record : records) {
+                Row row = sheet.createRow(rowIndex++);
+                CustomerEntity customer = record.getCustomer();
+                EmployeeEntity sales = record.getSales();
+                String currentCustomerName = customer == null ? "" :
+                        StringUtils.defaultIfBlank(customer.getCustomerName(), customer.getCompanyName());
+                String salesName = sales == null ? "" : StringUtils.defaultIfBlank(
+                        StringUtils.joinWith(" ", sales.getFirstNameTh(), sales.getLastNameTh()).trim(),
+                        sales.getNickName()
+                );
+                Object[] values = {
+                        record.getSalesOrderNo(),
+                        record.getDocDate() == null ? "" : record.getDocDate().format(DateUtil.DD_MM_YY),
+                        record.getExpireDate() == null ? "" : record.getExpireDate().format(DateUtil.DD_MM_YY),
+                        record.getStatus(), record.getQuotationNo(),
+                        customer == null ? "" : customer.getId(),
+                        StringUtils.defaultIfBlank(record.getCustomerNameSnapshot(), currentCustomerName),
+                        customer == null || customer.getCustomerTier() == null ? "" : customer.getCustomerTier().getNameEn(),
+                        sales == null ? "" : sales.getEmployeeId(), salesName, record.getShippingType(),
+                        record.getProcurementStatus(), record.getPaymentStatus(), record.getCurrency()
+                };
+                int columnIndex = 0;
+                for (Object value : values) {
+                    row.createCell(columnIndex++).setCellValue(Objects.toString(value, ""));
+                }
+                BigDecimal[] amounts = {
+                        record.getSubTotal(), record.getDiscount(), record.getFreight(), record.getVat(),
+                        record.getGrandTotal(), record.getAmount(), record.getPaidTotal(), record.getOutstandingTotal()
+                };
+                for (BigDecimal amount : amounts) {
+                    Cell cell = row.createCell(columnIndex++);
+                    cell.setCellValue(ExcelUtil.toDoubleOrZero(amount));
+                    cell.setCellStyle(moneyStyle);
+                }
+                row.createCell(columnIndex++).setCellValue(record.getPaymentScheduleDate() == null ? "" :
+                        record.getPaymentScheduleDate().format(DateUtil.DD_MM_YY));
+                row.createCell(columnIndex).setCellValue(StringUtils.defaultString(record.getRemark()));
+            }
+            sheet.createFreezePane(0, 1);
+            sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, records.size(), 0, headers.length - 1));
+            for (int column = 0; column < headers.length; column++) {
+                sheet.autoSizeColumn(column);
+                sheet.setColumnWidth(column, Math.min(sheet.getColumnWidth(column) + 512, 60 * 256));
+            }
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Cannot export sales order data", exception);
+        }
     }
 
     @Transactional(readOnly = true)

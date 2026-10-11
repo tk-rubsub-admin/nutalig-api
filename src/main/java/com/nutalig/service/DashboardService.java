@@ -43,18 +43,23 @@ public class DashboardService {
 
     private final ApprovalRequestRepository approvalRequestRepository;
 
-    private static final DateTimeFormatter REQUEST_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter REQUEST_DATE_FORMAT = DateTimeFormatter.ofPattern("MM/yyyy");
+    // Locked tokens from NUTALIG CI Active Source Rev.03, page 7.
+    private static final String BRAND_GREEN = "#1F3F37";
+    private static final String BRAND_SAND = "#D4C5BA";
+    private static final String BRAND_TERRACOTTA = "#925944";
+    private static final String BRAND_CHARCOAL = "#30302F";
+    // Additional categories use brand-derived tints, not additional official brand colors.
     private static final List<String> DISTRIBUTION_PALETTE = List.of(
-            "#2f80ed",
-            "#27ae60",
-            "#f2994a",
-            "#9b51e0",
-            "#eb5757",
-            "#56ccf2",
-            "#f2c94c",
-            "#6fcf97",
-            "#bb6bd9",
-            "#f299c1"
+            BRAND_GREEN, BRAND_TERRACOTTA, BRAND_SAND, BRAND_CHARCOAL,
+            "#6B7E77", "#B58F80", "#ABA097", "#ABB4AE", "#D4BDB2", "#94928E"
+    );
+    // Any selected range of up to three consecutive months has three distinct brand colors.
+    private static final List<String> MONTH_PALETTE = List.of(
+            BRAND_GREEN, BRAND_TERRACOTTA, BRAND_SAND,
+            BRAND_GREEN, BRAND_TERRACOTTA, BRAND_SAND,
+            BRAND_GREEN, BRAND_TERRACOTTA, BRAND_SAND,
+            BRAND_GREEN, BRAND_TERRACOTTA, BRAND_SAND
     );
     private static final List<RfqStatus> IN_PROGRESS_QUEUE_STATUSES = List.of(RfqStatus.IN_PROGRESS, RfqStatus.REQUESTED_INFO);
     private static final Set<String> RFQ_CREATE_ROLES = Set.of("SUPER_ADMIN", "ADMIN", "SALES", "SALES_MANAGER", "SALES_ADMIN");
@@ -127,6 +132,7 @@ public class DashboardService {
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
 
+        List<LocalDate> months = enumerateMonths(startDate, endDate);
         DashboardDataDto dashboard = new DashboardDataDto();
         dashboard.setRange("CUSTOM");
         dashboard.setDateFrom(startDate.toString());
@@ -135,10 +141,11 @@ public class DashboardService {
         dashboard.setSource("api");
         dashboard.setMetrics(buildMetrics(rfqs, startDate, endDate, selectedFilters));
         dashboard.setTrendCharts(buildTrendCharts(rfqs, startDate, endDate, roleCode));
-        dashboard.setAcceptWorkDurationChart(buildAcceptWorkDurationChart(rfqs, roleCode));
-        dashboard.setSupplierQuoteDurationChart(buildSupplierQuoteDurationChart(rfqs, roleCode));
-        dashboard.setSalesCountChart(buildSalesCountChart(rfqs, roleCode));
-        dashboard.setCustomerTypeCountChart(buildCustomerTypeCountChart(rfqs, roleCode));
+        dashboard.setAcceptWorkDurationChart(buildAcceptWorkDurationChart(rfqs, roleCode, months));
+        dashboard.setSupplierQuoteDurationChart(buildSupplierQuoteDurationChart(rfqs, roleCode, months));
+        dashboard.setProcurementKpiChart(buildProcurementKpiChart(rfqs, months));
+        dashboard.setSalesCountChart(buildSalesCountChart(rfqs, roleCode, months));
+        dashboard.setCustomerTypeCountChart(buildCustomerTypeCountChart(rfqs, roleCode, months));
         dashboard.setDistributionCharts(buildDistributionCharts(rfqs, roleCode));
         dashboard.setWorkQueues(buildWorkQueues(rfqs, startDate, endDate, selectedFilters, rfqIdsWithQuotation));
         dashboard.setQuickLinks(buildQuickLinks(roleCode, startDate, endDate, selectedFilters));
@@ -252,11 +259,11 @@ public class DashboardService {
             LocalDate endDate,
             String roleCode
     ) {
-        List<LocalDate> dates = enumerateDates(startDate, endDate);
+        List<LocalDate> dates = enumerateMonths(startDate, endDate);
         Map<LocalDate, List<RfqHeaderEntity>> rfqByDate = rfqs.stream()
                 .filter(rfq -> rfq.getRequestedDate() != null)
                 .collect(Collectors.groupingBy(
-                        rfq -> rfq.getRequestedDate().withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate(),
+                        this::rfqMonth,
                         LinkedHashMap::new,
                         Collectors.toList()
                 ));
@@ -273,8 +280,8 @@ public class DashboardService {
         volumeChart.setUnit("COUNT");
         volumeChart.setLabels(dates.stream().map(date -> date.format(REQUEST_DATE_FORMAT)).toList());
         volumeChart.setSeries(List.of(
-                series("งานปกติ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> !urgentRfqIds.contains(item.getId())).count()),
-                series("งานเร่งด่วน", "#f2994a", dates, rfqByDate, items -> (double) items.stream().filter(item -> urgentRfqIds.contains(item.getId())).count())
+                series("งานปกติ", BRAND_GREEN, dates, rfqByDate, items -> (double) items.stream().filter(item -> !urgentRfqIds.contains(item.getId())).count()),
+                series("งานเร่งด่วน", BRAND_TERRACOTTA, dates, rfqByDate, items -> (double) items.stream().filter(item -> urgentRfqIds.contains(item.getId())).count())
         ));
         volumeChart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
 
@@ -289,17 +296,17 @@ public class DashboardService {
         stageChart.setUnit("COUNT");
         stageChart.setLabels(dates.stream().map(date -> date.format(REQUEST_DATE_FORMAT)).toList());
         stageChart.setSeries(List.of(
-                series("ใหม่", "#56ccf2", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.NEW).count()),
-                series("กำลังดำเนินการ", "#2f80ed", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.IN_PROGRESS).count()),
-                series("ซัพตอบแล้ว", "#27ae60", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.SUPPLIER_QUOTED).count()),
-                series("เสนอราคาแล้ว", "#6fcf97", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count())
+                series("ใหม่", BRAND_SAND, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.NEW).count()),
+                series("กำลังดำเนินการ", BRAND_GREEN, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.IN_PROGRESS).count()),
+                series("ซัพตอบแล้ว", "#6B7E77", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.SUPPLIER_QUOTED).count()),
+                series("เสนอราคาแล้ว", BRAND_TERRACOTTA, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count())
         ));
         stageChart.setVisibleTo(StringUtils.equals(roleCode, "PROCUREMENT") ? PROCUREMENT_VISIBLE_TO : SALES_VISIBLE_TO);
 
         return List.of(volumeChart, stageChart);
     }
 
-    private DashboardTrendChartDto buildAcceptWorkDurationChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+    private DashboardTrendChartDto buildAcceptWorkDurationChart(List<RfqHeaderEntity> rfqs, String roleCode, List<LocalDate> months) {
         List<RfqHeaderEntity> eligibleRfqs = rfqs.stream()
                 .filter(rfq -> rfq.getRequestedDate() != null)
                 .toList();
@@ -313,8 +320,10 @@ public class DashboardService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<String, ZonedDateTime> inProgressTimelineByRfqId = buildTimelineMap(rfqIdsNeedingFallback, RfqStatus.IN_PROGRESS);
 
-        long[] bucketCounts = new long[8];
+        Map<LocalDate, long[]> monthlyCounts = new LinkedHashMap<>();
+        months.forEach(month -> monthlyCounts.put(month, new long[8]));
         for (RfqHeaderEntity rfq : eligibleRfqs) {
+            long[] bucketCounts = monthlyCounts.get(rfqMonth(rfq));
             Long durationMinutes = resolveAcceptWorkDurationMinutes(rfq, inProgressTimelineByRfqId);
             if (durationMinutes == null) {
                 bucketCounts[7]++;
@@ -339,19 +348,15 @@ public class DashboardService {
                 "dashboard.rfq.charts.acceptWorkDuration.buckets.gt3d",
                 "dashboard.rfq.charts.acceptWorkDuration.buckets.notAccepted"
         ));
-        DashboardSeriesDto series = new DashboardSeriesDto();
-        series.setName("จำนวน RFQ");
-        series.setColor("#f2994a");
-        series.setData(Arrays.stream(bucketCounts)
-                .boxed()
-                .map(Long::doubleValue)
+        chart.setSeries(monthlyCounts.entrySet().stream()
+                .map(entry -> monthSeries(entry.getKey(), Arrays.stream(entry.getValue())
+                        .mapToDouble(value -> value).boxed().toList()))
                 .toList());
-        chart.setSeries(List.of(series));
         chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
         return chart;
     }
 
-    private DashboardTrendChartDto buildSupplierQuoteDurationChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+    private DashboardTrendChartDto buildSupplierQuoteDurationChart(List<RfqHeaderEntity> rfqs, String roleCode, List<LocalDate> months) {
         List<RfqHeaderEntity> eligibleRfqs = rfqs.stream()
                 .filter(rfq -> rfq.getRequestedDate() != null)
                 .toList();
@@ -365,18 +370,17 @@ public class DashboardService {
         Map<String, ZonedDateTime> inProgressTimelineByRfqId = buildTimelineMap(rfqIds, RfqStatus.IN_PROGRESS);
         Map<String, ZonedDateTime> supplierQuotedTimelineByRfqId = buildTimelineMap(rfqIds, RfqStatus.SUPPLIER_QUOTED);
 
-        long[] bucketCounts = new long[8];
-        long counted = 0;
+        Map<LocalDate, long[]> monthlyCounts = new LinkedHashMap<>();
+        months.forEach(month -> monthlyCounts.put(month, new long[8]));
         for (RfqHeaderEntity rfq : eligibleRfqs) {
+            long[] bucketCounts = monthlyCounts.get(rfqMonth(rfq));
             Long durationMinutes = resolveSupplierQuoteDurationMinutes(rfq, inProgressTimelineByRfqId, supplierQuotedTimelineByRfqId);
             if (durationMinutes == null) {
-                continue;
+                bucketCounts[7]++;
+            } else {
+                bucketCounts[getAcceptWorkDurationBucketIndex(durationMinutes)]++;
             }
-
-            bucketCounts[getAcceptWorkDurationBucketIndex(durationMinutes)]++;
-            counted++;
         }
-        bucketCounts[7] = Math.max(eligibleRfqs.size() - counted, 0);
 
         DashboardTrendChartDto chart = new DashboardTrendChartDto();
         chart.setId("rfq-supplier-quote-duration");
@@ -393,20 +397,92 @@ public class DashboardService {
                 "dashboard.rfq.charts.supplierQuoteDuration.buckets.gt3d",
                 "dashboard.rfq.charts.supplierQuoteDuration.buckets.remaining"
         ));
-        DashboardSeriesDto series = new DashboardSeriesDto();
-        series.setName("จำนวน RFQ");
-        series.setColor("#f2994a");
-        series.setData(Arrays.stream(bucketCounts)
-                .boxed()
-                .map(Long::doubleValue)
+        chart.setSeries(monthlyCounts.entrySet().stream()
+                .map(entry -> monthSeries(entry.getKey(), Arrays.stream(entry.getValue())
+                        .mapToDouble(value -> value).boxed().toList()))
                 .toList());
-        chart.setSeries(List.of(series));
         chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
         return chart;
     }
 
+    private DashboardTrendChartDto buildProcurementKpiChart(List<RfqHeaderEntity> rfqs, List<LocalDate> months) {
+        List<RfqHeaderEntity> eligibleRfqs = rfqs.stream()
+                .filter(rfq -> rfq.getRequestedDate() != null)
+                .toList();
+        if (eligibleRfqs.isEmpty()) {
+            return null;
+        }
+        Set<String> rfqIds = eligibleRfqs.stream().map(RfqHeaderEntity::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, ZonedDateTime> newTimeline = buildTimelineMap(rfqIds, RfqStatus.NEW);
+        Map<String, ZonedDateTime> quotedTimeline = buildTimelineMap(rfqIds, RfqStatus.SUPPLIER_QUOTED);
+        Map<LocalDate, long[]> monthlyCounts = new LinkedHashMap<>();
+        months.forEach(month -> monthlyCounts.put(month, new long[6]));
+        Set<RfqStatus> beforeSupplierQuoted = EnumSet.of(RfqStatus.NEW, RfqStatus.IN_PROGRESS, RfqStatus.REQUESTED_INFO);
+        AppProperties.RfqPendingAcceptance acceptanceConfig = appProperties.getRfqPendingAcceptance();
+
+        for (RfqHeaderEntity rfq : eligibleRfqs) {
+            long[] counts = monthlyCounts.get(rfqMonth(rfq));
+            ZonedDateTime start = newTimeline.getOrDefault(rfq.getId(), rfq.getRequestedDate());
+            ZonedDateTime end = quotedTimeline.get(rfq.getId());
+            if (end == null) {
+                counts[beforeSupplierQuoted.contains(rfq.getStatus()) ? 4 : 5]++;
+            } else if (start == null || end.isBefore(start)) {
+                counts[5]++;
+            } else {
+                long minutes = businessDurationService.calculateBusinessDurationMinutesWithCutoff(
+                        start,
+                        end,
+                        acceptanceConfig != null ? acceptanceConfig.getCutoffTime() : null,
+                        acceptanceConfig != null ? acceptanceConfig.getNextDayStartTime() : null
+                );
+                counts[getProcurementKpiBucketIndex(minutes)]++;
+            }
+        }
+
+        DashboardTrendChartDto chart = new DashboardTrendChartDto();
+        chart.setId("rfq-procurement-kpi");
+        chart.setTitle("dashboard.rfq.charts.procurementKpi.title");
+        chart.setUnit("COUNT");
+        chart.setLabels(List.of(
+                "dashboard.rfq.charts.procurementKpi.buckets.lt1d",
+                "dashboard.rfq.charts.procurementKpi.buckets.lt2d",
+                "dashboard.rfq.charts.procurementKpi.buckets.lt3d",
+                "dashboard.rfq.charts.procurementKpi.buckets.gte3d",
+                "dashboard.rfq.charts.procurementKpi.buckets.pending",
+                "dashboard.rfq.charts.procurementKpi.buckets.missingData"
+        ));
+        chart.setSeries(monthlyCounts.entrySet().stream()
+                .map(entry -> monthSeries(entry.getKey(), Arrays.stream(entry.getValue())
+                        .mapToDouble(value -> value).boxed().toList()))
+                .toList());
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
+    }
+
+    private int getProcurementKpiBucketIndex(long minutes) {
+        if (minutes < 1_440) {
+            return 0;
+        }
+        if (minutes < 2_880) {
+            return 1;
+        }
+        if (minutes < 4_320) {
+            return 2;
+        }
+        return 3;
+    }
+
     private List<DashboardDistributionChartDto> buildDistributionCharts(List<RfqHeaderEntity> rfqs, String roleCode) {
         List<DashboardDistributionChartDto> charts = new ArrayList<>();
+
+        charts.add(distributionChart(
+                "rfq-by-type",
+                "dashboard.rfq.charts.rfqType.title",
+                "dashboard.rfq.charts.rfqType.subtitle",
+                buildRfqTypeBreakdown(rfqs),
+                ALL_RFQ_VISIBLE_TO
+        ));
 
         charts.add(distributionChart(
                 "rfq-by-family",
@@ -430,8 +506,8 @@ public class DashboardService {
                 "dashboard.rfq.charts.channel.subtitle",
                 buildBreakdown(
                         rfqs,
-                        rfq -> StringUtils.defaultIfBlank(StringUtils.trimToNull(rfq.getContactChannel()), "-"),
-                        8
+                        this::getContactChannelLabel,
+                        Integer.MAX_VALUE
                 ),
                 ALL_RFQ_VISIBLE_TO
         ));
@@ -454,7 +530,44 @@ public class DashboardService {
         return charts;
     }
 
-    private DashboardDistributionChartDto buildSalesCountChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+    private String getContactChannelLabel(RfqHeaderEntity rfq) {
+        String channel = StringUtils.defaultIfBlank(StringUtils.trimToNull(rfq.getContactChannel()), "-");
+        if (!StringUtils.equalsIgnoreCase(channel, "LINE")) {
+            return channel;
+        }
+        EmployeeEntity sales = rfq.getSales();
+        SystemConfigEntity team = sales != null ? sales.getTeam() : null;
+        if (team == null || team.getId() == null) {
+            return "LINE";
+        }
+        return switch (StringUtils.defaultString(team.getId().getCode())) {
+            case "SALES_ONLINE" -> "LINE Online";
+            case "SALES_OFFLINE" -> "LINE Offline";
+            default -> "LINE";
+        };
+    }
+
+    private List<DashboardDistributionItemDto> buildRfqTypeBreakdown(List<RfqHeaderEntity> rfqs) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (RfqHeaderEntity rfq : rfqs) {
+            String code = getRfqTypeCode(rfq);
+            SystemConfigEntity type = rfq.getRfqType();
+            labels.putIfAbsent(code, type == null ? code : StringUtils.firstNonBlank(
+                    type.getNameTh(), type.getNameEn(), code));
+        }
+        List<DashboardDistributionItemDto> items = buildBreakdown(rfqs, this::getRfqTypeCode, Integer.MAX_VALUE);
+        items.forEach(item -> item.setLabel(labels.get(item.getLabel())));
+        return items;
+    }
+
+    private String getRfqTypeCode(RfqHeaderEntity rfq) {
+        SystemConfigEntity type = rfq.getRfqType();
+        return type != null && type.getId() != null
+                ? StringUtils.defaultIfBlank(type.getId().getCode(), "dashboard.rfq.charts.rfqType.unspecified")
+                : "dashboard.rfq.charts.rfqType.unspecified";
+    }
+
+    private DashboardDistributionChartDto buildSalesCountChart(List<RfqHeaderEntity> rfqs, String roleCode, List<LocalDate> months) {
         if (rfqs == null || rfqs.isEmpty()) {
             return null;
         }
@@ -473,6 +586,7 @@ public class DashboardService {
         chart.setTitle("dashboard.rfq.charts.bySalesCount.title");
         chart.setSubtitle("dashboard.rfq.charts.bySalesCount.subtitle");
         chart.setItems(items);
+        chart.setSeries(buildMonthlyBreakdown(rfqs, months, items, rfq -> getEmployeeLabel(rfq.getSales())));
         chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
         return chart;
     }
@@ -652,12 +766,12 @@ public class DashboardService {
             return null;
         }
 
+        AppProperties.RfqPendingAcceptance acceptanceConfig = appProperties.getRfqPendingAcceptance();
         return businessDurationService.calculateBusinessDurationMinutesWithCutoff(
                 rfq.getRequestedDate(),
                 inProgressAt,
-                appProperties.getRfqPendingAcceptance() != null
-                        ? appProperties.getRfqPendingAcceptance().getCutoffTime()
-                        : null
+                acceptanceConfig != null ? acceptanceConfig.getCutoffTime() : null,
+                acceptanceConfig != null ? acceptanceConfig.getNextDayStartTime() : null
         );
     }
 
@@ -838,7 +952,7 @@ public class DashboardService {
                 StringUtils.trimToEmpty(employee.getFirstNameTh()) + " " + StringUtils.trimToEmpty(employee.getLastNameTh())).trim();
     }
 
-    private DashboardDistributionChartDto buildCustomerTypeCountChart(List<RfqHeaderEntity> rfqs, String roleCode) {
+    private DashboardDistributionChartDto buildCustomerTypeCountChart(List<RfqHeaderEntity> rfqs, String roleCode, List<LocalDate> months) {
         if (rfqs == null || rfqs.isEmpty()) {
             return null;
         }
@@ -857,6 +971,7 @@ public class DashboardService {
         chart.setTitle("dashboard.rfq.charts.byCustomerTypeCount.title");
         chart.setSubtitle("dashboard.rfq.charts.byCustomerTypeCount.subtitle");
         chart.setItems(items);
+        chart.setSeries(buildMonthlyBreakdown(rfqs, months, items, this::getCustomerTypeLabel));
         chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
         return chart;
     }
@@ -947,14 +1062,43 @@ public class DashboardService {
         return URLEncoder.encode(StringUtils.defaultString(value), StandardCharsets.UTF_8);
     }
 
-    private List<LocalDate> enumerateDates(LocalDate startDate, LocalDate endDate) {
-        List<LocalDate> dates = new ArrayList<>();
-        LocalDate cursor = startDate;
-        while (!cursor.isAfter(endDate)) {
-            dates.add(cursor);
-            cursor = cursor.plusDays(1);
+    private List<LocalDate> enumerateMonths(LocalDate startDate, LocalDate endDate) {
+        List<LocalDate> months = new ArrayList<>();
+        LocalDate cursor = startDate.withDayOfMonth(1);
+        LocalDate lastMonth = endDate.withDayOfMonth(1);
+        while (!cursor.isAfter(lastMonth)) {
+            months.add(cursor);
+            cursor = cursor.plusMonths(1);
         }
-        return dates;
+        return months;
+    }
+
+    private LocalDate rfqMonth(RfqHeaderEntity rfq) {
+        return rfq.getRequestedDate().withZoneSameInstant(DateUtil.getTimeZone())
+                .toLocalDate().withDayOfMonth(1);
+    }
+
+    private DashboardSeriesDto monthSeries(LocalDate month, List<Double> values) {
+        DashboardSeriesDto series = new DashboardSeriesDto();
+        series.setName(month.toString().substring(0, 7));
+        series.setColor(MONTH_PALETTE.get(month.getMonthValue() - 1));
+        series.setData(values);
+        return series;
+    }
+
+    private List<DashboardSeriesDto> buildMonthlyBreakdown(
+            List<RfqHeaderEntity> rfqs,
+            List<LocalDate> months,
+            List<DashboardDistributionItemDto> items,
+            Function<RfqHeaderEntity, String> classifier
+    ) {
+        Map<LocalDate, Map<String, Long>> counts = rfqs.stream()
+                .filter(rfq -> rfq.getRequestedDate() != null && StringUtils.isNotBlank(classifier.apply(rfq)))
+                .collect(Collectors.groupingBy(this::rfqMonth,
+                        Collectors.groupingBy(classifier, Collectors.counting())));
+        return months.stream().map(month -> monthSeries(month, items.stream()
+                .map(item -> counts.getOrDefault(month, Map.of()).getOrDefault(item.getLabel(), 0L).doubleValue())
+                .toList())).toList();
     }
 
     private LocalDate parseLocalDateOrDefault(String value, LocalDate fallback) {
