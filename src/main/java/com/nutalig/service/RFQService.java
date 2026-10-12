@@ -3490,9 +3490,9 @@ public class RFQService {
         }
         boolean hasTiers = request.getTiers() != null && !request.getTiers().isEmpty();
         boolean hasTierSplits = request.getTierSplits() != null && !request.getTierSplits().isEmpty();
-        if (!hasTiers && !hasTierSplits) {
-            throw new InvalidRequestException("tiers or tierSplits are required");
-        }
+//        if (!hasTiers && !hasTierSplits) {
+//            throw new InvalidRequestException("tiers or tierSplits are required");
+//        }
 
         RfqDetailEntity detailEntity = new RfqDetailEntity();
         detailEntity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
