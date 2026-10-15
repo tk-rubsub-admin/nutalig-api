@@ -3092,3 +3092,7 @@ databaseChangeLog:
       file: db/changelog/20261008-001-backfill-sales-manager-permissions.yaml
   - include:
       file: db/changelog/20261009-001-backfill-first-installment-ready-for-po.yaml
+  - include:
+      file: db/changelog/20261011-001-add-product-qc-masters.yaml
+  - include:
+      file: db/changelog/20261012-001-add-purchase-order-deliveries.yaml

@@ -14,6 +14,13 @@ public class AppProperties {
     private final Upload upload = new Upload();
     private final RfqPendingAcceptance rfqPendingAcceptance = new RfqPendingAcceptance();
     private final RfqPendingSupplierQuoted rfqPendingSupplierQuoted = new RfqPendingSupplierQuoted();
+    private final ProductTaxonomy productTaxonomy = new ProductTaxonomy();
+
+    @Getter
+    @Setter
+    public static class ProductTaxonomy {
+        private String activeRevision = "REV10";
+    }
 
     @Getter
     @Setter

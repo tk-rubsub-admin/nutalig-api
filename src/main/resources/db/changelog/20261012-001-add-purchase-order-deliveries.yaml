@@ -1,0 +1,63 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261012-001-add-purchase-order-deliveries
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_delivery (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  delivery_no VARCHAR(50) NOT NULL,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  shipped_at DATETIME(6) DEFAULT NULL,
+                  expected_warehouse_date DATE DEFAULT NULL,
+                  received_at DATETIME(6) DEFAULT NULL,
+                  shipping_method VARCHAR(50) DEFAULT NULL,
+                  shipping_location_id BIGINT DEFAULT NULL,
+                  shipping_location_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+                  remark TEXT DEFAULT NULL,
+                  created_by VARCHAR(100) DEFAULT NULL,
+                  updated_by VARCHAR(100) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_po_delivery_no (delivery_no),
+                  KEY idx_po_delivery_po_date (purchase_order_no, shipped_at),
+                  KEY idx_po_delivery_status (status),
+                  KEY idx_po_delivery_location (shipping_location_id),
+                  CONSTRAINT fk_po_delivery_po FOREIGN KEY (purchase_order_no)
+                      REFERENCES purchase_order (purchase_order_no) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_delivery_location FOREIGN KEY (shipping_location_id)
+                      REFERENCES supplier_shipping_destination (id) ON DELETE SET NULL
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE purchase_order_delivery_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  purchase_order_delivery_id BIGINT NOT NULL,
+                  purchase_order_detail_id BIGINT NOT NULL,
+                  purchase_order_detail_component_id BIGINT DEFAULT NULL,
+                  product_name_snapshot VARCHAR(255) NOT NULL,
+                  component_name_snapshot VARCHAR(255) DEFAULT NULL,
+                  quantity DECIMAL(18,5) NOT NULL,
+                  carton_count DECIMAL(18,5) DEFAULT NULL,
+                  pieces_per_carton DECIMAL(18,5) DEFAULT NULL,
+                  net_weight_kg DECIMAL(18,4) DEFAULT NULL,
+                  gross_weight_kg DECIMAL(18,4) DEFAULT NULL,
+                  length_cm DECIMAL(18,4) DEFAULT NULL,
+                  width_cm DECIMAL(18,4) DEFAULT NULL,
+                  height_cm DECIMAL(18,4) DEFAULT NULL,
+                  cbm_m3 DECIMAL(18,6) DEFAULT NULL,
+                  sort_order INT DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_po_delivery_detail_delivery (purchase_order_delivery_id),
+                  KEY idx_po_delivery_detail_po_detail (purchase_order_detail_id),
+                  KEY idx_po_delivery_detail_component (purchase_order_detail_component_id),
+                  CONSTRAINT fk_po_delivery_detail_delivery FOREIGN KEY (purchase_order_delivery_id)
+                      REFERENCES purchase_order_delivery (id) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_delivery_detail_item FOREIGN KEY (purchase_order_detail_id)
+                      REFERENCES purchase_order_detail (id),
+                  CONSTRAINT fk_po_delivery_detail_component FOREIGN KEY (purchase_order_detail_component_id)
+                      REFERENCES purchase_order_detail_component (id) ON DELETE SET NULL
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

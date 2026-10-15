@@ -175,6 +175,11 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @ToString.Exclude
     private Set<PurchaseOrderPaymentScheduleEntity> paymentSchedules = new LinkedHashSet<>();
 
+    @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdDate desc, id desc")
+    @ToString.Exclude
+    private Set<PurchaseOrderDeliveryEntity> deliveries = new LinkedHashSet<>();
+
     public void addItem(PurchaseOrderDetailEntity item) {
         if (item == null) return;
         items.add(item);
@@ -209,6 +214,18 @@ public class PurchaseOrderEntity extends AuditDateEntity {
         if (schedule == null) return;
         paymentSchedules.add(schedule);
         schedule.setPurchaseOrder(this);
+    }
+
+    public void addDelivery(PurchaseOrderDeliveryEntity delivery) {
+        if (delivery == null) return;
+        deliveries.add(delivery);
+        delivery.setPurchaseOrder(this);
+    }
+
+    public void removeDelivery(PurchaseOrderDeliveryEntity delivery) {
+        if (delivery == null) return;
+        deliveries.remove(delivery);
+        delivery.setPurchaseOrder(null);
     }
 
     @Override

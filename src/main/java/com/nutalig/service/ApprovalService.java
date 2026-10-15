@@ -476,6 +476,29 @@ public class ApprovalService {
         return toDto(request);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void resendPurchaseOrderProofApprovalCard(ApprovalRequestEntity request, String actorUserId)
+            throws Exception {
+        if (request == null || request.getRequestType() != ApprovalRequestType.PURCHASE_ORDER_PROOF
+                || request.getStatus() != ApprovalRequestStatus.PENDING) {
+            throw new InvalidRequestException("Proof approval request is not pending.");
+        }
+        ApprovalRequestStepEntity step = request.getSteps().stream()
+                .filter(candidate -> candidate.getStepNo().equals(request.getCurrentStepNo()))
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException("Current proof approval step not found."));
+        if (step.getStatus() != ApprovalStepStatus.PENDING || step.getApproverUser() == null) {
+            throw new InvalidRequestException("Current proof approval step is not pending.");
+        }
+        if (StringUtils.isBlank(step.getApproveActionKey())) {
+            step.setApproveActionKey(generateActionKey());
+        }
+        if (StringUtils.isBlank(step.getRejectActionKey())) {
+            step.setRejectActionKey(generateActionKey());
+        }
+        sendCurrentStepApprovalCard(request, step, List.of(step.getApproverUser()), actorUserId);
+    }
+
     private void sendProofApprovalCardAfterCommit(Long requestId, Long stepId, String approverId, String userId) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) {

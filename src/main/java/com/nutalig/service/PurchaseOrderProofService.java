@@ -77,6 +77,34 @@ public class PurchaseOrderProofService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderProofDto resendNotification(Long proofId, String userId)
+            throws Exception {
+        PurchaseOrderProofEntity proof = getDetailedProof(proofId);
+        if (proof.getStatus() != PurchaseOrderProofStatus.PENDING_APPROVAL) {
+            throw new InvalidRequestException("Can only resend notification while proof is pending approval.");
+        }
+        PurchaseOrderProofRevisionEntity revision = getCurrentRevision(proof);
+        if (revision.getStatus() != PurchaseOrderProofStatus.PENDING_APPROVAL
+                || revision.getApprovalRequest() == null) {
+            throw new InvalidRequestException("Current proof revision is not pending approval.");
+        }
+        if (proof.getAssignedSalesUser() == null || !Status.ACTIVE.equals(proof.getAssignedSalesUser().getStatus())) {
+            throw new InvalidRequestException("Assigned sales user is not active.");
+        }
+        if (StringUtils.isBlank(proof.getAssignedSalesUser().getLineUserId())) {
+            throw new InvalidRequestException("Assigned sales user does not have a LINE account linked.");
+        }
+        if (!proof.getAssignedSalesUser().getId().equals(revision.getApprovalRequest().getSteps().stream()
+                .filter(step -> step.getStepNo().equals(revision.getApprovalRequest().getCurrentStepNo()))
+                .map(step -> step.getApproverUser() != null ? step.getApproverUser().getId() : null)
+                .findFirst().orElse(null))) {
+            throw new InvalidRequestException("Assigned sales user is not the current proof approver.");
+        }
+        approvalService.resendPurchaseOrderProofApprovalCard(revision.getApprovalRequest(), userId);
+        return toDto(getDetailedProof(proofId), userId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderProofDto createAndSubmit(
             String purchaseOrderNo,
             CreatePurchaseOrderProofRequest request,

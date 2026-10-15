@@ -53,6 +53,15 @@ public class PurchaseOrderProofController {
         return new GeneralResponse<>(SUCCESS, purchaseOrderProofService.getProof(proofId, userId));
     }
 
+    @PostMapping("/purchase-order-proofs/{proofId}/resend-notification")
+    @PreAuthorize("hasAuthority('PERM_PO_PROOF_REQUEST')")
+    public GeneralResponse<PurchaseOrderProofDto> resendNotification(
+            @PathVariable Long proofId,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderProofService.resendNotification(proofId, userId));
+    }
+
     @PostMapping(path = "/purchase-order-proofs/{proofId}/revisions", consumes = "multipart/form-data")
     @PreAuthorize("hasAuthority('PERM_PO_PROOF_REQUEST')")
     public GeneralResponse<PurchaseOrderProofDto> resubmitProof(

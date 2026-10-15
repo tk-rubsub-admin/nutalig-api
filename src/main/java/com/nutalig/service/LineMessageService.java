@@ -2,6 +2,8 @@ package com.nutalig.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nutalig.config.LineConfiguration;
 import com.nutalig.dto.line.ApprovalMessageData;
 import com.nutalig.dto.line.LinePushMessageRequest;
@@ -22,8 +24,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +66,27 @@ public class LineMessageService {
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
         log.info("Response from Line API: " + response.getBody());
+    }
+
+    public void sendNotificationCard(
+            String userId,
+            String altText,
+            String title,
+            String detail,
+            String detailUrl
+    ) throws Exception {
+        UserEntity userEntity = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found"));
+        if (StringUtils.isBlank(userEntity.getLineUserId()) && !isTestEnvironment()) {
+            throw new InvalidRequestException("User " + userId + " doesn't have line user id");
+        }
+
+        Map<String, String> placeholders = new HashMap<>();
+        placeholders.put("altText", altText);
+        placeholders.put("title", title);
+        placeholders.put("detail", detail);
+        placeholders.put("detailUrl", detailUrl);
+        sendFlexMessage(userEntity.getLineUserId(), renderNotificationTemplate(placeholders));
     }
 
     public void sendTestNotificationCard(String userId) throws Exception {
@@ -182,16 +205,49 @@ public class LineMessageService {
         }
     }
 
-    private JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
+    JsonNode renderNotificationTemplate(Map<String, String> placeholders) throws Exception {
         ClassPathResource resource = new ClassPathResource("line/notification.json");
         try (InputStream inputStream = resource.getInputStream()) {
-            String template = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-            String rendered = template;
-            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                rendered = rendered.replace("${" + entry.getKey() + "}", StringUtils.defaultString(entry.getValue()));
-            }
-            return objectMapper.readTree(rendered);
+            JsonNode template = objectMapper.readTree(inputStream);
+            replacePlaceholders(template, placeholders);
+            return template;
         }
+    }
+
+    private void replacePlaceholders(JsonNode node, Map<String, String> placeholders) {
+        if (node.isObject()) {
+            ObjectNode objectNode = (ObjectNode) node;
+            List<String> fieldNames = new ArrayList<>();
+            node.fieldNames().forEachRemaining(fieldNames::add);
+            for (String fieldName : fieldNames) {
+                JsonNode child = objectNode.get(fieldName);
+                if (child.isTextual()) {
+                    objectNode.put(fieldName, replacePlaceholderText(child.asText(), placeholders));
+                } else {
+                    replacePlaceholders(child, placeholders);
+                }
+            }
+        } else if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int index = 0; index < arrayNode.size(); index++) {
+                JsonNode child = arrayNode.get(index);
+                if (child.isTextual()) {
+                    arrayNode.set(index, objectMapper.getNodeFactory().textNode(
+                            replacePlaceholderText(child.asText(), placeholders)));
+                } else {
+                    replacePlaceholders(child, placeholders);
+                }
+            }
+        }
+    }
+
+    private String replacePlaceholderText(String text, Map<String, String> placeholders) {
+        String resolved = text;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            resolved = resolved.replace("${" + entry.getKey() + "}",
+                    StringUtils.defaultString(entry.getValue()));
+        }
+        return resolved;
     }
 
     private String buildTestNotificationDetailUrl() throws InvalidRequestException {

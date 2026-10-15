@@ -51,4 +51,5 @@ public class PurchaseOrderDto {
     private UserDto updatedBy;
     private List<PurchaseOrderAttachmentDto> attachments;
     private List<PurchaseOrderDetailDto> items;
+    private List<PurchaseOrderDeliveryDto> deliveries;
 }

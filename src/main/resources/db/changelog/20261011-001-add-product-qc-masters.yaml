@@ -1,0 +1,92 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261011-001-product-subtype-family-key
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: product_subtype1
+                indexName: uk_product_subtype1_code_family
+      changes:
+        - addUniqueConstraint:
+            tableName: product_subtype1
+            columnNames: code, product_family_code
+            constraintName: uk_product_subtype1_code_family
+
+  - changeSet:
+      id: 20261011-002-create-product-qc-masters
+      author: codex
+      changes:
+        - sqlFile:
+            path: sql/product_qc_tables.sql
+            splitStatements: true
+      modifySql:
+        - append:
+            dbms: mysql
+            value: " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"
+
+  - changeSet:
+      id: 20261011-003-product-qc-rule-scope
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE product_material_qc_rule
+              ADD subtype1_scope_code VARCHAR(50)
+              GENERATED ALWAYS AS (COALESCE(product_subtype1_code, ''))
+      modifySql:
+        - append:
+            dbms: mysql
+            value: " STORED"
+
+  - changeSet:
+      id: 20261011-004-product-qc-constraints
+      author: codex
+      changes:
+        - addUniqueConstraint:
+            tableName: product_material_qc_rule
+            columnNames: taxonomy_revision, product_family_code, product_material_code, subtype1_scope_code
+            constraintName: uk_product_qc_rule_scope
+        - addForeignKeyConstraint:
+            baseTableName: qc_document
+            baseColumnNames: current_revision_id, id, current_revision_status
+            referencedTableName: qc_document_revision
+            referencedColumnNames: id, qc_document_id, status
+            constraintName: fk_qc_document_current_revision
+        - createIndex:
+            tableName: product_material_qc_rule
+            indexName: idx_product_qc_rule_lookup
+            columns:
+              - column:
+                  name: taxonomy_revision
+              - column:
+                  name: product_family_code
+              - column:
+                  name: product_material_code
+              - column:
+                  name: status
+        - createIndex:
+            tableName: qc_document
+            indexName: idx_qc_document_route_active
+            columns:
+              - column:
+                  name: qc_route_code
+              - column:
+                  name: is_active
+
+  - changeSet:
+      id: 20261011-005-seed-product-qc-masters
+      author: codex
+      changes:
+        - sqlFile:
+            path: sql/product_qc_seed.sql
+            splitStatements: true
+
+  - changeSet:
+      id: 20261011-006-product-material-qc-view
+      author: codex
+      changes:
+        - sqlFile:
+            path: sql/product_material_qc_view.sql
+            splitStatements: true

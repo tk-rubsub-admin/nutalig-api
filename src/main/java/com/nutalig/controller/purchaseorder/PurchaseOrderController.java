@@ -4,6 +4,7 @@ import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
+import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderPaymentDecisionRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
@@ -77,6 +78,9 @@ public class PurchaseOrderController {
             @RequestBody(required = false) UpdatePurchaseOrderMilestoneRequest request,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
+        if (milestoneCode == com.nutalig.constant.PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED) {
+            throw new InvalidRequestException("Use the production-complete endpoint to provide delivery details.");
+        }
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateMilestone(
                 id,
                 milestoneCode,
@@ -106,9 +110,10 @@ public class PurchaseOrderController {
     @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
     public GeneralResponse<PurchaseOrderDto> productionComplete(
             @PathVariable("id") String id,
+            @RequestBody CompletePurchaseOrderProductionRequest request,
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
-        return new GeneralResponse<>(SUCCESS, purchaseOrderService.completeProduction(id, userId));
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.completeProduction(id, request, userId));
     }
 
     @PatchMapping("/{id}/production-expected-end-date")
@@ -198,6 +203,14 @@ public class PurchaseOrderController {
                 request != null ? request.getLateStartReason() : null,
                 request != null ? request.getStartRunOverrideReason() : null
         ));
+    }
+
+    @PostMapping("/{id}/notify-sales-production-started")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<String> notifySalesProductionStarted(@PathVariable("id") String id)
+            throws DataNotFoundException, InvalidRequestException {
+        purchaseOrderService.notifySalesProductionStarted(id);
+        return new GeneralResponse<>(SUCCESS, "ส่งการแจ้งเตือนการเริ่มผลิตแล้ว");
     }
 
     @GetMapping("/{id}/late-start-check")

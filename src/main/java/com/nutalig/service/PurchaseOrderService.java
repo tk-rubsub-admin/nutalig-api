@@ -4,6 +4,7 @@ import com.nutalig.constant.Currency;
 import com.nutalig.constant.*;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
@@ -81,6 +82,7 @@ public class PurchaseOrderService {
     private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
+    private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -320,6 +322,15 @@ public class PurchaseOrderService {
         PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         return mapToDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public void notifySalesProductionStarted(String purchaseOrderNo)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity entity = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Purchase order " + purchaseOrderNo + " not found."));
+        purchaseOrderMilestoneService.notifySalesProductionStarted(entity);
     }
 
     @Transactional(readOnly = true)
@@ -817,15 +828,207 @@ public class PurchaseOrderService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public PurchaseOrderDto completeProduction(String purchaseOrderNo, String userId)
+    public PurchaseOrderDto completeProduction(
+            String purchaseOrderNo,
+            CompletePurchaseOrderProductionRequest request,
+            String userId
+    )
             throws DataNotFoundException, InvalidRequestException {
-        return updateMilestone(
-                purchaseOrderNo,
-                PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
-                null,
-                null,
-                userId
+        if (request == null || request.getDelivery() == null) {
+            throw new InvalidRequestException("Purchase order delivery details are required.");
+        }
+        PurchaseOrderEntity entity = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(entity, userId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        boolean allQuantitiesDelivered = saveProductionCompletionDelivery(
+                entity, request.getDelivery(), request.getNote(), userId);
+        entity.setUpdatedBy(user);
+        entity.setUpdatedDate(now(DateUtil.getTimeZone()));
+        if (allQuantitiesDelivered) {
+            purchaseOrderMilestoneService.completeMilestone(
+                    entity,
+                    PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
+                    null,
+                    request.getNote(),
+                    userId
+            );
+        }
+        return mapToDto(entity);
+    }
+
+    private boolean saveProductionCompletionDelivery(
+            PurchaseOrderEntity purchaseOrder,
+            CompletePurchaseOrderProductionRequest.PurchaseOrderDelivery request,
+            String note,
+            String userId
+    ) throws InvalidRequestException {
+        if (request.getShippedDate() == null) {
+            throw new InvalidRequestException("Delivery shippedDate is required.");
+        }
+        if (request.getExpectedWarehouseDate() == null) {
+            throw new InvalidRequestException("Delivery expectedWarehouseDate is required.");
+        }
+        if (request.getExpectedWarehouseDate().isBefore(request.getShippedDate())) {
+            throw new InvalidRequestException("Expected warehouse date cannot be before shipped date.");
+        }
+        if (request.getReceivedDate() != null && request.getReceivedDate().isBefore(request.getShippedDate())) {
+            throw new InvalidRequestException("Received date cannot be before shipped date.");
+        }
+        SupplierShippingEntity supplierShipping = purchaseOrder.getSupplierShipping();
+        String expectedShippingMethod = StringUtils.defaultIfBlank(
+                purchaseOrder.getShippingMethodSnapshot(),
+                supplierShipping == null || supplierShipping.getShippingMethod() == null
+                        ? null : supplierShipping.getShippingMethod().name()
         );
+        if (StringUtils.isBlank(request.getShippingMethod())
+                || !StringUtils.equalsIgnoreCase(request.getShippingMethod().trim(), expectedShippingMethod)) {
+            throw new InvalidRequestException("Delivery shipping method must match the purchase order shipping method.");
+        }
+        SupplierShippingDestinationEntity location = supplierShipping == null
+                ? null
+                : supplierShipping.getDestinations().stream()
+                .filter(destination -> Objects.equals(destination.getId(), request.getShippingLocationId()))
+                .filter(destination -> Boolean.TRUE.equals(destination.getActive()))
+                .findFirst()
+                .orElse(null);
+        if (location == null) {
+            throw new InvalidRequestException("Delivery shipping location is not an active destination of this purchase order.");
+        }
+        if (request.getDetails() == null || request.getDetails().isEmpty()) {
+            throw new InvalidRequestException("At least one purchase order delivery detail is required.");
+        }
+
+        List<PurchaseOrderDeliveryEntity> previousDeliveries = purchaseOrderDeliveryRepository
+                .findAllByPurchaseOrder_PurchaseOrderNo(purchaseOrder.getPurchaseOrderNo());
+        Map<String, BigDecimal> alreadyDelivered = new HashMap<>();
+        previousDeliveries.stream()
+                .filter(delivery -> delivery.getStatus() != PurchaseOrderDeliveryStatus.CANCELLED)
+                .flatMap(delivery -> delivery.getDetails().stream())
+                .forEach(detail -> alreadyDelivered.merge(
+                        deliveryDetailKey(detail.getPurchaseOrderDetail().getId(),
+                                detail.getPurchaseOrderDetailComponent() == null ? null : detail.getPurchaseOrderDetailComponent().getId()),
+                        Optional.ofNullable(detail.getQuantity()).orElse(BigDecimal.ZERO),
+                        BigDecimal::add
+                ));
+
+        PurchaseOrderDeliveryEntity delivery = new PurchaseOrderDeliveryEntity();
+        delivery.setPurchaseOrder(purchaseOrder);
+        delivery.setDeliveryNo(String.format(Locale.ROOT, "%s-D%03d", purchaseOrder.getPurchaseOrderNo(),
+                purchaseOrderDeliveryRepository.countByPurchaseOrder_PurchaseOrderNo(purchaseOrder.getPurchaseOrderNo()) + 1));
+        delivery.setShippedAt(request.getShippedDate().atStartOfDay(DateUtil.getTimeZone()));
+        delivery.setExpectedWarehouseDate(request.getExpectedWarehouseDate());
+        delivery.setReceivedAt(request.getReceivedDate() == null ? null
+                : request.getReceivedDate().atStartOfDay(DateUtil.getTimeZone()));
+        delivery.setShippingMethod(request.getShippingMethod().trim());
+        delivery.setShippingLocation(location);
+        delivery.setShippingLocationNameSnapshot(StringUtils.defaultIfBlank(
+                location.getDestinationName(), location.getFullAddress()));
+        delivery.setStatus(request.getReceivedDate() == null
+                ? PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER
+                : PurchaseOrderDeliveryStatus.RECEIVED_AT_WAREHOUSE);
+        delivery.setRemark(StringUtils.trimToNull(note));
+        delivery.setCreatedBy(userId);
+        delivery.setUpdatedBy(userId);
+
+        Map<String, BigDecimal> requestTotals = new HashMap<>();
+        for (CompletePurchaseOrderProductionRequest.Detail detailRequest : request.getDetails()) {
+            if (detailRequest.getPurchaseOrderDetailId() == null || detailRequest.getQuantity() == null
+                    || detailRequest.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidRequestException("Delivery detail requires a purchase order item and quantity greater than zero.");
+            }
+            PurchaseOrderDetailEntity orderItem = purchaseOrder.getItems().stream()
+                    .filter(item -> Objects.equals(item.getId(), detailRequest.getPurchaseOrderDetailId()))
+                    .findFirst()
+                    .orElseThrow(() -> new InvalidRequestException("Delivery detail item does not belong to this purchase order."));
+            PurchaseOrderDetailComponentEntity component = null;
+            BigDecimal orderedQuantity = orderItem.getQuantity();
+            if (detailRequest.getPurchaseOrderDetailComponentId() != null) {
+                component = orderItem.getComponents().stream()
+                        .filter(value -> Objects.equals(value.getId(), detailRequest.getPurchaseOrderDetailComponentId()))
+                        .findFirst()
+                        .orElseThrow(() -> new InvalidRequestException("Delivery component does not belong to the selected purchase order item."));
+                orderedQuantity = Optional.ofNullable(orderItem.getQuantity()).orElse(BigDecimal.ZERO)
+                        .multiply(Optional.ofNullable(component.getQuantityPerItem()).orElse(BigDecimal.ZERO));
+            }
+            String key = deliveryDetailKey(orderItem.getId(), component == null ? null : component.getId());
+            BigDecimal requestedTotal = requestTotals.merge(key, detailRequest.getQuantity(), BigDecimal::add);
+            BigDecimal priorQuantity = alreadyDelivered.getOrDefault(key, BigDecimal.ZERO);
+            if (orderedQuantity != null && priorQuantity.add(requestedTotal).compareTo(orderedQuantity) > 0) {
+                throw new InvalidRequestException("Delivery quantity exceeds the remaining purchase order quantity for "
+                        + (component == null ? orderItem.getName() : component.getComponentName()) + ".");
+            }
+            validateNonNegative(detailRequest.getCartonCount(), "cartonCount");
+            validateNonNegative(detailRequest.getPiecesPerCarton(), "piecesPerCarton");
+            validateNonNegative(detailRequest.getNetWeightKg(), "netWeightKg");
+            validateNonNegative(detailRequest.getGrossWeightKg(), "grossWeightKg");
+            validateNonNegative(detailRequest.getLengthCm(), "lengthCm");
+            validateNonNegative(detailRequest.getWidthCm(), "widthCm");
+            validateNonNegative(detailRequest.getHeightCm(), "heightCm");
+            validateNonNegative(detailRequest.getCbmM3(), "cbmM3");
+
+            PurchaseOrderDeliveryDetailEntity detail = new PurchaseOrderDeliveryDetailEntity();
+            detail.setPurchaseOrderDetail(orderItem);
+            detail.setPurchaseOrderDetailComponent(component);
+            detail.setProductNameSnapshot(orderItem.getName());
+            detail.setComponentNameSnapshot(component == null ? null : component.getComponentName());
+            detail.setQuantity(detailRequest.getQuantity());
+            detail.setCartonCount(detailRequest.getCartonCount());
+            detail.setPiecesPerCarton(detailRequest.getPiecesPerCarton());
+            detail.setNetWeightKg(detailRequest.getNetWeightKg());
+            detail.setGrossWeightKg(detailRequest.getGrossWeightKg());
+            detail.setLengthCm(detailRequest.getLengthCm());
+            detail.setWidthCm(detailRequest.getWidthCm());
+            detail.setHeightCm(detailRequest.getHeightCm());
+            detail.setCbmM3(detailRequest.getCbmM3());
+            detail.setSortOrder(detailRequest.getSortOrder());
+            delivery.addDetail(detail);
+        }
+        purchaseOrderDeliveryRepository.save(delivery);
+        return hasNoRemainingDeliveryQuantity(purchaseOrder, alreadyDelivered, requestTotals);
+    }
+
+    private boolean hasNoRemainingDeliveryQuantity(
+            PurchaseOrderEntity purchaseOrder,
+            Map<String, BigDecimal> alreadyDelivered,
+            Map<String, BigDecimal> requestTotals
+    ) {
+        for (PurchaseOrderDetailEntity item : purchaseOrder.getItems()) {
+            if (item.getComponents() == null || item.getComponents().isEmpty()) {
+                if (hasRemainingDeliveryQuantity(item.getId(), null, item.getQuantity(), alreadyDelivered, requestTotals)) {
+                    return false;
+                }
+                continue;
+            }
+            for (PurchaseOrderDetailComponentEntity component : item.getComponents()) {
+                BigDecimal orderedQuantity = Optional.ofNullable(item.getQuantity()).orElse(BigDecimal.ZERO)
+                        .multiply(Optional.ofNullable(component.getQuantityPerItem()).orElse(BigDecimal.ZERO));
+                if (hasRemainingDeliveryQuantity(item.getId(), component.getId(), orderedQuantity,
+                        alreadyDelivered, requestTotals)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean hasRemainingDeliveryQuantity(
+            Long purchaseOrderDetailId,
+            Long componentId,
+            BigDecimal orderedQuantity,
+            Map<String, BigDecimal> alreadyDelivered,
+            Map<String, BigDecimal> requestTotals
+    ) {
+        if (orderedQuantity == null || orderedQuantity.signum() <= 0) return false;
+        String key = deliveryDetailKey(purchaseOrderDetailId, componentId);
+        BigDecimal deliveredQuantity = alreadyDelivered.getOrDefault(key, BigDecimal.ZERO)
+                .add(requestTotals.getOrDefault(key, BigDecimal.ZERO));
+        return deliveredQuantity.compareTo(orderedQuantity) < 0;
+    }
+
+    private String deliveryDetailKey(Long purchaseOrderDetailId, Long componentId) {
+        return purchaseOrderDetailId + ":" + (componentId == null ? "PRODUCT" : componentId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -1619,6 +1822,24 @@ public class PurchaseOrderService {
             items.add(item);
         }
         dto.setItems(items);
+        dto.setDeliveries(purchaseOrderDeliveryRepository.findAllByPurchaseOrder_PurchaseOrderNo(entity.getPurchaseOrderNo())
+                .stream()
+                .map(delivery -> {
+                    PurchaseOrderDeliveryDto deliveryDto = new PurchaseOrderDeliveryDto();
+                    deliveryDto.setId(delivery.getId());
+                    deliveryDto.setDeliveryNo(delivery.getDeliveryNo());
+                    deliveryDto.setStatus(delivery.getStatus());
+                    deliveryDto.setDetails(delivery.getDetails().stream().map(detail -> {
+                        PurchaseOrderDeliveryDetailDto detailDto = new PurchaseOrderDeliveryDetailDto();
+                        detailDto.setPurchaseOrderDetailId(detail.getPurchaseOrderDetail().getId());
+                        detailDto.setPurchaseOrderDetailComponentId(detail.getPurchaseOrderDetailComponent() == null
+                                ? null : detail.getPurchaseOrderDetailComponent().getId());
+                        detailDto.setQuantity(detail.getQuantity());
+                        return detailDto;
+                    }).toList());
+                    return deliveryDto;
+                })
+                .toList());
         return dto;
     }
 

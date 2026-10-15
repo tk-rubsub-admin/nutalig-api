@@ -1,13 +1,18 @@
 package com.nutalig.service;
 
 import com.nutalig.constant.*;
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.PurchaseOrderMilestoneEntity;
 import com.nutalig.entity.PurchaseOrderProofEntity;
+import com.nutalig.entity.EmployeeEntity;
+import com.nutalig.entity.SalesOrderEntity;
+import com.nutalig.entity.UserEntity;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.PurchaseOrderMilestoneRepository;
 import com.nutalig.repository.PurchaseOrderProofRepository;
 import com.nutalig.repository.PurchaseOrderRepository;
+import com.nutalig.repository.UserRepository;
 import com.nutalig.utils.DateUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +41,9 @@ class PurchaseOrderMilestoneServiceTest {
     @Mock PurchaseOrderRepository purchaseOrderRepository;
     @Mock PurchaseOrderProofRepository proofRepository;
     @Mock ActivityHistoryService activityHistoryService;
+    @Mock UserRepository userRepository;
+    @Mock LineMessageService lineMessageService;
+    @Mock LineConfiguration lineConfiguration;
     @InjectMocks PurchaseOrderMilestoneService service;
 
     private PurchaseOrderEntity po;
@@ -241,5 +249,48 @@ class PurchaseOrderMilestoneServiceTest {
         assertNotNull(po.getProductionStartedDate());
         assertEquals(expected, po.getProductionExpectedEndDate());
         assertEquals("เริ่มผลิตด้วยตนเอง", milestones.get(PurchaseOrderMilestoneCode.PRODUCTION_STARTED).getNote());
+    }
+
+    @Test
+    void notifiesAssignedSalesWhenProductionStarts() throws Exception {
+        EmployeeEntity sales = new EmployeeEntity();
+        sales.setEmployeeId("EMP-1");
+        SalesOrderEntity salesOrder = new SalesOrderEntity();
+        salesOrder.setSalesOrderNo("SO-1");
+        salesOrder.setSales(sales);
+        salesOrder.setCustomerNameSnapshot("ลูกค้าทดสอบ");
+        po.setSalesOrder(salesOrder);
+        when(lineConfiguration.getLoginSuccessUrl()).thenReturn("http://localhost:3000/login-success");
+        UserEntity salesUser = new UserEntity();
+        salesUser.setId("USER-SALES-1");
+        salesUser.setStatus(Status.ACTIVE);
+        salesUser.setLineUserId("LINE-SALES-1");
+        when(userRepository.findByEmployeeEntity_EmployeeId("EMP-1"))
+                .thenReturn(Optional.of(salesUser));
+        milestone(PurchaseOrderMilestoneCode.DIGITAL_PROOF, PurchaseOrderMilestoneStatus.COMPLETED);
+        milestone(PurchaseOrderMilestoneCode.ON_PRESS_COLOR_CHECK, PurchaseOrderMilestoneStatus.COMPLETED);
+
+        LocalDate expectedEnd = LocalDate.now(DateUtil.getTimeZone()).plusDays(20);
+        service.completeMilestone(po, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
+                expectedEnd, "เริ่มผลิตด้วยตนเอง", "USER-1");
+
+        verify(lineMessageService).sendNotificationCard(
+                eq("USER-SALES-1"),
+                eq("PO PO-AUTO-PRODUCTION เริ่มผลิตแล้ว"),
+                eq("เริ่มผลิตแล้ว"),
+                argThat(detail -> detail.contains("PO: PO-AUTO-PRODUCTION")
+                        && detail.contains("SO: SO-1")
+                        && detail.contains("ลูกค้าทดสอบ")
+                        && detail.matches("(?s).*วันที่เริ่มผลิต: \\d{2}/\\d{2}/\\d{4}.*")
+                        && detail.matches("(?s).*วันที่คาดว่าจะผลิตเสร็จ: \\d{2}/\\d{2}/\\d{4}.*")),
+                eq("http://localhost:3000/sales-order/SO-1")
+        );
+    }
+
+    @Test
+    void rejectsNotificationWhenProductionHasNotStarted() {
+        assertThrows(InvalidRequestException.class,
+                () -> service.notifySalesProductionStarted(po));
+        verifyNoInteractions(lineMessageService);
     }
 }

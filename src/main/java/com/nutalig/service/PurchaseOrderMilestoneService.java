@@ -1,29 +1,41 @@
 package com.nutalig.service;
 
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.constant.*;
 import com.nutalig.dto.PurchaseOrderTimelineDto;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.PurchaseOrderMilestoneEntity;
 import com.nutalig.entity.PurchaseOrderProofEntity;
+import com.nutalig.entity.SalesOrderEntity;
+import com.nutalig.entity.UserEntity;
+import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.repository.PurchaseOrderMilestoneRepository;
 import com.nutalig.repository.PurchaseOrderProofRepository;
 import com.nutalig.repository.PurchaseOrderRepository;
+import com.nutalig.repository.UserRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PurchaseOrderMilestoneService {
+
+    private static final DateTimeFormatter NOTIFICATION_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private static final Set<PurchaseOrderMilestoneCode> PROOF_CODES = Set.of(
             PurchaseOrderMilestoneCode.DIGITAL_PROOF,
@@ -33,11 +45,23 @@ public class PurchaseOrderMilestoneService {
             PurchaseOrderMilestoneStatus.COMPLETED,
             PurchaseOrderMilestoneStatus.SKIPPED
     );
+    private static final List<PurchaseOrderMilestoneCode> PRODUCTION_TIMELINE_CODES = List.of(
+            PurchaseOrderMilestoneCode.PO_CREATED,
+            PurchaseOrderMilestoneCode.JOB_STARTED,
+            PurchaseOrderMilestoneCode.DIGITAL_PROOF,
+            PurchaseOrderMilestoneCode.ON_PRESS_COLOR_CHECK,
+            PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
+            PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS,
+            PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED
+    );
 
     private final PurchaseOrderMilestoneRepository milestoneRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderProofRepository proofRepository;
     private final ActivityHistoryService activityHistoryService;
+    private final UserRepository userRepository;
+    private final LineMessageService lineMessageService;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional
     public void initializeMilestones(PurchaseOrderEntity purchaseOrder, String userId) {
@@ -190,6 +214,9 @@ public class PurchaseOrderMilestoneService {
                 purchaseOrder.setProductionCompletedDate(actualDate);
                 mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
                         PurchaseOrderMilestoneStatus.COMPLETED, null, actualAt, note, userId);
+                mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS,
+                        PurchaseOrderMilestoneStatus.COMPLETED,
+                        purchaseOrder.getProductionExpectedEndDate(), actualAt, null, userId);
             }
             case ARRIVED_AT_CARRIER -> {
                 requireCompleted(milestones, PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
@@ -250,7 +277,7 @@ public class PurchaseOrderMilestoneService {
         LocalDate expectedEnd = Optional.ofNullable(purchaseOrder.getProductionExpectedEndDate())
                 .orElseGet(() -> actualAt.toLocalDate().plusDays(Math.max(0,
                         Optional.ofNullable(purchaseOrder.getProductionLeadTimeDay()).orElse(0))));
-        String note = "เริ่มผลิตอัตโนมัติเมื่อพรูฟดิจิตอลปริ้นท์และพรูฟสีหน้าเครื่องอนุมัติหรือข้ามครบแล้ว";
+        String note = "เริ่มผลิตอัตโนมัติ";
         startProduction(purchaseOrder, expectedEnd, actualAt, note, userId);
         purchaseOrder.setUpdatedDate(actualAt);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
@@ -268,8 +295,106 @@ public class PurchaseOrderMilestoneService {
         purchaseOrder.setProductionExpectedEndDate(expectedEnd);
         mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,
                 PurchaseOrderMilestoneStatus.COMPLETED, null, actualAt, note, userId);
-        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END,
-                PurchaseOrderMilestoneStatus.COMPLETED, expectedEnd, actualAt, null, userId);
+        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS,
+                PurchaseOrderMilestoneStatus.IN_PROGRESS, expectedEnd, actualAt, null, userId);
+        notifySalesProductionStartedSafely(purchaseOrder);
+    }
+
+    @Transactional(readOnly = true)
+    public void notifySalesProductionStarted(PurchaseOrderEntity purchaseOrder)
+            throws InvalidRequestException, DataNotFoundException {
+        validateProductionStartedForNotification(purchaseOrder);
+        UserEntity salesUser = resolveSalesUser(purchaseOrder);
+        try {
+            sendSalesProductionStartedCard(purchaseOrder, salesUser);
+        } catch (Exception exception) {
+            log.warn("Cannot send production-start notification to sales user {} for PO {}.",
+                    salesUser.getId(), purchaseOrder.getPurchaseOrderNo(), exception);
+            throw new InvalidRequestException("Unable to send production-start notification.");
+        }
+    }
+
+    private void notifySalesProductionStartedSafely(PurchaseOrderEntity purchaseOrder) {
+        try {
+            UserEntity salesUser = resolveSalesUser(purchaseOrder);
+            sendSalesProductionStartedCard(purchaseOrder, salesUser);
+        } catch (Exception exception) {
+            log.warn("Cannot notify sales about production start for PO {}.",
+                    purchaseOrder.getPurchaseOrderNo(), exception);
+        }
+    }
+
+    private void validateProductionStartedForNotification(PurchaseOrderEntity purchaseOrder)
+            throws InvalidRequestException {
+        if (purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING
+                || purchaseOrder.getProductionStartedDate() == null) {
+            throw new InvalidRequestException("Purchase order production has not started.");
+        }
+        PurchaseOrderMilestoneEntity productionStarted = milestoneMap(purchaseOrder)
+                .get(PurchaseOrderMilestoneCode.PRODUCTION_STARTED);
+        if (productionStarted == null
+                || productionStarted.getStatus() != PurchaseOrderMilestoneStatus.COMPLETED) {
+            throw new InvalidRequestException("Production-started milestone is not completed.");
+        }
+    }
+
+    private UserEntity resolveSalesUser(PurchaseOrderEntity purchaseOrder)
+            throws InvalidRequestException, DataNotFoundException {
+        SalesOrderEntity salesOrder = purchaseOrder.getSalesOrder();
+        String employeeId = salesOrder != null && salesOrder.getSales() != null
+                ? salesOrder.getSales().getEmployeeId() : null;
+        if (StringUtils.isBlank(employeeId)) {
+            throw new InvalidRequestException("Purchase order has no assigned sales employee.");
+        }
+
+        UserEntity salesUser = userRepository.findByEmployeeEntity_EmployeeId(employeeId).orElse(null);
+        if (salesUser == null) {
+            throw new DataNotFoundException("User for sales employee " + employeeId + " not found.");
+        }
+        if (salesUser.getStatus() != Status.ACTIVE) {
+            throw new InvalidRequestException("Assigned sales user is inactive.");
+        }
+        if (StringUtils.isBlank(salesUser.getLineUserId())
+                && !StringUtils.equalsIgnoreCase("test", lineConfiguration.getLineMessageEnv())) {
+            throw new InvalidRequestException("Assigned sales user is not connected to LINE.");
+        }
+        return salesUser;
+    }
+
+    private void sendSalesProductionStartedCard(PurchaseOrderEntity purchaseOrder, UserEntity salesUser)
+            throws Exception {
+        SalesOrderEntity salesOrder = purchaseOrder.getSalesOrder();
+        String customerName = StringUtils.defaultIfBlank(
+                salesOrder.getCustomerNameSnapshot(),
+                salesOrder.getCustomer() != null ? salesOrder.getCustomer().getCustomerName() : "-");
+        String detail = "เลขที่ SO: " + salesOrder.getSalesOrderNo()
+                + "\nลูกค้า: " + StringUtils.defaultIfBlank(customerName, "-")
+                + "\nวันที่เริ่มผลิต: " + formatNotificationDate(purchaseOrder.getProductionStartedDate())
+                + "\nวันที่คาดว่าจะผลิตเสร็จ: " + formatNotificationDate(purchaseOrder.getProductionExpectedEndDate());
+        lineMessageService.sendNotificationCard(
+                salesUser.getId(),
+                "PO " + purchaseOrder.getPurchaseOrderNo() + " เริ่มผลิตแล้ว",
+                "เริ่มผลิตแล้ว",
+                detail,
+                buildSalesOrderDetailUrl(salesOrder.getSalesOrderNo())
+        );
+    }
+
+    private String formatNotificationDate(LocalDate date) {
+        return date != null ? date.format(NOTIFICATION_DATE_FORMAT) : "-";
+    }
+
+    private String buildSalesOrderDetailUrl(String salesOrderNo) {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new IllegalStateException("LINE frontend redirect URL is not configured");
+        }
+        URI uri = URI.create(loginSuccessUrl);
+        String frontendBaseUrl = uri.getScheme() + "://" + uri.getAuthority();
+        return UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                .pathSegment("sales-order", StringUtils.defaultString(salesOrderNo))
+                .build()
+                .toUriString();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -309,12 +434,14 @@ public class PurchaseOrderMilestoneService {
         }
 
         purchaseOrder.setProductionExpectedEndDate(expectedEndDate);
-        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END,
-                PurchaseOrderMilestoneStatus.COMPLETED, expectedEndDate, now(), null, userId);
+        mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS,
+                purchaseOrder.getProductionStartedDate() == null
+                        ? PurchaseOrderMilestoneStatus.PENDING : PurchaseOrderMilestoneStatus.IN_PROGRESS,
+                expectedEndDate, now(), null, userId);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
 
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("milestoneCode", PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END.name());
+        detail.put("milestoneCode", PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS.name());
         detail.put("previousProductionExpectedEndDate", previousExpectedEndDate);
         detail.put("productionExpectedEndDate", expectedEndDate);
         activityHistoryService.record(
@@ -354,7 +481,7 @@ public class PurchaseOrderMilestoneService {
         }
 
         List<PurchaseOrderTimelineDto.Event> events = new ArrayList<>();
-        for (PurchaseOrderMilestoneCode code : PurchaseOrderMilestoneCode.values()) {
+        for (PurchaseOrderMilestoneCode code : PRODUCTION_TIMELINE_CODES) {
             PurchaseOrderMilestoneEntity milestone = milestones.get(code);
             PurchaseOrderMilestoneStatus status = statuses.get(code);
             PurchaseOrderTimelineDto.Event event = new PurchaseOrderTimelineDto.Event();
@@ -365,13 +492,13 @@ public class PurchaseOrderMilestoneService {
             event.setOptional(PROOF_CODES.contains(code));
             event.setPlannedDate(milestone != null ? milestone.getPlannedDate() : fallbackPlannedDate(purchaseOrder, code));
             event.setActualAt(milestone != null ? milestone.getActualAt() : fallbackActualAt(purchaseOrder, code));
-            event.setDate(code == PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END
+            event.setDate(code == PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS
                     ? event.getPlannedDate()
                     : event.getActualAt() != null
                     ? event.getActualAt().withZoneSameInstant(DateUtil.getTimeZone()).toLocalDate()
                     : event.getPlannedDate());
             event.setNote(milestone != null ? milestone.getNote() : null);
-            event.setOverdue(code == PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END
+            event.setOverdue(code == PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS
                     && event.getPlannedDate() != null
                     && statuses.get(PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED)
                     != PurchaseOrderMilestoneStatus.COMPLETED
@@ -450,14 +577,14 @@ public class PurchaseOrderMilestoneService {
             PurchaseOrderMilestoneCode code,
             PurchaseOrderMilestoneEntity milestone
     ) {
+        if (code == PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS) {
+            if (purchaseOrder.getProductionCompletedDate() != null) return PurchaseOrderMilestoneStatus.COMPLETED;
+            if (purchaseOrder.getProductionStartedDate() != null) return PurchaseOrderMilestoneStatus.IN_PROGRESS;
+        }
         if (milestone != null) return milestone.getStatus();
         if (code == PurchaseOrderMilestoneCode.PO_CREATED) return PurchaseOrderMilestoneStatus.COMPLETED;
         if ((code == PurchaseOrderMilestoneCode.JOB_STARTED || code == PurchaseOrderMilestoneCode.PRODUCTION_STARTED)
                 && purchaseOrder.getProductionStartedDate() != null) return PurchaseOrderMilestoneStatus.COMPLETED;
-        if (code == PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END
-                && purchaseOrder.getProductionExpectedEndDate() != null) {
-            return PurchaseOrderMilestoneStatus.COMPLETED;
-        }
         if (code == PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED
                 && purchaseOrder.getProductionCompletedDate() != null) return PurchaseOrderMilestoneStatus.COMPLETED;
         return purchaseOrder.getStatus() == PurchaseOrderStatus.CANCELLED
@@ -467,7 +594,7 @@ public class PurchaseOrderMilestoneService {
     private ZonedDateTime fallbackActualAt(PurchaseOrderEntity purchaseOrder, PurchaseOrderMilestoneCode code) {
         LocalDate date = switch (code) {
             case PO_CREATED -> purchaseOrder.getDocDate();
-            case JOB_STARTED, PRODUCTION_STARTED -> purchaseOrder.getProductionStartedDate();
+            case JOB_STARTED, PRODUCTION_STARTED, PRODUCTION_IN_PROGRESS -> purchaseOrder.getProductionStartedDate();
             case PRODUCTION_COMPLETED -> purchaseOrder.getProductionCompletedDate();
             default -> null;
         };
@@ -475,7 +602,7 @@ public class PurchaseOrderMilestoneService {
     }
 
     private LocalDate fallbackPlannedDate(PurchaseOrderEntity purchaseOrder, PurchaseOrderMilestoneCode code) {
-        return code == PurchaseOrderMilestoneCode.PRODUCTION_EXPECTED_END
+        return code == PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS
                 ? purchaseOrder.getProductionExpectedEndDate() : null;
     }
 
@@ -564,6 +691,7 @@ public class PurchaseOrderMilestoneService {
             case DIGITAL_PROOF -> "พรูฟดิจิตอลปริ้นท์";
             case ON_PRESS_COLOR_CHECK -> "พรูฟสีหน้าเครื่อง";
             case PRODUCTION_STARTED -> "เริ่มผลิต";
+            case PRODUCTION_IN_PROGRESS -> "กำลังผลิต";
             case PRODUCTION_EXPECTED_END -> "กำหนดผลิตเสร็จ";
             case PRODUCTION_COMPLETED -> "ผลิตเสร็จ";
             case ARRIVED_AT_CARRIER -> "สินค้าถึงขนส่ง";
