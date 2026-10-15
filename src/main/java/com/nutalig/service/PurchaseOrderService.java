@@ -1828,13 +1828,38 @@ public class PurchaseOrderService {
                     PurchaseOrderDeliveryDto deliveryDto = new PurchaseOrderDeliveryDto();
                     deliveryDto.setId(delivery.getId());
                     deliveryDto.setDeliveryNo(delivery.getDeliveryNo());
+                    deliveryDto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
+                    deliveryDto.setShippedAt(delivery.getShippedAt());
+                    deliveryDto.setExpectedWarehouseDate(delivery.getExpectedWarehouseDate());
+                    deliveryDto.setReceivedAt(delivery.getReceivedAt());
+                    deliveryDto.setShippingMethod(delivery.getShippingMethod());
+                    deliveryDto.setShippingLocationId(delivery.getShippingLocation() == null
+                            ? null : delivery.getShippingLocation().getId());
+                    deliveryDto.setShippingLocationName(delivery.getShippingLocationNameSnapshot());
                     deliveryDto.setStatus(delivery.getStatus());
+                    deliveryDto.setRemark(delivery.getRemark());
+                    deliveryDto.setCreatedBy(delivery.getCreatedBy());
+                    deliveryDto.setUpdatedBy(delivery.getUpdatedBy());
+                    deliveryDto.setCreatedDate(delivery.getCreatedDate());
+                    deliveryDto.setUpdatedDate(delivery.getUpdatedDate());
                     deliveryDto.setDetails(delivery.getDetails().stream().map(detail -> {
                         PurchaseOrderDeliveryDetailDto detailDto = new PurchaseOrderDeliveryDetailDto();
+                        detailDto.setId(detail.getId());
                         detailDto.setPurchaseOrderDetailId(detail.getPurchaseOrderDetail().getId());
                         detailDto.setPurchaseOrderDetailComponentId(detail.getPurchaseOrderDetailComponent() == null
                                 ? null : detail.getPurchaseOrderDetailComponent().getId());
+                        detailDto.setProductName(detail.getProductNameSnapshot());
+                        detailDto.setComponentName(detail.getComponentNameSnapshot());
                         detailDto.setQuantity(detail.getQuantity());
+                        detailDto.setCartonCount(detail.getCartonCount());
+                        detailDto.setPiecesPerCarton(detail.getPiecesPerCarton());
+                        detailDto.setNetWeightKg(detail.getNetWeightKg());
+                        detailDto.setGrossWeightKg(detail.getGrossWeightKg());
+                        detailDto.setLengthCm(detail.getLengthCm());
+                        detailDto.setWidthCm(detail.getWidthCm());
+                        detailDto.setHeightCm(detail.getHeightCm());
+                        detailDto.setCbmM3(detail.getCbmM3());
+                        detailDto.setSortOrder(detail.getSortOrder());
                         return detailDto;
                     }).toList());
                     return deliveryDto;

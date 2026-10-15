@@ -250,6 +250,58 @@ public class InvoiceService {
         if (request.getCustomerSnapshot() != null) {
             applyCustomerSnapshot(invoice, null, request.getCustomerSnapshot());
         }
+        if (request.getRemark() != null) {
+            invoice.setRemark(StringUtils.trimToNull(request.getRemark()));
+        }
+        if (request.getItems() != null) {
+            Map<Long, UpdateInvoiceRequest.Item> requestedItems = new HashMap<>();
+            for (UpdateInvoiceRequest.Item itemRequest : request.getItems()) {
+                if (itemRequest == null || itemRequest.getId() == null
+                        || itemRequest.getUnitPrice() == null || itemRequest.getQuantity() == null) {
+                    throw new InvalidRequestException("Each invoice item requires id, unitPrice and quantity.");
+                }
+                if (itemRequest.getUnitPrice().signum() < 0 || itemRequest.getQuantity().signum() <= 0) {
+                    throw new InvalidRequestException("Invoice item unitPrice must be non-negative and quantity must be greater than zero.");
+                }
+                if (requestedItems.put(itemRequest.getId(), itemRequest) != null) {
+                    throw new InvalidRequestException("Duplicate invoice item id " + itemRequest.getId());
+                }
+            }
+
+            BigDecimal subTotal = BigDecimal.ZERO;
+            for (InvoiceDetailEntity item : invoice.getItems()) {
+                UpdateInvoiceRequest.Item itemRequest = requestedItems.remove(item.getId());
+                if (itemRequest != null) {
+                    item.setUnitPrice(itemRequest.getUnitPrice());
+                    item.setQuantity(itemRequest.getQuantity());
+                }
+                BigDecimal lineAmount = defaultIfNull(item.getUnitPrice())
+                        .multiply(defaultIfNull(item.getQuantity()))
+                        .setScale(2, RoundingMode.HALF_UP);
+                item.setAmount(lineAmount);
+                subTotal = subTotal.add(lineAmount);
+            }
+            if (!requestedItems.isEmpty()) {
+                throw new InvalidRequestException("One or more invoice item ids do not belong to this invoice.");
+            }
+
+            subTotal = subTotal.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal discount = defaultIfNull(invoice.getDiscount());
+            BigDecimal taxableAmount = subTotal.subtract(discount).max(BigDecimal.ZERO);
+            BigDecimal vat = taxableAmount.multiply(defaultIfNull(invoice.getVatRate()))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal freight = defaultIfNull(invoice.getFreight());
+            BigDecimal grandTotal = taxableAmount.add(vat).add(freight).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal paidTotal = defaultIfNull(invoice.getPaidTotal());
+            if (paidTotal.compareTo(grandTotal) > 0) {
+                throw new InvalidRequestException("Invoice total cannot be less than the amount already paid.");
+            }
+            invoice.setSubTotal(subTotal);
+            invoice.setAmount(subTotal.subtract(freight).setScale(2, RoundingMode.HALF_UP));
+            invoice.setVat(vat);
+            invoice.setGrandTotal(grandTotal);
+            invoice.setOutstandingTotal(grandTotal.subtract(paidTotal).setScale(2, RoundingMode.HALF_UP));
+        }
         invoice.setRevNo(defaultRevNo(invoice.getRevNo()) + 1);
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
