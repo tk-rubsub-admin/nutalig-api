@@ -5,6 +5,7 @@ import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryTransitRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderPaymentDecisionRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
@@ -114,6 +115,18 @@ public class PurchaseOrderController {
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.completeProduction(id, request, userId));
+    }
+
+    @PatchMapping("/{id}/deliveries/{deliveryId}/in-transit")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> markDeliveryInTransit(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId,
+            @RequestBody UpdatePurchaseOrderDeliveryTransitRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.markDeliveryInTransit(
+                id, deliveryId, request, userId));
     }
 
     @PatchMapping("/{id}/production-expected-end-date")

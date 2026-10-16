@@ -85,6 +85,8 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
+    private final CustomerAnnualSalesService customerAnnualSalesService;
+    private final SalesPerformanceService salesPerformanceService;
     private final ApprovalService approvalService;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final SystemConfigRepository systemConfigRepository;
@@ -123,6 +125,8 @@ public class InvoiceService {
         entity.setDocDate(docDate);
         entity.setDueDate(dueDate);
         entity.setDeliveryDate(request.getDeliveryDate());
+        entity.setInstallmentNo(resolveInstallmentNo(salesOrder, request));
+        entity.setInstallmentCount(resolveInstallmentCount(salesOrder, request));
         entity.setCurrency(salesOrder.getCurrency());
         entity.setCustomer(salesOrder.getCustomer());
         entity.setCustomerAddress(salesOrder.getCustomerAddress());
@@ -307,6 +311,8 @@ public class InvoiceService {
         invoice.setUpdatedDate(now);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
         if (shouldCreateRequiredApproveRequest) {
             try {
                 approvalService.createInvoicePaymentTermApprovalRequest(saved, userId);
@@ -394,6 +400,8 @@ public class InvoiceService {
         markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, PUBLIC_TOKEN_ACTOR);
         InvoiceEntity saved = invoiceRepository.save(invoice);
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
         recordAwaitingValidationDecisionActivity(
                 saved,
                 payment,
@@ -440,6 +448,8 @@ public class InvoiceService {
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
         recordAwaitingValidationDecisionActivity(
                 saved,
                 payment,
@@ -706,6 +716,40 @@ public class InvoiceService {
         if (StringUtils.isBlank(request.getSalesOrderNo())) {
             throw new InvalidRequestException("salesOrderNo is required");
         }
+    }
+
+    private Integer resolveInstallmentNo(SalesOrderEntity salesOrder, CreateInvoiceRequest request)
+            throws InvalidRequestException {
+        Integer installmentNo = request.getInstallmentNo();
+        if (installmentNo == null) {
+            long previousInvoices = invoiceRepository
+                    .findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrder.getSalesOrderNo()).stream()
+                    .filter(invoice -> invoice.getStatus() == InvoiceStatus.ISSUED
+                            || invoice.getStatus() == InvoiceStatus.AWAITING_VALIDATION
+                            || invoice.getStatus() == InvoiceStatus.PARTIALLY_PAID
+                            || invoice.getStatus() == InvoiceStatus.PAID)
+                    .count();
+            installmentNo = Math.toIntExact(previousInvoices + 1);
+        }
+        if (installmentNo < 1) throw new InvalidRequestException("installmentNo must be greater than zero.");
+        return installmentNo;
+    }
+
+    private Integer resolveInstallmentCount(SalesOrderEntity salesOrder, CreateInvoiceRequest request)
+            throws InvalidRequestException {
+        Integer count = request.getInstallmentCount();
+        if (count == null) {
+            String term = StringUtils.defaultIfBlank(request.getCustomerPaymentTerm(),
+                    salesOrder.getCustomer() != null && salesOrder.getCustomer().getCustomerPaymentTerm() != null
+                            ? salesOrder.getCustomer().getCustomerPaymentTerm().getId().getCode() : null);
+            count = "DEP35_35_30_BBS".equals(term) ? 3 : 2;
+        }
+        if (count < 1 || count > 10) throw new InvalidRequestException("installmentCount must be between 1 and 10.");
+        Integer installmentNo = resolveInstallmentNo(salesOrder, request);
+        if (installmentNo > count) {
+            throw new InvalidRequestException("installmentNo cannot exceed installmentCount.");
+        }
+        return count;
     }
 
     private boolean requiresPaymentTermApproval(String paymentTerm) {
@@ -1006,6 +1050,8 @@ public class InvoiceService {
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setDueDate(entity.getDueDate() != null ? entity.getDueDate().format(DateUtil.DD_MM_YY) : null);
         dto.setDeliveryDate(entity.getDeliveryDate() != null ? entity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setInstallmentNo(entity.getInstallmentNo());
+        dto.setInstallmentCount(entity.getInstallmentCount());
         dto.setStatus(entity.getStatus());
         dto.setStatusProfile(DocumentStatusResolver.resolveInvoice(entity.getStatus(), entity.getPayments()));
         dto.setCurrency(entity.getCurrency());

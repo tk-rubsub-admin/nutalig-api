@@ -5,6 +5,7 @@ import com.nutalig.constant.*;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryTransitRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
@@ -856,6 +857,50 @@ public class PurchaseOrderService {
             );
         }
         return mapToDto(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto markDeliveryInTransit(
+            String purchaseOrderNo,
+            Long deliveryId,
+            UpdatePurchaseOrderDeliveryTransitRequest request,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getTrackingNumber())) {
+            throw new InvalidRequestException("Tracking number and in-transit date are required.");
+        }
+        if (request.getInTransitDate() == null) {
+            throw new InvalidRequestException("In-transit date is required.");
+        }
+        String trackingNumber = request.getTrackingNumber().trim();
+        if (trackingNumber.length() > 255) {
+            throw new InvalidRequestException("Tracking number must not exceed 255 characters.");
+        }
+
+        PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(purchaseOrder, userId);
+        PurchaseOrderDeliveryEntity delivery = purchaseOrderDeliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order delivery " + deliveryId + " not found."));
+        if (!purchaseOrderNo.equals(delivery.getPurchaseOrder().getPurchaseOrderNo())) {
+            throw new InvalidRequestException("Delivery does not belong to this purchase order.");
+        }
+        if (delivery.getStatus() != PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER) {
+            throw new InvalidRequestException("Only deliveries handed over to the carrier can be marked in transit.");
+        }
+        if (delivery.getShippedAt() != null
+                && request.getInTransitDate().isBefore(delivery.getShippedAt().toLocalDate())) {
+            throw new InvalidRequestException("In-transit date cannot be before the shipped date.");
+        }
+
+        delivery.setTrackingNumber(trackingNumber);
+        delivery.setInTransitDate(request.getInTransitDate());
+        delivery.setStatus(PurchaseOrderDeliveryStatus.IN_TRANSIT);
+        delivery.setUpdatedBy(userId);
+        delivery.setUpdatedDate(now(DateUtil.getTimeZone()));
+        purchaseOrderDeliveryRepository.save(delivery);
+        purchaseOrderMilestoneService.notifySalesDeliveryInTransitSafely(purchaseOrder, delivery);
+        return mapToDto(purchaseOrder);
     }
 
     private boolean saveProductionCompletionDelivery(
@@ -1833,6 +1878,8 @@ public class PurchaseOrderService {
                     deliveryDto.setExpectedWarehouseDate(delivery.getExpectedWarehouseDate());
                     deliveryDto.setReceivedAt(delivery.getReceivedAt());
                     deliveryDto.setShippingMethod(delivery.getShippingMethod());
+                    deliveryDto.setTrackingNumber(delivery.getTrackingNumber());
+                    deliveryDto.setInTransitDate(delivery.getInTransitDate());
                     deliveryDto.setShippingLocationId(delivery.getShippingLocation() == null
                             ? null : delivery.getShippingLocation().getId());
                     deliveryDto.setShippingLocationName(delivery.getShippingLocationNameSnapshot());

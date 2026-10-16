@@ -4,6 +4,7 @@ import com.nutalig.config.LineConfiguration;
 import com.nutalig.constant.*;
 import com.nutalig.dto.PurchaseOrderTimelineDto;
 import com.nutalig.entity.PurchaseOrderEntity;
+import com.nutalig.entity.PurchaseOrderDeliveryEntity;
 import com.nutalig.entity.PurchaseOrderMilestoneEntity;
 import com.nutalig.entity.PurchaseOrderProofEntity;
 import com.nutalig.entity.SalesOrderEntity;
@@ -324,6 +325,35 @@ public class PurchaseOrderMilestoneService {
         }
     }
 
+    public void notifySalesDeliveryInTransitSafely(
+            PurchaseOrderEntity purchaseOrder,
+            PurchaseOrderDeliveryEntity delivery
+    ) {
+        try {
+            UserEntity salesUser = resolveSalesUser(purchaseOrder);
+            SalesOrderEntity salesOrder = purchaseOrder.getSalesOrder();
+            String customerName = StringUtils.defaultIfBlank(
+                    salesOrder.getCustomerNameSnapshot(),
+                    salesOrder.getCustomer() != null ? salesOrder.getCustomer().getCustomerName() : "-");
+            String detail = "เลขที่ SO: " + salesOrder.getSalesOrderNo()
+                    + "\nลูกค้า: " + StringUtils.defaultIfBlank(customerName, "-")
+                    + "\nวันที่ส่งออก: " + formatNotificationDate(delivery.getInTransitDate())
+                    + "\nวันที่คาดว่าจะถึงคลัง: " + formatNotificationDate(delivery.getExpectedWarehouseDate());
+            lineMessageService.sendNotificationCard(
+                    salesUser.getId(),
+                    "SO " + salesOrder.getSalesOrderNo() + " อยู่ระหว่างขนส่ง",
+                    "สินค้าอยู่ระหว่างขนส่ง",
+                    detail,
+                    buildPurchaseOrderDetailUrl(purchaseOrder.getPurchaseOrderNo())
+            );
+        } catch (Exception exception) {
+            log.warn("Cannot notify sales about delivery {} in transit for PO {}.",
+                    delivery != null ? delivery.getDeliveryNo() : null,
+                    purchaseOrder != null ? purchaseOrder.getPurchaseOrderNo() : null,
+                    exception);
+        }
+    }
+
     private void validateProductionStartedForNotification(PurchaseOrderEntity purchaseOrder)
             throws InvalidRequestException {
         if (purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING
@@ -393,6 +423,19 @@ public class PurchaseOrderMilestoneService {
         String frontendBaseUrl = uri.getScheme() + "://" + uri.getAuthority();
         return UriComponentsBuilder.fromUriString(frontendBaseUrl)
                 .pathSegment("sales-order", StringUtils.defaultString(salesOrderNo))
+                .build()
+                .toUriString();
+    }
+
+    private String buildPurchaseOrderDetailUrl(String purchaseOrderNo) {
+        String loginSuccessUrl = lineConfiguration.getLoginSuccessUrl();
+        if (StringUtils.isBlank(loginSuccessUrl)) {
+            throw new IllegalStateException("LINE frontend redirect URL is not configured");
+        }
+        URI uri = URI.create(loginSuccessUrl);
+        String frontendBaseUrl = uri.getScheme() + "://" + uri.getAuthority();
+        return UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                .pathSegment("purchase-order", StringUtils.defaultString(purchaseOrderNo))
                 .build()
                 .toUriString();
     }

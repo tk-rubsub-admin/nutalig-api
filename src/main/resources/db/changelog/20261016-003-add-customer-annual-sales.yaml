@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-003-add-customer-annual-sales
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE customer_annual_sales (
+                  customer_id VARCHAR(255) NOT NULL,
+                  sales_year SMALLINT NOT NULL,
+                  currency VARCHAR(10) NOT NULL,
+                  total_order_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                  order_count INT NOT NULL DEFAULT 0,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (customer_id, sales_year, currency),
+                  KEY idx_customer_annual_sales_year (sales_year),
+                  CONSTRAINT fk_customer_annual_sales_customer
+                      FOREIGN KEY (customer_id) REFERENCES customer (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT INTO customer_annual_sales
+                  (customer_id, sales_year, currency, total_order_amount, order_count)
+              SELECT customer_id, YEAR(doc_date), currency,
+                     COALESCE(SUM(grand_total), 0), COUNT(*)
+              FROM sales_order
+              WHERE customer_id IS NOT NULL AND doc_date IS NOT NULL AND currency IS NOT NULL
+                AND status NOT IN ('REJECTED', 'CANCELLED')
+              GROUP BY customer_id, YEAR(doc_date), currency;

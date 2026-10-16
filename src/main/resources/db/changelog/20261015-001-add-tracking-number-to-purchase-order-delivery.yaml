@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261015-001-add-tracking-number-to-purchase-order-delivery
+      author: codex
+      changes:
+        - addColumn:
+            tableName: purchase_order_delivery
+            columns:
+              - column:
+                  name: tracking_number
+                  type: VARCHAR(255)

@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-005-add-sales-performance-transactions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE sales_performance_transaction (
+                  invoice_payment_id BIGINT NOT NULL,
+                  sales_order_no VARCHAR(50) NOT NULL,
+                  invoice_no VARCHAR(50) NOT NULL,
+                  sales_id VARCHAR(255) NOT NULL,
+                  performance_type VARCHAR(30) NOT NULL,
+                  payment_date DATE NOT NULL,
+                  currency VARCHAR(10) NOT NULL,
+                  amount DECIMAL(18,5) NOT NULL,
+                  PRIMARY KEY (invoice_payment_id),
+                  KEY idx_sales_performance_monthly (sales_id, payment_date, currency),
+                  KEY idx_sales_performance_sales_order (sales_order_no),
+                  CONSTRAINT fk_sales_performance_payment FOREIGN KEY (invoice_payment_id) REFERENCES invoice_payment (id),
+                  CONSTRAINT fk_sales_performance_sales_order FOREIGN KEY (sales_order_no) REFERENCES sales_order (sales_order_no),
+                  CONSTRAINT fk_sales_performance_invoice FOREIGN KEY (invoice_no) REFERENCES invoice (invoice_no)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT INTO sales_performance_transaction
+                  (invoice_payment_id, sales_order_no, invoice_no, sales_id, performance_type, payment_date, currency, amount)
+              SELECT ip.id, so.sales_order_no, i.invoice_no, so.sales_id,
+                     CASE WHEN i.installment_no = 1 THEN 'DEPOSIT'
+                          WHEN i.installment_no = i.installment_count THEN 'SALE'
+                          ELSE 'INTERIM_INSTALLMENT' END,
+                     DATE(ip.payment_date), i.currency, ip.amount
+              FROM invoice_payment ip
+              JOIN invoice i ON i.invoice_no = ip.invoice_no
+              JOIN sales_order so ON so.sales_order_no = i.sales_order_no
+              WHERE ip.status = 'APPROVE'
+                AND i.status NOT IN ('CANCELLED', 'VOID')
+                AND so.sales_id IS NOT NULL
+                AND i.installment_no IS NOT NULL
+                AND i.installment_count IS NOT NULL;

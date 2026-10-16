@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-006-settle-customer-annual-sales-on-full-payment
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE customer_annual_sales_order (
+                  sales_order_no VARCHAR(50) NOT NULL,
+                  customer_id VARCHAR(255) NOT NULL,
+                  sales_year SMALLINT NOT NULL,
+                  currency VARCHAR(10) NOT NULL,
+                  paid_in_full_date DATE NOT NULL,
+                  total_order_amount DECIMAL(18,5) NOT NULL,
+                  PRIMARY KEY (sales_order_no),
+                  KEY idx_customer_annual_sales_order_bucket (customer_id, sales_year, currency),
+                  CONSTRAINT fk_customer_annual_sales_order_customer FOREIGN KEY (customer_id) REFERENCES customer (id),
+                  CONSTRAINT fk_customer_annual_sales_order_sales_order FOREIGN KEY (sales_order_no) REFERENCES sales_order (sales_order_no)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              INSERT INTO customer_annual_sales_order
+                  (sales_order_no, customer_id, sales_year, currency, paid_in_full_date, total_order_amount)
+              SELECT so.sales_order_no, so.customer_id, YEAR(payments.paid_in_full_date), so.currency,
+                     DATE(payments.paid_in_full_date), so.grand_total
+              FROM sales_order so
+              JOIN (
+                  SELECT i.sales_order_no, MAX(ip.payment_date) AS paid_in_full_date,
+                         SUM(ip.amount) AS approved_total
+                  FROM invoice i
+                  JOIN invoice_payment ip ON ip.invoice_no = i.invoice_no
+                  WHERE i.status NOT IN ('CANCELLED', 'VOID') AND ip.status = 'APPROVE'
+                  GROUP BY i.sales_order_no
+              ) payments ON payments.sales_order_no = so.sales_order_no
+              WHERE so.customer_id IS NOT NULL AND so.currency IS NOT NULL
+                AND so.status NOT IN ('REJECTED', 'CANCELLED')
+                AND so.grand_total > 0 AND payments.approved_total >= so.grand_total;
+
+              DELETE FROM customer_annual_sales;
+
+              INSERT INTO customer_annual_sales
+                  (customer_id, sales_year, currency, total_order_amount, order_count)
+              SELECT customer_id, sales_year, currency, SUM(total_order_amount), COUNT(*)
+              FROM customer_annual_sales_order
+              GROUP BY customer_id, sales_year, currency;

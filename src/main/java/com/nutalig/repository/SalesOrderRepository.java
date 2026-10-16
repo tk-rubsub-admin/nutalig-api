@@ -1,6 +1,7 @@
 package com.nutalig.repository;
 
 import com.nutalig.constant.SalesOrderStatus;
+import com.nutalig.constant.Currency;
 import com.nutalig.entity.SalesOrderEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.time.LocalDate;
 
 @Repository
 public interface SalesOrderRepository extends JpaRepository<SalesOrderEntity, String>, JpaSpecificationExecutor<SalesOrderEntity> {
@@ -29,6 +31,40 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrderEntity, St
     """)
     BigDecimal sumGrandTotalByCustomerIdAndStatusNotIn(
             @Param("customerId") String customerId,
+            @Param("excludedStatuses") Collection<SalesOrderStatus> excludedStatuses
+    );
+
+    @Query("""
+        select coalesce(sum(so.grandTotal), 0)
+        from SalesOrderEntity so
+        where so.customer.id = :customerId
+          and so.currency = :currency
+          and so.docDate >= :startDate
+          and so.docDate < :endDate
+          and so.status not in :excludedStatuses
+    """)
+    BigDecimal sumGrandTotalByCustomerCurrencyAndDateRange(
+            @Param("customerId") String customerId,
+            @Param("currency") Currency currency,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("excludedStatuses") Collection<SalesOrderStatus> excludedStatuses
+    );
+
+    @Query("""
+        select count(so)
+        from SalesOrderEntity so
+        where so.customer.id = :customerId
+          and so.currency = :currency
+          and so.docDate >= :startDate
+          and so.docDate < :endDate
+          and so.status not in :excludedStatuses
+    """)
+    long countByCustomerCurrencyAndDateRange(
+            @Param("customerId") String customerId,
+            @Param("currency") Currency currency,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
             @Param("excludedStatuses") Collection<SalesOrderStatus> excludedStatuses
     );
 

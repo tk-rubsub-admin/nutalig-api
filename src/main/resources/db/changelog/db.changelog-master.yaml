@@ -3096,3 +3096,17 @@ databaseChangeLog:
       file: db/changelog/20261011-001-add-product-qc-masters.yaml
   - include:
       file: db/changelog/20261012-001-add-purchase-order-deliveries.yaml
+  - include:
+      file: db/changelog/20261015-001-add-tracking-number-to-purchase-order-delivery.yaml
+  - include:
+      file: db/changelog/20261016-001-add-in-transit-date-to-purchase-order-delivery.yaml
+  - include:
+      file: db/changelog/20261016-002-add-customer-tier-rules.yaml
+  - include:
+      file: db/changelog/20261016-003-add-customer-annual-sales.yaml
+  - include:
+      file: db/changelog/20261016-004-add-invoice-installment-fields.yaml
+  - include:
+      file: db/changelog/20261016-005-add-sales-performance-transactions.yaml
+  - include:
+      file: db/changelog/20261016-006-settle-customer-annual-sales-on-full-payment.yaml

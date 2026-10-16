@@ -47,6 +47,12 @@ public class InvoiceEntity extends AuditDateEntity {
     @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 
+    @Column(name = "installment_no")
+    private Integer installmentNo;
+
+    @Column(name = "installment_count")
+    private Integer installmentCount;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30)
     private InvoiceStatus status;

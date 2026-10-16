@@ -16,6 +16,8 @@ public class PurchaseOrderDeliveryDto {
     private LocalDate expectedWarehouseDate;
     private ZonedDateTime receivedAt;
     private String shippingMethod;
+    private String trackingNumber;
+    private LocalDate inTransitDate;
     private Long shippingLocationId;
     private String shippingLocationName;
     private PurchaseOrderDeliveryStatus status;

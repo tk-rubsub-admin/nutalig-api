@@ -86,6 +86,9 @@ public class SalesOrderService {
     private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
     private final CustomerRepository customerRepository;
+    private final CustomerTierService customerTierService;
+    private final CustomerAnnualSalesService customerAnnualSalesService;
+    private final SalesPerformanceService salesPerformanceService;
     private final EmployeeRepository employeeRepository;
     private final SupplierRepository supplierRepository;
     private final UserRepository userRepository;
@@ -301,6 +304,8 @@ public class SalesOrderService {
 
         salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(entity.getCustomer());
+        salesPerformanceService.refreshForSalesOrder(entity);
+        customerAnnualSalesService.refreshForSalesOrder(entity);
         recalculatePaymentSummary(entity.getSalesOrderNo());
         recordUpdateSalesOrderActivity(entity, request, userId, oldRevNo, before);
 
@@ -362,6 +367,8 @@ public class SalesOrderService {
         entity.setUpdatedDate(now);
         entity = salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(entity.getCustomer());
+        salesPerformanceService.refreshForSalesOrder(entity);
+        customerAnnualSalesService.refreshForSalesOrder(entity);
         rfqService.rollbackSalesOrderLink(salesOrderNo, entity.getCancelReason(), userId);
 
         Map<String, Object> detail = new LinkedHashMap<>();
@@ -836,6 +843,7 @@ public class SalesOrderService {
                 EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES
         );
         customer.setTotalSalesOrderAmount(defaultIfNull(total));
+        customerTierService.applyTier(customer);
         customerRepository.save(customer);
     }
 

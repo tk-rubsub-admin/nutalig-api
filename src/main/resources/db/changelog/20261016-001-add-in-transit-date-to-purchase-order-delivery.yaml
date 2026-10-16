@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-001-add-in-transit-date-to-purchase-order-delivery
+      author: codex
+      changes:
+        - addColumn:
+            tableName: purchase_order_delivery
+            columns:
+              - column:
+                  name: in_transit_date
+                  type: DATE

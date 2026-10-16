@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-004-add-invoice-installment-fields
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: invoice
+                columnName: installment_no
+      changes:
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column:
+                  name: installment_no
+                  type: INT
+              - column:
+                  name: installment_count
+                  type: INT
+        - sql:
+            splitStatements: false
+            sql: |
+              UPDATE invoice i
+              JOIN (
+                  SELECT invoice_no,
+                         ROW_NUMBER() OVER (PARTITION BY sales_order_no ORDER BY doc_date, created_date, invoice_no) AS installment_no
+                  FROM invoice
+                  WHERE status NOT IN ('DRAFT', 'CANCELLED', 'VOID')
+              ) ranked ON ranked.invoice_no = i.invoice_no
+              SET i.installment_no = ranked.installment_no,
+                  i.installment_count = CASE
+                      WHEN COALESCE(i.customer_payment_term, '') = 'DEP35_35_30_BBS' THEN 3
+                      ELSE 2
+                  END;

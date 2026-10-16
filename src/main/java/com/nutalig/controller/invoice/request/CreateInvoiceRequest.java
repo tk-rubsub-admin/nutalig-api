@@ -19,5 +19,7 @@ public class CreateInvoiceRequest {
     private BigDecimal vat;
     private BigDecimal grandTotal;
     private String customerPaymentTerm;
+    private Integer installmentNo;
+    private Integer installmentCount;
     private QuotationCustomerSnapshotDto customerSnapshot;
 }

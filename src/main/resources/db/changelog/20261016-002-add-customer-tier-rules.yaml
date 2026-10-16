@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261016-002-add-customer-tier-rules
+      author: codex
+      changes:
+        - createTable:
+            tableName: customer_tier_rule
+            columns:
+              - column:
+                  name: tier_code
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: minimum_order_amount
+                  type: DECIMAL(18,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: maximum_order_amount
+                  type: DECIMAL(18,2)
+              - column:
+                  name: created_date
+                  type: DATETIME(6)
+              - column:
+                  name: updated_date
+                  type: DATETIME(6)
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO customer_tier_rule (tier_code, minimum_order_amount, maximum_order_amount) VALUES
+                ('TIER_4', 0, 100000),
+                ('TIER_3', 100001, 500000),
+                ('TIER_2', 500001, 999999),
+                ('TIER_1', 1000000, NULL)
+              ON DUPLICATE KEY UPDATE
+                minimum_order_amount = VALUES(minimum_order_amount),
+                maximum_order_amount = VALUES(maximum_order_amount);
+
+              UPDATE customer c
+              JOIN customer_tier_rule r
+                ON COALESCE(c.total_sales_order_amount, 0) >= r.minimum_order_amount
+               AND (r.maximum_order_amount IS NULL OR COALESCE(c.total_sales_order_amount, 0) <= r.maximum_order_amount)
+              SET c.customer_tier = r.tier_code;
