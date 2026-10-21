@@ -9,8 +9,10 @@ import com.nutalig.entity.PurchaseOrderPaymentEntity;
 import com.nutalig.entity.PurchaseOrderPaymentScheduleEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.repository.PurchaseOrderPaymentScheduleRepository;
+import com.nutalig.repository.PurchaseOrderPaymentInstructionRepository;
 import com.nutalig.repository.PurchaseOrderRepository;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,13 +34,24 @@ public class PurchaseOrderPaymentScheduleService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderPaymentScheduleRepository scheduleRepository;
+    private final PurchaseOrderPaymentInstructionRepository instructionRepository;
+
+    @Autowired
+    public PurchaseOrderPaymentScheduleService(
+            PurchaseOrderRepository purchaseOrderRepository,
+            PurchaseOrderPaymentScheduleRepository scheduleRepository,
+            PurchaseOrderPaymentInstructionRepository instructionRepository
+    ) {
+        this.purchaseOrderRepository = purchaseOrderRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.instructionRepository = instructionRepository;
+    }
 
     public PurchaseOrderPaymentScheduleService(
             PurchaseOrderRepository purchaseOrderRepository,
             PurchaseOrderPaymentScheduleRepository scheduleRepository
     ) {
-        this.purchaseOrderRepository = purchaseOrderRepository;
-        this.scheduleRepository = scheduleRepository;
+        this(purchaseOrderRepository, scheduleRepository, null);
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +98,9 @@ public class PurchaseOrderPaymentScheduleService {
             schedule.setExpectedAmountThb(expectedAmountThb.setScale(5, RoundingMode.HALF_UP));
             schedule.setPaidAmount(BigDecimal.ZERO.setScale(5, RoundingMode.HALF_UP));
             schedule.setPaidAmountThb(BigDecimal.ZERO.setScale(5, RoundingMode.HALF_UP));
-            schedule.setStatus(PurchaseOrderPaymentScheduleStatus.UNPAID);
+            schedule.setStatus(index == 0
+                    ? PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP
+                    : PurchaseOrderPaymentScheduleStatus.UNPAID);
             schedule.setCreatedDate(now);
             schedule.setUpdatedDate(now);
             purchaseOrder.addPaymentSchedule(schedule);
@@ -97,6 +112,18 @@ public class PurchaseOrderPaymentScheduleService {
 
     public void recalculateSchedules(PurchaseOrderEntity purchaseOrder) {
         if (purchaseOrder == null) return;
+        var scheduleIds = purchaseOrder.getPaymentSchedules().stream()
+                .map(PurchaseOrderPaymentScheduleEntity::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        var scheduleInstructions = scheduleIds.isEmpty() || instructionRepository == null
+                ? List.<com.nutalig.entity.PurchaseOrderPaymentInstructionEntity>of()
+                : instructionRepository.findBySchedule_IdIn(scheduleIds);
+        var schedulesWithActiveInstructions = scheduleInstructions.stream()
+                        .filter(instruction -> instruction.getStatus() == com.nutalig.constant.PurchaseOrderPaymentInstructionStatus.AWAITING_PAYMENT
+                                || instruction.getStatus() == com.nutalig.constant.PurchaseOrderPaymentInstructionStatus.PARTIALLY_PAID)
+                        .map(instruction -> instruction.getSchedule().getId())
+                        .collect(java.util.stream.Collectors.toSet());
         for (PurchaseOrderPaymentScheduleEntity schedule : purchaseOrder.getPaymentSchedules()) {
             BigDecimal paidAmount = schedule.getPayments().stream()
                     .filter(payment -> payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED)
@@ -111,7 +138,11 @@ public class PurchaseOrderPaymentScheduleService {
             schedule.setPaidAmount(paidAmount.setScale(5, RoundingMode.HALF_UP));
             schedule.setPaidAmountThb(paidAmountThb.setScale(5, RoundingMode.HALF_UP));
             if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                schedule.setStatus(PurchaseOrderPaymentScheduleStatus.UNPAID);
+                schedule.setStatus(schedulesWithActiveInstructions.contains(schedule.getId())
+                        ? PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT
+                        : schedule.getInstallmentNo() != null && schedule.getInstallmentNo() == 1
+                                ? PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP
+                                : PurchaseOrderPaymentScheduleStatus.UNPAID);
             } else if (paidAmount.compareTo(defaultAmount(schedule.getExpectedAmount())) >= 0) {
                 schedule.setStatus(PurchaseOrderPaymentScheduleStatus.PAID);
             } else {

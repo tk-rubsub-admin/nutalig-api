@@ -4,10 +4,12 @@ import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
+import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentInstructionRequest;
 import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryTransitRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderPaymentDecisionRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.SearchPendingSupplierPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.StartPurchaseOrderRunRequest;
@@ -21,14 +23,18 @@ import com.nutalig.controller.response.Pageable;
 import com.nutalig.dto.PurchaseOrderDto;
 import com.nutalig.dto.PurchaseOrderCbmPreviewDto;
 import com.nutalig.dto.PurchaseOrderPaymentDto;
+import com.nutalig.dto.PurchaseOrderPaymentInstructionDto;
 import com.nutalig.dto.PurchaseOrderPaymentScheduleDto;
+import com.nutalig.dto.PendingSupplierPaymentDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.PurchaseOrderService;
 import com.nutalig.service.PurchaseOrderPaymentService;
+import com.nutalig.service.PurchaseOrderPaymentInstructionService;
 import com.nutalig.service.PurchaseOrderPaymentScheduleService;
+import com.nutalig.service.PendingSupplierPaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +56,9 @@ public class PurchaseOrderController {
     private final PurchaseOrderService purchaseOrderService;
     private final com.nutalig.service.PurchaseOrderCbmService purchaseOrderCbmService;
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
+    private final PurchaseOrderPaymentInstructionService paymentInstructionService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
+    private final PendingSupplierPaymentService pendingSupplierPaymentService;
 
     @GetMapping("/production-calendar")
     @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_TRACKING')")
@@ -157,6 +165,15 @@ public class PurchaseOrderController {
     ) {
         Pageable<PurchaseOrderDto> response = purchaseOrderService.searchPurchaseOrders(request, pageableRequest);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/pending-payments/search")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_VIEW')")
+    public GeneralResponse<Pageable<PendingSupplierPaymentDto>> searchPendingSupplierPayments(
+            @RequestBody(required = false) SearchPendingSupplierPaymentRequest request,
+            @Valid PageableRequest pageableRequest
+    ) {
+        return new GeneralResponse<>(SUCCESS, pendingSupplierPaymentService.search(request, pageableRequest));
     }
 
     @PostMapping
@@ -284,6 +301,109 @@ public class PurchaseOrderController {
             @PathVariable("id") String id
     ) throws DataNotFoundException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderPaymentScheduleService.getSchedules(id));
+    }
+
+    @GetMapping("/{id}/payment-instructions")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_VIEW')")
+    public GeneralResponse<List<PurchaseOrderPaymentInstructionDto>> getPaymentInstructions(
+            @PathVariable("id") String id
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, paymentInstructionService.getInstructions(id));
+    }
+
+    @PostMapping("/{id}/payment-instructions")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> createPaymentInstruction(
+            @PathVariable("id") String id,
+            @RequestBody CreatePurchaseOrderPaymentInstructionRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, paymentInstructionService.createInstruction(id, request, userId));
+    }
+
+    @PostMapping("/{id}/payment-instructions/drafts")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> createPaymentInstructionDraft(
+            @PathVariable("id") String id,
+            @RequestBody CreatePurchaseOrderPaymentInstructionRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, paymentInstructionService.createDraft(id, request, userId));
+    }
+
+    @PostMapping("/{id}/payment-instructions/{instructionId}/submit")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> submitPaymentInstructionDraft(
+            @PathVariable("id") String id,
+            @PathVariable("instructionId") Long instructionId,
+            @RequestBody CreatePurchaseOrderPaymentInstructionRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, paymentInstructionService.submitDraft(id, instructionId, request, userId));
+    }
+
+    @PatchMapping("/{id}/payment-instructions/{instructionId}")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> updatePaymentInstruction(
+            @PathVariable("id") String id,
+            @PathVariable("instructionId") Long instructionId,
+            @RequestBody CreatePurchaseOrderPaymentInstructionRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                paymentInstructionService.updateInstruction(id, instructionId, request, userId));
+    }
+
+    @PostMapping("/{id}/payment-instructions/{instructionId}/cancel")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> cancelPaymentInstruction(
+            @PathVariable("id") String id,
+            @PathVariable("instructionId") Long instructionId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                paymentInstructionService.cancelInstruction(id, instructionId, userId));
+    }
+
+    @PostMapping("/{id}/payment-instructions/{instructionId}/confirm-paid")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_CONFIRM')")
+    public GeneralResponse<PurchaseOrderPaymentInstructionDto> confirmPaymentInstructionPaid(
+            @PathVariable("id") String id,
+            @PathVariable("instructionId") Long instructionId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                paymentInstructionService.confirmInstructionPaid(id, instructionId, userId));
+    }
+
+    @PostMapping("/{id}/payment-schedules/{scheduleId}/notify-super-admins")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_CREATE')")
+    public GeneralResponse<String> notifySuperAdminsOfPaymentSchedule(
+            @PathVariable("id") String id,
+            @PathVariable("scheduleId") Long scheduleId
+    ) throws DataNotFoundException, InvalidRequestException {
+        purchaseOrderService.notifySuperAdminsOfPaymentSchedule(id, scheduleId);
+        return new GeneralResponse<>(SUCCESS, "Notification sent");
+    }
+
+    @PostMapping("/{id}/payment-schedules/{scheduleId}/notify-accounting-admins")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_CONFIRM')")
+    public GeneralResponse<String> notifyAccountingAdminsOfPaymentSchedule(
+            @PathVariable("id") String id,
+            @PathVariable("scheduleId") Long scheduleId
+    ) throws DataNotFoundException, InvalidRequestException {
+        purchaseOrderService.notifyAccountingAdminsOfPaymentSchedule(id, scheduleId);
+        return new GeneralResponse<>(SUCCESS, "Accounting notification sent");
+    }
+
+    @PostMapping("/{id}/payment-schedules/{scheduleId}/notify-save-payment")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_PAYMENT_CONFIRM')")
+    public GeneralResponse<String> notifyAccountingAdminsForSavePayment(
+            @PathVariable("id") String id,
+            @PathVariable("scheduleId") Long scheduleId
+    ) throws DataNotFoundException, InvalidRequestException {
+        purchaseOrderService.notifyAccountingAdminsForSavePayment(id, scheduleId);
+        return new GeneralResponse<>(SUCCESS, "Accounting notification sent");
     }
 
     @PostMapping(path = "/{id}/payments", consumes = "multipart/form-data")

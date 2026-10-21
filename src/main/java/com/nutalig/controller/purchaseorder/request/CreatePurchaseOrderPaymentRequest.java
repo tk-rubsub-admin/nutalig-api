@@ -12,6 +12,7 @@ import java.time.ZonedDateTime;
 @Data
 public class CreatePurchaseOrderPaymentRequest {
     private Long scheduleId;
+    private Long instructionId;
     private PurchaseOrderPaymentType paymentType;
     private Integer installmentNo;
 
@@ -19,6 +20,7 @@ public class CreatePurchaseOrderPaymentRequest {
     private ZonedDateTime paymentDate;
 
     private BigDecimal amount;
+    private BigDecimal amountThb;
     private BigDecimal exchangeRate;
     private PaymentMethod paymentMethod;
     private String transferReference;

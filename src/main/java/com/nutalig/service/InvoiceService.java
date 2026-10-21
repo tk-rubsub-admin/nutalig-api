@@ -1155,6 +1155,10 @@ public class InvoiceService {
         dto.setSalesOrderNo(invoiceEntity.getSalesOrder().getSalesOrderNo());
         dto.setDueDate(invoiceEntity.getDueDate() != null ?invoiceEntity.getDueDate().format(DateUtil.DD_MM_YY) : null);
         dto.setDeliveryDate(invoiceEntity.getDeliveryDate() != null ? invoiceEntity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setDepositLabel(buildDepositLabel(invoiceEntity, language));
+        dto.setDepositDate(invoiceEntity.getDocDate() != null
+                ? invoiceEntity.getDocDate().format(DateUtil.DD_MM_YY)
+                : null);
         dto.setAmount(invoiceEntity.getAmount());
         dto.setDiscount(invoiceEntity.getDiscount());
         dto.setGrandTotal(invoiceEntity.getGrandTotal());
@@ -1195,6 +1199,19 @@ public class InvoiceService {
         dto.setItems(getItemDocumentDtos(invoiceEntity));
 
         return dto;
+    }
+
+    private String buildDepositLabel(InvoiceEntity invoiceEntity, TemplateLanguage language) {
+        Integer installmentNo = invoiceEntity.getInstallmentNo();
+        if (installmentNo == null) return null;
+
+        Integer installmentCount = invoiceEntity.getInstallmentCount();
+        String installment = installmentCount == null
+                ? installmentNo.toString()
+                : installmentNo + "/" + installmentCount;
+        return language == TemplateLanguage.EN
+                ? "Deposit " + installment
+                : "มัดจำงวดที่ " + installment;
     }
 
     private String buildFullAddress(CustomerAddressEntity address) {

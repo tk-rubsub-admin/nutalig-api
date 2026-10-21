@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261020-002-add-purchase-order-payment-drafts
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE purchase_order_payment_instruction MODIFY amount_thb DECIMAL(18,5) NULL;
+              ALTER TABLE purchase_order_payment_instruction MODIFY exchange_rate DECIMAL(18,6) NULL;

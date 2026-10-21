@@ -39,6 +39,11 @@ public class PurchaseOrderPaymentEntity extends AuditDateEntity {
     @ToString.Exclude
     private PurchaseOrderPaymentScheduleEntity schedule;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instruction_id", referencedColumnName = "id")
+    @ToString.Exclude
+    private PurchaseOrderPaymentInstructionEntity instruction;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_type", length = 30, nullable = false)
     private PurchaseOrderPaymentType paymentType;

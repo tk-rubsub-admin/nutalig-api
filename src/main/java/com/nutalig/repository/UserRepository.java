@@ -3,6 +3,7 @@ package com.nutalig.repository;
 import com.nutalig.entity.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,5 +28,13 @@ public interface UserRepository extends JpaRepository<UserEntity, String>, JpaSp
        WHERE u.userRoleEntity.roleCode IN :roleCodes
        """)
     List<UserEntity> findByRoleIn(@Param("roleCodes") List<String> roleCodes);
+
+    @EntityGraph(attributePaths = "userRoleEntity")
+    @Query("select u from User u")
+    List<UserEntity> findAllWithRole();
+
+    @EntityGraph(attributePaths = {"employeeEntity", "employeeEntity.position"})
+    @Query("select u from User u")
+    List<UserEntity> findAllWithEmployeePosition();
 
 }

@@ -2,6 +2,7 @@ package com.nutalig.service;
 
 import com.nutalig.constant.*;
 import com.nutalig.constant.Currency;
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
@@ -10,27 +11,35 @@ import com.nutalig.entity.PurchaseOrderAttachmentEntity;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.PurchaseOrderPaymentEntity;
 import com.nutalig.entity.PurchaseOrderPaymentScheduleEntity;
+import com.nutalig.entity.PurchaseOrderPaymentInstructionEntity;
 import com.nutalig.entity.UserEntity;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.PurchaseOrderPaymentMapper;
 import com.nutalig.repository.PurchaseOrderPaymentRepository;
+import com.nutalig.repository.PurchaseOrderPaymentInstructionRepository;
 import com.nutalig.repository.PurchaseOrderRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.ZonedDateTime;
+import java.net.URI;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PurchaseOrderPaymentService {
 
     private static final Set<PurchaseOrderPaymentStatus> COMMITTED_STATUSES = EnumSet.of(
@@ -45,6 +54,10 @@ public class PurchaseOrderPaymentService {
     private final PurchaseOrderPaymentMapper purchaseOrderPaymentMapper;
     private final ActivityHistoryService activityHistoryService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
+    private final PurchaseOrderPaymentInstructionService paymentInstructionService;
+    private final PurchaseOrderPaymentInstructionRepository paymentInstructionRepository;
+    private final LineMessageService lineMessageService;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderPaymentDto> getPayments(String purchaseOrderNo) throws DataNotFoundException {
@@ -66,6 +79,7 @@ public class PurchaseOrderPaymentService {
             List<MultipartFile> attachments,
             String userId
     ) throws Exception {
+        validateAmountThb(request.getAmountThb());
         String requestKey = StringUtils.defaultIfBlank(StringUtils.trimToNull(request.getRequestKey()), UUID.randomUUID().toString());
         Optional<PurchaseOrderPaymentEntity> existingPayment = purchaseOrderPaymentRepository.findByRequestKey(requestKey);
         if (existingPayment.isPresent()) {
@@ -78,6 +92,8 @@ public class PurchaseOrderPaymentService {
         PurchaseOrderEntity purchaseOrder = getPurchaseOrderForUpdate(purchaseOrderNo);
         ensurePaymentAllowed(purchaseOrder);
         PurchaseOrderPaymentScheduleEntity schedule = resolveSchedule(purchaseOrder, request.getScheduleId());
+        PurchaseOrderPaymentInstructionEntity instruction = resolveInstruction(
+                purchaseOrder, schedule, request.getInstructionId());
         PurchaseOrderPaymentType paymentType = schedule == null ? request.getPaymentType() : schedule.getPaymentType();
         Integer installmentNo = schedule == null ? request.getInstallmentNo() : schedule.getInstallmentNo();
         validatePaymentRequest(
@@ -92,7 +108,7 @@ public class PurchaseOrderPaymentService {
                 attachments,
                 true
         );
-        validateCommittedLimit(purchaseOrder, schedule, request.getAmount(), null);
+        validateCommittedLimit(purchaseOrder, schedule, request.getAmount(), null, instruction);
         BigDecimal exchangeRate = resolvePaymentExchangeRate(purchaseOrder, request.getExchangeRate());
 
         UserEntity user = getUser(userId);
@@ -112,7 +128,8 @@ public class PurchaseOrderPaymentService {
                 request.getChequeDate(),
                 request.getChequeBranch(),
                 request.getRemark(),
-                purchaseOrder.getCurrency()
+                purchaseOrder.getCurrency(),
+                request.getAmountThb()
         );
         // A confirmed payment entry is approved immediately. The approve/reject
         // endpoints remain available for legacy payments that are still PENDING.
@@ -126,16 +143,88 @@ public class PurchaseOrderPaymentService {
         payment.setUpdatedDate(now);
         purchaseOrder.addPayment(payment);
         assignSchedule(payment, schedule);
+        assignInstruction(payment, instruction);
+        // Persist the payment before adding its attachments to the purchase order.
+        // Attachments are also cascaded from the purchase order, so saving them
+        // first can make Hibernate flush an attachment that references a
+        // transient payment entity.
+        purchaseOrderPaymentRepository.saveAndFlush(payment);
         addAttachments(payment, attachments, user, now, purchaseOrderNo);
         recalculatePaymentSummary(purchaseOrder);
+        if (instruction != null) paymentInstructionService.recalculateInstruction(instruction);
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
+
+        if (schedule != null
+                && Objects.equals(schedule.getInstallmentNo(), 1)
+                && schedule.getStatus() == PurchaseOrderPaymentScheduleStatus.PAID) {
+            notifyProcurementToStartRunAfterCommit(purchaseOrder, payment);
+        }
 
         recordActivity(purchaseOrder, payment, userId, ActivityAction.CREATE,
                 "บันทึกและอนุมัติรายการชำระเงินของใบสั่งซื้อเลขที่ " + purchaseOrderNo,
                 Map.of("autoApproved", true));
         return purchaseOrderPaymentMapper.toDto(payment);
+    }
+
+    private void notifyProcurementToStartRunAfterCommit(
+            PurchaseOrderEntity purchaseOrder,
+            PurchaseOrderPaymentEntity payment
+    ) {
+        UserEntity procurementOwner = purchaseOrder.getCreatedBy();
+        if (procurementOwner == null || StringUtils.isBlank(procurementOwner.getId())) {
+            log.warn("Skip start-run notification for PO {} because the procurement owner is missing",
+                    purchaseOrder.getPurchaseOrderNo());
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.warn("Skip start-run notification for PO {} because no transaction synchronization is active",
+                    purchaseOrder.getPurchaseOrderNo());
+            return;
+        }
+
+        String userId = procurementOwner.getId();
+        String purchaseOrderNo = purchaseOrder.getPurchaseOrderNo();
+        String salesOrderNo = purchaseOrder.getSalesOrder() == null
+                ? null : purchaseOrder.getSalesOrder().getSalesOrderNo();
+        String supplierName = StringUtils.defaultIfBlank(purchaseOrder.getSupplierNameSnapshot(),
+                purchaseOrder.getSupplier() == null ? null : purchaseOrder.getSupplier().getSupplierName());
+        String amount = payment.getAmount().stripTrailingZeros().toPlainString();
+        String currency = payment.getCurrency().name();
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    if (StringUtils.isBlank(procurementOwner.getLineUserId())) {
+                        log.warn("Skip start-run notification for PO {} because procurement owner {} has no LINE binding",
+                                purchaseOrderNo, userId);
+                        return;
+                    }
+                    URI loginSuccessUri = URI.create(lineConfiguration.getLoginSuccessUrl());
+                    String detailUrl = UriComponentsBuilder
+                            .fromUriString(loginSuccessUri.getScheme() + "://" + loginSuccessUri.getAuthority())
+                            .pathSegment("purchase-order", purchaseOrderNo)
+                            .build()
+                            .toUriString();
+                    String detail = "เลขที่ PO: " + purchaseOrderNo
+                            + "\nSupplier: " + StringUtils.defaultIfBlank(supplierName, "-")
+                            + "\nชำระงวดที่ 1 ครบแล้ว จำนวน " + amount + " " + currency
+                            + "\nกรุณาเริ่มรันงาน";
+                    lineMessageService.sendNotificationCard(
+                            userId,
+                            "PO " + purchaseOrderNo + " ชำระงวดแรกครบแล้ว กรุณาเริ่มรันงาน",
+                            "เริ่มรันงานผลิต",
+                            detail,
+                            detailUrl
+                    );
+                } catch (Exception exception) {
+                    log.warn("Cannot send start-run notification to procurement owner for PO {}",
+                            purchaseOrderNo, exception);
+                }
+            }
+        });
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -146,6 +235,7 @@ public class PurchaseOrderPaymentService {
             List<MultipartFile> attachments,
             String userId
     ) throws Exception {
+        validateAmountThb(request.getAmountThb());
         PurchaseOrderEntity purchaseOrder = getPurchaseOrderForUpdate(purchaseOrderNo);
         ensurePaymentAllowed(purchaseOrder);
         PurchaseOrderPaymentEntity payment = getPayment(purchaseOrderNo, paymentId);
@@ -153,6 +243,11 @@ public class PurchaseOrderPaymentService {
             throw new InvalidRequestException("Only pending purchase order payments can be edited");
         }
         PurchaseOrderPaymentScheduleEntity schedule = resolveSchedule(purchaseOrder, request.getScheduleId());
+        PurchaseOrderPaymentInstructionEntity instruction = payment.getInstruction();
+        if (instruction != null && (schedule == null
+                || !Objects.equals(instruction.getSchedule().getId(), schedule.getId()))) {
+            throw new InvalidRequestException("Payment instruction must belong to the selected schedule");
+        }
         PurchaseOrderPaymentType paymentType = schedule == null ? request.getPaymentType() : schedule.getPaymentType();
         Integer installmentNo = schedule == null ? request.getInstallmentNo() : schedule.getInstallmentNo();
         validatePaymentRequest(
@@ -160,7 +255,7 @@ public class PurchaseOrderPaymentService {
                 request.getAmount(), request.getPaymentMethod(), request.getChequeBank(),
                 request.getChequeNo(), request.getChequeDate(), attachments, false
         );
-        validateCommittedLimit(purchaseOrder, schedule, request.getAmount(), paymentId);
+        validateCommittedLimit(purchaseOrder, schedule, request.getAmount(), paymentId, instruction);
         BigDecimal exchangeRate = resolvePaymentExchangeRate(purchaseOrder, request.getExchangeRate());
 
         Map<String, Object> before = paymentSnapshot(payment);
@@ -170,7 +265,8 @@ public class PurchaseOrderPaymentService {
                 payment, paymentType, installmentNo, request.getPaymentDate(),
                 request.getAmount(), exchangeRate, request.getPaymentMethod(),
                 request.getTransferReference(), request.getChequeBank(), request.getChequeNo(),
-                request.getChequeDate(), request.getChequeBranch(), request.getRemark(), purchaseOrder.getCurrency()
+                request.getChequeDate(), request.getChequeBranch(), request.getRemark(),
+                purchaseOrder.getCurrency(), request.getAmountThb()
         );
         assignSchedule(payment, schedule);
         payment.setUpdatedBy(user);
@@ -202,6 +298,7 @@ public class PurchaseOrderPaymentService {
         payment.setUpdatedBy(user);
         payment.setUpdatedDate(now);
         recalculatePaymentSummary(purchaseOrder);
+        if (payment.getInstruction() != null) paymentInstructionService.recalculateInstruction(payment.getInstruction());
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
@@ -235,6 +332,7 @@ public class PurchaseOrderPaymentService {
         payment.setUpdatedBy(user);
         payment.setUpdatedDate(now);
         purchaseOrderPaymentScheduleService.recalculateSchedules(purchaseOrder);
+        if (payment.getInstruction() != null) paymentInstructionService.recalculateInstruction(payment.getInstruction());
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
@@ -274,6 +372,8 @@ public class PurchaseOrderPaymentService {
         payment.setUpdatedBy(user);
         payment.setUpdatedDate(now);
         recalculatePaymentSummary(purchaseOrder);
+        if (payment.getInstruction() != null) paymentInstructionService.recalculateInstruction(payment.getInstruction());
+        purchaseOrderPaymentScheduleService.recalculateSchedules(purchaseOrder);
         purchaseOrder.setUpdatedBy(user);
         purchaseOrder.setUpdatedDate(now);
         purchaseOrderRepository.saveAndFlush(purchaseOrder);
@@ -301,8 +401,9 @@ public class PurchaseOrderPaymentService {
                 .map(PurchaseOrderPaymentEntity::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (committed.compareTo(defaultAmount(purchaseOrder.getGrandTotal())) > 0) {
-            throw new InvalidRequestException("Purchase order total cannot be less than pending or approved payments");
+        BigDecimal reserved = reservedInstructionAmount(purchaseOrder.getPurchaseOrderNo(), null);
+        if (committed.add(reserved).compareTo(defaultAmount(purchaseOrder.getGrandTotal())) > 0) {
+            throw new InvalidRequestException("Purchase order total cannot be less than pending payments and payment instructions");
         }
         purchaseOrderPaymentScheduleService.recalculateExpectedAmounts(purchaseOrder);
         for (PurchaseOrderPaymentScheduleEntity schedule : purchaseOrder.getPaymentSchedules()) {
@@ -311,9 +412,11 @@ public class PurchaseOrderPaymentService {
                     .map(PurchaseOrderPaymentEntity::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (scheduleCommitted.compareTo(defaultAmount(schedule.getExpectedAmount())) > 0) {
+            BigDecimal scheduleReserved = reservedInstructionAmount(
+                    purchaseOrder.getPurchaseOrderNo(), schedule.getId());
+            if (scheduleCommitted.add(scheduleReserved).compareTo(defaultAmount(schedule.getExpectedAmount())) > 0) {
                 throw new InvalidRequestException(
-                        "Purchase order total cannot make a payment schedule lower than its pending or approved payments"
+                        "Purchase order total cannot make a payment schedule lower than its committed payments and instructions"
                 );
             }
         }
@@ -448,7 +551,8 @@ public class PurchaseOrderPaymentService {
             PurchaseOrderEntity purchaseOrder,
             PurchaseOrderPaymentScheduleEntity schedule,
             BigDecimal requestedAmount,
-            Long excludedPaymentId
+            Long excludedPaymentId,
+            PurchaseOrderPaymentInstructionEntity instruction
     )
             throws InvalidRequestException {
         BigDecimal committed = purchaseOrder.getPayments().stream()
@@ -457,7 +561,16 @@ public class PurchaseOrderPaymentService {
                 .map(PurchaseOrderPaymentEntity::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (committed.add(requestedAmount).compareTo(defaultAmount(purchaseOrder.getGrandTotal())) > 0) {
+        BigDecimal reserved = reservedInstructionAmount(purchaseOrder.getPurchaseOrderNo(), null);
+        BigDecimal available = defaultAmount(purchaseOrder.getGrandTotal()).subtract(committed).subtract(reserved);
+        if (instruction != null) {
+            BigDecimal instructionRemaining = instructionRemaining(instruction);
+            if (requestedAmount.compareTo(instructionRemaining) > 0) {
+                throw new InvalidRequestException("Payment amount exceeds the remaining payment instruction amount");
+            }
+            available = available.add(instructionRemaining);
+        }
+        if (requestedAmount.compareTo(available.max(BigDecimal.ZERO)) > 0) {
             throw new InvalidRequestException("Payment amount exceeds the remaining purchase order total");
         }
         if (schedule != null) {
@@ -467,11 +580,54 @@ public class PurchaseOrderPaymentService {
                     .map(PurchaseOrderPaymentEntity::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (scheduleCommitted.add(requestedAmount)
-                    .compareTo(defaultAmount(schedule.getExpectedAmount())) > 0) {
+            BigDecimal scheduleReserved = reservedInstructionAmount(
+                    purchaseOrder.getPurchaseOrderNo(), schedule.getId());
+            BigDecimal scheduleAvailable = defaultAmount(schedule.getExpectedAmount())
+                    .subtract(scheduleCommitted).subtract(scheduleReserved);
+            if (instruction != null) scheduleAvailable = scheduleAvailable.add(instructionRemaining(instruction));
+            if (requestedAmount.compareTo(scheduleAvailable.max(BigDecimal.ZERO)) > 0) {
                 throw new InvalidRequestException("Payment amount exceeds the remaining payment schedule amount");
             }
         }
+    }
+
+    private PurchaseOrderPaymentInstructionEntity resolveInstruction(
+            PurchaseOrderEntity purchaseOrder,
+            PurchaseOrderPaymentScheduleEntity schedule,
+            Long instructionId
+    ) throws InvalidRequestException {
+        if (instructionId == null) return null;
+        PurchaseOrderPaymentInstructionEntity instruction = paymentInstructionRepository
+                .findByIdAndSchedule_PurchaseOrder_PurchaseOrderNo(instructionId, purchaseOrder.getPurchaseOrderNo())
+                .orElseThrow(() -> new InvalidRequestException(
+                        "Payment instruction does not belong to this purchase order"));
+        if (schedule == null || !Objects.equals(instruction.getSchedule().getId(), schedule.getId())) {
+            throw new InvalidRequestException("Payment instruction must belong to the selected schedule");
+        }
+        if (instruction.getStatus() != PurchaseOrderPaymentInstructionStatus.AWAITING_PAYMENT
+                && instruction.getStatus() != PurchaseOrderPaymentInstructionStatus.PARTIALLY_PAID) {
+            throw new InvalidRequestException("Payment instruction is not awaiting payment");
+        }
+        return instruction;
+    }
+
+    private BigDecimal instructionRemaining(PurchaseOrderPaymentInstructionEntity instruction) {
+        BigDecimal committed = instruction.getPayments().stream()
+                .filter(payment -> COMMITTED_STATUSES.contains(payment.getStatus()))
+                .map(PurchaseOrderPaymentEntity::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return defaultAmount(instruction.getAmount()).subtract(committed).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal reservedInstructionAmount(String purchaseOrderNo, Long scheduleId) {
+        return paymentInstructionRepository
+                .findBySchedule_PurchaseOrder_PurchaseOrderNoOrderByCreatedDateDescIdDesc(purchaseOrderNo).stream()
+                .filter(instruction -> scheduleId == null
+                        || Objects.equals(instruction.getSchedule().getId(), scheduleId))
+                .filter(instruction -> instruction.getStatus() == PurchaseOrderPaymentInstructionStatus.AWAITING_PAYMENT
+                        || instruction.getStatus() == PurchaseOrderPaymentInstructionStatus.PARTIALLY_PAID)
+                .map(this::instructionRemaining)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private PurchaseOrderPaymentScheduleEntity resolveSchedule(PurchaseOrderEntity purchaseOrder, Long scheduleId)
@@ -500,6 +656,17 @@ public class PurchaseOrderPaymentService {
         if (schedule != null) schedule.addPayment(payment);
     }
 
+    private void assignInstruction(
+            PurchaseOrderPaymentEntity payment,
+            PurchaseOrderPaymentInstructionEntity instruction
+    ) {
+        PurchaseOrderPaymentInstructionEntity previous = payment.getInstruction();
+        if (previous == instruction) return;
+        if (previous != null) previous.getPayments().remove(payment);
+        payment.setInstruction(instruction);
+        if (instruction != null) instruction.getPayments().add(payment);
+    }
+
     private void applyPaymentValues(
             PurchaseOrderPaymentEntity payment,
             PurchaseOrderPaymentType paymentType,
@@ -514,7 +681,8 @@ public class PurchaseOrderPaymentService {
             java.time.LocalDate chequeDate,
             String chequeBranch,
             String remark,
-            Currency currency
+            Currency currency,
+            BigDecimal requestedAmountThb
     ) {
         BigDecimal normalizedRate = currency == Currency.THB ? BigDecimal.ONE : exchangeRate;
         payment.setPaymentType(paymentType);
@@ -525,7 +693,9 @@ public class PurchaseOrderPaymentService {
         payment.setAmount(amount.setScale(5, RoundingMode.HALF_UP));
         payment.setCurrency(currency);
         payment.setExchangeRate(normalizedRate.setScale(6, RoundingMode.HALF_UP));
-        payment.setAmountThb(amount.multiply(normalizedRate).setScale(5, RoundingMode.HALF_UP));
+        payment.setAmountThb((requestedAmountThb == null
+                ? amount.multiply(normalizedRate)
+                : requestedAmountThb).setScale(5, RoundingMode.HALF_UP));
         payment.setPaymentMethod(paymentMethod);
         payment.setTransferReference(paymentMethod == PaymentMethod.TRANSFER ? StringUtils.trimToNull(transferReference) : null);
         payment.setChequeBank(paymentMethod == PaymentMethod.CHEQUE ? StringUtils.trimToNull(chequeBank) : null);
@@ -533,6 +703,12 @@ public class PurchaseOrderPaymentService {
         payment.setChequeDate(paymentMethod == PaymentMethod.CHEQUE ? chequeDate : null);
         payment.setChequeBranch(paymentMethod == PaymentMethod.CHEQUE ? StringUtils.trimToNull(chequeBranch) : null);
         payment.setRemark(StringUtils.trimToNull(remark));
+    }
+
+    private void validateAmountThb(BigDecimal amountThb) throws InvalidRequestException {
+        if (amountThb != null && amountThb.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidRequestException("amountThb must be greater than zero when provided");
+        }
     }
 
     private void addAttachments(

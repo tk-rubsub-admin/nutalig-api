@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261019-004-set-schedule-status-after-payment-instruction
+      author: codex
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              UPDATE purchase_order_payment_schedule schedule
+              SET status = 'AWAITING_PAYMENT'
+              WHERE schedule.status = 'AWAITING_PAYMENT_SETUP'
+                AND EXISTS (
+                    SELECT 1
+                    FROM purchase_order_payment_instruction instruction
+                    WHERE instruction.schedule_id = schedule.id
+                      AND instruction.status IN ('AWAITING_PAYMENT', 'PARTIALLY_PAID')
+                )

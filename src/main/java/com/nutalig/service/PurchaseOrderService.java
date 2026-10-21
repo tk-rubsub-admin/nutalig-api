@@ -2,6 +2,7 @@ package com.nutalig.service;
 
 import com.nutalig.constant.Currency;
 import com.nutalig.constant.*;
+import com.nutalig.config.LineConfiguration;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CompletePurchaseOrderProductionRequest;
@@ -39,11 +40,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -84,6 +89,8 @@ public class PurchaseOrderService {
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
+    private final LineMessageService lineMessageService;
+    private final LineConfiguration lineConfiguration;
 
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrderEntity createPurchaseOrder(CreatePurchaseOrderRequest request, List<MultipartFile> attachments, String userId)
@@ -297,6 +304,20 @@ public class PurchaseOrderService {
         entity = purchaseOrderRepository.save(entity);
         purchaseOrderMilestoneService.initializeMilestones(entity, userId);
         recordCreatePurchaseOrderActivity(entity, userId);
+        PurchaseOrderPaymentScheduleEntity firstInstallment = entity.getPaymentSchedules().stream()
+                .filter(schedule -> Objects.equals(schedule.getInstallmentNo(), 1))
+                .findFirst()
+                .orElse(null);
+        if (firstInstallment != null
+                && firstInstallment.getStatus() == PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP) {
+            notifyAccountingAdminsOfFirstInstallmentAfterCommit(
+                    entity.getPurchaseOrderNo(),
+                    StringUtils.defaultIfBlank(entity.getSupplierNameSnapshot(), supplier.getSupplierName()),
+                    firstInstallment.getInstallmentNo(),
+                    entity.getCurrency().name(),
+                    firstInstallment.getExpectedAmount()
+            );
+        }
 
         PurchaseOrderStatus createdStatus = entity.getStatus();
         entity.setStatus(PurchaseOrderStatus.AWAITING_PAYMENT);
@@ -316,6 +337,227 @@ public class PurchaseOrderService {
         recordSalesOrderProcurementCreatedActivity(salesOrder, entity, userId);
 
         return entity;
+    }
+
+    private void notifyAccountingAdminsOfFirstInstallmentAfterCommit(
+            String purchaseOrderNo,
+            String supplierName,
+            Integer installmentNo,
+            String currency,
+            BigDecimal installmentAmount
+    ) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.warn("Skip first installment notification for PO {} because no transaction synchronization is active",
+                    purchaseOrderNo);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    sendAccountingAdminPaymentScheduleCard(
+                            purchaseOrderNo,
+                            supplierName,
+                            installmentNo,
+                            currency,
+                            installmentAmount
+                    );
+                } catch (Exception exception) {
+                    log.warn("Cannot send first installment notifications to accounting for PO {}",
+                            purchaseOrderNo, exception);
+                }
+            }
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public void notifySuperAdminsOfPaymentSchedule(String purchaseOrderNo, Long scheduleId)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        PurchaseOrderPaymentScheduleEntity schedule = purchaseOrder.getPaymentSchedules().stream()
+                .filter(item -> Objects.equals(item.getId(), scheduleId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Payment schedule " + scheduleId + " not found for purchase order " + purchaseOrderNo + "."));
+        if (schedule.getStatus() != PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP) {
+            throw new InvalidRequestException("Only payment schedules awaiting payment can be notified.");
+        }
+        try {
+            sendPaymentScheduleCardToUsers(
+                    getActiveSuperAdmins(),
+                    purchaseOrder.getPurchaseOrderNo(),
+                    StringUtils.defaultIfBlank(purchaseOrder.getSupplierNameSnapshot(),
+                            purchaseOrder.getSupplier() != null ? purchaseOrder.getSupplier().getSupplierName() : null),
+                    schedule.getInstallmentNo(),
+                    purchaseOrder.getCurrency().name(),
+                    schedule.getExpectedAmount(),
+                    "SUPER_ADMIN",
+                    purchaseOrder.getPurchaseOrderNo() + " มีงวดที่ "
+                            + schedule.getInstallmentNo() + " รอโอนชำระ",
+                    "PO รอโอนชำระ"
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot send payment schedule notification for PO " + purchaseOrderNo,
+                    exception);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void notifyAccountingAdminsOfPaymentSchedule(String purchaseOrderNo, Long scheduleId)
+            throws DataNotFoundException, InvalidRequestException {
+        PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        PurchaseOrderPaymentScheduleEntity schedule = purchaseOrder.getPaymentSchedules().stream()
+                .filter(item -> Objects.equals(item.getId(), scheduleId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Payment schedule " + scheduleId + " not found for purchase order " + purchaseOrderNo + "."));
+        if (schedule.getStatus() != PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP) {
+            throw new InvalidRequestException("Only payment schedules awaiting payment can be confirmed.");
+        }
+
+        List<UserEntity> accountingAdmins = getActiveAccountingAdmins();
+        try {
+            sendPaymentScheduleCardToUsers(
+                    accountingAdmins,
+                    purchaseOrder.getPurchaseOrderNo(),
+                    StringUtils.defaultIfBlank(purchaseOrder.getSupplierNameSnapshot(),
+                            purchaseOrder.getSupplier() != null ? purchaseOrder.getSupplier().getSupplierName() : null),
+                    schedule.getInstallmentNo(),
+                    purchaseOrder.getCurrency().name(),
+                    schedule.getExpectedAmount(),
+                    "ACCOUNTING_ADMIN",
+                    purchaseOrder.getPurchaseOrderNo() + " มีงวดที่ "
+                            + schedule.getInstallmentNo() + " รอตั้งจ่าย",
+                    "PO รอตั้งจ่าย"
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot send payment schedule notification to accounting for PO "
+                    + purchaseOrderNo, exception);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void notifyAccountingAdminsForSavePayment(String purchaseOrderNo, Long scheduleId)
+            throws DataNotFoundException {
+        PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        PurchaseOrderPaymentScheduleEntity schedule = purchaseOrder.getPaymentSchedules().stream()
+                .filter(item -> Objects.equals(item.getId(), scheduleId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Payment schedule " + scheduleId + " not found for purchase order " + purchaseOrderNo + "."));
+
+        List<UserEntity> accountingAdmins = getActiveAccountingAdmins();
+        try {
+            sendPaymentScheduleCardToUsers(
+                    accountingAdmins,
+                    purchaseOrder.getPurchaseOrderNo(),
+                    StringUtils.defaultIfBlank(purchaseOrder.getSupplierNameSnapshot(),
+                            purchaseOrder.getSupplier() != null ? purchaseOrder.getSupplier().getSupplierName() : null),
+                    schedule.getInstallmentNo(),
+                    purchaseOrder.getCurrency().name(),
+                    schedule.getExpectedAmount(),
+                    "ACCOUNTING_ADMIN",
+                    purchaseOrder.getPurchaseOrderNo() + " มีงวดที่ "
+                            + schedule.getInstallmentNo() + " รอบันทึกการชำระเงิน",
+                    "PO รอบันทึกการชำระเงิน"
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot send payment schedule notification to accounting for PO "
+                    + purchaseOrderNo, exception);
+        }
+    }
+
+    private void sendAccountingAdminPaymentScheduleCard(
+            String purchaseOrderNo,
+            String supplierName,
+            Integer installmentNo,
+            String currency,
+            BigDecimal installmentAmount
+    ) throws Exception {
+        sendPaymentScheduleCardToUsers(
+                getActiveAccountingAdmins(),
+                purchaseOrderNo,
+                supplierName,
+                installmentNo,
+                currency,
+                installmentAmount,
+                "ACCOUNTING_ADMIN",
+                "PO " + purchaseOrderNo + " มีงวดที่ " + installmentNo + " รอตั้งจ่าย",
+                "PO รอตั้งจ่าย"
+        );
+    }
+
+    private List<UserEntity> getActiveAccountingAdmins() {
+        return userRepository.findAllWithEmployeePosition().stream()
+                .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                .filter(user -> user.getEmployeeEntity() != null
+                        && user.getEmployeeEntity().getPosition() != null
+                        && user.getEmployeeEntity().getPosition().getId() != null
+                        && "ACCOUNTING_ADMIN".equals(user.getEmployeeEntity().getPosition().getId().getCode()))
+                .toList();
+    }
+
+    private List<UserEntity> getActiveSuperAdmins() {
+        return userRepository.findByRoleIn(List.of(RoleCode.SUPER_ADMIN.name()))
+                .stream()
+                .filter(user -> Status.ACTIVE.equals(user.getStatus()))
+                .filter(user -> StringUtils.isNotBlank(user.getLineUserId()))
+                .toList();
+    }
+
+    private void sendPaymentScheduleCardToUsers(
+            List<UserEntity> recipients,
+            String purchaseOrderNo,
+            String supplierName,
+            Integer installmentNo,
+            String currency,
+            BigDecimal installmentAmount,
+            String recipientType,
+            String altText,
+            String cardTitle
+    ) throws Exception {
+        if (recipients.isEmpty()) {
+            throw new IllegalStateException("No active " + recipientType + " users with LINE binding found");
+        }
+        URI loginSuccessUri = URI.create(lineConfiguration.getLoginSuccessUrl());
+        String detailUrl = UriComponentsBuilder
+                .fromUriString(loginSuccessUri.getScheme() + "://" + loginSuccessUri.getAuthority())
+                .pathSegment("purchase-order", purchaseOrderNo)
+                .queryParam("tab", "payment")
+                .build()
+                .toUriString();
+        String detail = "เลขที่ PO: " + purchaseOrderNo
+                + "\nSupplier: " + StringUtils.defaultIfBlank(supplierName, "-")
+                + "\nงวดที่ " + installmentNo + ": "
+                + installmentAmount.stripTrailingZeros().toPlainString() + " " + currency
+                + "\nสถานะ: รอตั้งจ่าย";
+
+        int sentCount = 0;
+        Exception lastException = null;
+        for (UserEntity recipient : recipients) {
+            try {
+                lineMessageService.sendNotificationCard(
+                        recipient.getId(),
+                        altText,
+                        cardTitle,
+                        detail,
+                        detailUrl
+                );
+                sentCount++;
+            } catch (Exception exception) {
+                lastException = exception;
+                log.warn("Cannot send payment schedule notification to {} {} for PO {}",
+                        recipientType, recipient.getId(), purchaseOrderNo, exception);
+            }
+        }
+        if (sentCount == 0) {
+            throw new IllegalStateException("Unable to deliver notification to any " + recipientType, lastException);
+        }
     }
 
     @Transactional(readOnly = true)

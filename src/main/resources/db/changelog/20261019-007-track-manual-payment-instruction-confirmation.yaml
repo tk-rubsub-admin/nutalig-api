@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261019-007-track-manual-payment-instruction-confirmation
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE purchase_order_payment_instruction
+                  ADD COLUMN manually_confirmed_paid BOOLEAN NOT NULL DEFAULT FALSE;

@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261019-001-add-purchase-order-payment-confirm-permission
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at) VALUES
+                  ('PERM_PURCHASE_ORDER_PAYMENT_CONFIRM', 'ยืนยันแจ้งบัญชีชำระเงินใบสั่งซื้อ', 'Confirm purchase order payment notification', 'purchase_order', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code) VALUES
+                  ('SUPER_ADMIN', 'PERM_PURCHASE_ORDER_PAYMENT_CONFIRM'),
+                  ('PROCUREMENT', 'PERM_PURCHASE_ORDER_PAYMENT_CONFIRM'),
+                  ('PROCUREMENT_ADMIN', 'PERM_PURCHASE_ORDER_PAYMENT_CONFIRM'),
+                  ('PROCUREMENT_MANAGER', 'PERM_PURCHASE_ORDER_PAYMENT_CONFIRM');

@@ -21,6 +21,8 @@ public class InvoiceDocumentDto extends DefaultDocumentDto {
     private String thaiBahtText;
     private String deliveryDate;
     private String dueDate;
+    private String depositLabel;
+    private String depositDate;
 
     // Customer
     private String custName;

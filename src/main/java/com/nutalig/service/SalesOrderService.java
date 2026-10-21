@@ -843,7 +843,7 @@ public class SalesOrderService {
                 EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES
         );
         customer.setTotalSalesOrderAmount(defaultIfNull(total));
-        customerTierService.applyTier(customer);
+//        customerTierService.applyTier(customer);
         customerRepository.save(customer);
     }
 

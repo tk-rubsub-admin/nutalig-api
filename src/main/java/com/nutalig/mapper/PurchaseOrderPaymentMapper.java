@@ -22,6 +22,7 @@ public class PurchaseOrderPaymentMapper {
         PurchaseOrderPaymentDto dto = new PurchaseOrderPaymentDto();
         dto.setId(entity.getId());
         dto.setScheduleId(entity.getSchedule() == null ? null : entity.getSchedule().getId());
+        dto.setInstructionId(entity.getInstruction() == null ? null : entity.getInstruction().getId());
         dto.setPaymentType(entity.getPaymentType());
         dto.setInstallmentNo(entity.getInstallmentNo());
         dto.setPaymentDate(entity.getPaymentDate());

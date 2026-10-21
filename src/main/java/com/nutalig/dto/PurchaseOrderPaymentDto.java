@@ -15,6 +15,7 @@ import java.util.List;
 public class PurchaseOrderPaymentDto {
     private Long id;
     private Long scheduleId;
+    private Long instructionId;
     private PurchaseOrderPaymentType paymentType;
     private Integer installmentNo;
     private ZonedDateTime paymentDate;

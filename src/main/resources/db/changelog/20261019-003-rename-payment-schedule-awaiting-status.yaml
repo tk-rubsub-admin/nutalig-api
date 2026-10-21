@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261019-003-rename-payment-schedule-awaiting-status
+      author: codex
+      changes:
+        - sql:
+            sql: >
+              UPDATE purchase_order_payment_schedule
+              SET status = 'AWAITING_PAYMENT_SETUP'
+              WHERE status = 'AWAITING_PAYMENT';

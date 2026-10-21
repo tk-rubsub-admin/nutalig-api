@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261020-001-add-confirmed-paid-date-to-payment-instruction
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE purchase_order_payment_instruction
+                  ADD COLUMN confirmed_paid_date DATETIME(6) DEFAULT NULL;

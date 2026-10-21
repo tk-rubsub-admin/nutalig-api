@@ -199,6 +199,8 @@ public class ReportService {
         parameters.put("custAddress", dto.getCustAddress());
         parameters.put("custMobileNo", dto.getCustMobileNo());
         parameters.put("dueDate", dto.getDueDate());
+        parameters.put("depositLabel", dto.getDepositLabel());
+        parameters.put("depositDate", dto.getDepositDate());
         parameters.put("salesOrderNo", dto.getSalesOrderNo());
         parameters.put("quotationNo", dto.getQuotationNo());
 

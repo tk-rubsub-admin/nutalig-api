@@ -1,0 +1,53 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261019-002-add-purchase-order-payment-instructions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_payment_instruction (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  schedule_id BIGINT NOT NULL,
+                  amount DECIMAL(18,5) NOT NULL,
+                  amount_thb DECIMAL(18,5) NOT NULL,
+                  currency VARCHAR(10) NOT NULL,
+                  exchange_rate DECIMAL(18,6) NOT NULL,
+                  planned_payment_date DATE NOT NULL,
+                  paid_amount DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  paid_amount_thb DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  status VARCHAR(30) NOT NULL DEFAULT 'AWAITING_PAYMENT',
+                  remark VARCHAR(2000) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_po_payment_instruction_schedule (schedule_id),
+                  KEY idx_po_payment_instruction_status (status),
+                  CONSTRAINT fk_po_payment_instruction_schedule
+                      FOREIGN KEY (schedule_id) REFERENCES purchase_order_payment_schedule (id),
+                  CONSTRAINT fk_po_payment_instruction_created_by
+                      FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_po_payment_instruction_updated_by
+                      FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              ALTER TABLE purchase_order_payment
+                  ADD COLUMN instruction_id BIGINT DEFAULT NULL AFTER schedule_id,
+                  ADD KEY idx_po_payment_instruction_id (instruction_id),
+                  ADD CONSTRAINT fk_po_payment_instruction
+                      FOREIGN KEY (instruction_id) REFERENCES purchase_order_payment_instruction (id);
+
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at) VALUES
+                  ('PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT', 'ตั้งจ่ายเงินใบสั่งซื้อ', 'Create purchase order payment instructions', 'purchase_order', NOW(6))
+              ON DUPLICATE KEY UPDATE
+                  name_th = VALUES(name_th),
+                  name_en = VALUES(name_en),
+                  `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code) VALUES
+                  ('ACCOUNT', 'PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT'),
+                  ('ACCOUNT_ADMIN', 'PERM_PURCHASE_ORDER_PAYMENT_INSTRUCT'),
+                  ('ACCOUNT', 'PERM_PURCHASE_ORDER_PAYMENT_CREATE'),
+                  ('ACCOUNT_ADMIN', 'PERM_PURCHASE_ORDER_PAYMENT_CREATE');

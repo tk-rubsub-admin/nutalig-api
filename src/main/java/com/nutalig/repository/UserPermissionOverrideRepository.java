@@ -12,4 +12,6 @@ import java.util.List;
 public interface UserPermissionOverrideRepository extends JpaRepository<UserPermissionOverrideEntity, UserPermissionOverrideId> {
     @Query("select u from UserPermissionOverride u where u.userId = :userId")
     List<UserPermissionOverrideEntity> findByUserId(String userId);
+
+    List<UserPermissionOverrideEntity> findByPermissionCode(String permissionCode);
 }

@@ -19,6 +19,7 @@ public class UpdatePurchaseOrderPaymentRequest {
     private ZonedDateTime paymentDate;
 
     private BigDecimal amount;
+    private BigDecimal amountThb;
     private BigDecimal exchangeRate;
     private PaymentMethod paymentMethod;
     private String transferReference;
