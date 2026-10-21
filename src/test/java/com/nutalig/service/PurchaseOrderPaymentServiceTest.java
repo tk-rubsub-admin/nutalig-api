@@ -28,7 +28,11 @@ class PurchaseOrderPaymentServiceTest {
                 null,
                 null,
                 null,
-                new PurchaseOrderPaymentScheduleService(null, null)
+                new PurchaseOrderPaymentScheduleService(null, null),
+                null,
+                null,
+                null,
+                null
         );
     }
 
