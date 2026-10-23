@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261023-001-add-supplier-quoted-tier-id-to-rfq-tier-split
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: rfq_tier_split
+                columnName: supplier_quoted_tier_id
+      changes:
+        - addColumn:
+            tableName: rfq_tier_split
+            columns:
+              - column:
+                  name: supplier_quoted_tier_id
+                  type: BIGINT

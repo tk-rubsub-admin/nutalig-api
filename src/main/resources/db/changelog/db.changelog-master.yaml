@@ -3083,6 +3083,8 @@ databaseChangeLog:
   - include:
       file: db/changelog/20260926-001-add-purchase-order-start-run-permission.yaml
   - include:
+      file: db/changelog/20261023-001-add-supplier-quoted-tier-id-to-rfq-tier-split.yaml
+  - include:
       file: db/changelog/20260926-002-add-purchase-order-late-start-reason.yaml
   - include:
       file: db/changelog/20261006-001-add-purchase-order-start-run-override-reason.yaml
@@ -3126,3 +3128,5 @@ databaseChangeLog:
       file: db/changelog/20261020-002-add-purchase-order-payment-drafts.yaml
   - include:
       file: db/changelog/20261020-001-add-confirmed-paid-date-to-payment-instruction.yaml
+  - include:
+      file: db/changelog/20261023-002-rename-supplier-quoted-tier-id-on-rfq-tier-split.yaml

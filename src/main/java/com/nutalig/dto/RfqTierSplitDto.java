@@ -11,6 +11,7 @@ public class RfqTierSplitDto {
 
     private Long id;
     private SupplierDto supplier;
+    private Long supplierQuoteTierId;
     private BigDecimal quantity;
     private BigDecimal productPrice;
     private BigDecimal sellPrice;

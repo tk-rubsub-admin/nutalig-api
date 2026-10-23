@@ -42,6 +42,9 @@ public class RfqTierSplitEntity extends AuditDateEntity {
     @ToString.Exclude
     private SupplierEntity supplier;
 
+    @Column(name = "supplier_quote_tier_id")
+    private Long supplierQuoteTierId;
+
     @Column(name = "quantity", precision = 18, scale = 0, nullable = false)
     @ToString.Include
     private BigDecimal quantity;

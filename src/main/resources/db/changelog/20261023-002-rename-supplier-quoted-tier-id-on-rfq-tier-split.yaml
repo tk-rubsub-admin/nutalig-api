@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261023-002-rename-supplier-quoted-tier-id-on-rfq-tier-split
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: rfq_tier_split
+            columnName: supplier_quoted_tier_id
+        - not:
+            - columnExists:
+                tableName: rfq_tier_split
+                columnName: supplier_quote_tier_id
+      changes:
+        - renameColumn:
+            tableName: rfq_tier_split
+            oldColumnName: supplier_quoted_tier_id
+            newColumnName: supplier_quote_tier_id
+            columnDataType: BIGINT

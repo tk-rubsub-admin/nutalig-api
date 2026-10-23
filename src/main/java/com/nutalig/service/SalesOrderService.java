@@ -82,6 +82,7 @@ public class SalesOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final RequestPriceDetailRepository requestPriceDetailRepository;
+    private final RequestPriceTierSplitRepository requestPriceTierSplitRepository;
     private final RFQService rfqService;
     private final RequestPriceTierRepository requestPriceTierRepository;
     private final QuotationRepository quotationRepository;
@@ -1452,6 +1453,17 @@ public class SalesOrderService {
                 ));
 
         Map<Long, String> resolvedShippingMethods = salesOrderItemShippingService.resolveShippingMethods(entity.getItems());
+        Map<Long, Long> splitSupplierQuoteTierIdBySplitId = requestPriceTierSplitRepository.findAllById(
+                        entity.getItems().stream()
+                                .map(SalesOrderDetailEntity::getRfqTierSplitId)
+                                .filter(Objects::nonNull)
+                                .collect(java.util.stream.Collectors.toSet())
+                ).stream()
+                .filter(split -> split.getSupplierQuoteTierId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        RfqTierSplitEntity::getId,
+                        RfqTierSplitEntity::getSupplierQuoteTierId
+                ));
         List<SalesOrderDetailDto> items = new ArrayList<>();
         for (SalesOrderDetailEntity detail : entity.getItems()) {
             SalesOrderDetailDto item = new SalesOrderDetailDto();
@@ -1478,7 +1490,11 @@ public class SalesOrderService {
             item.setSupplierUnitPrice(detail.getSupplierUnitPrice());
             item.setSupplierShippingCost(detail.getSupplierShippingCost());
             item.setSupplierTotalUnitCost(detail.getSupplierTotalUnitCost());
-            item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());
+            item.setSupplierQuoteTierId(
+                    splitSupplierQuoteTierIdBySplitId.getOrDefault(
+                            detail.getRfqTierSplitId(), detail.getSupplierQuoteTierId()
+                    )
+            );
             items.add(item);
         }
         dto.setItems(items);
