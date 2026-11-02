@@ -99,6 +99,7 @@ public class InvoiceService {
     private final LineMessageService lineMessageService;
     private final LineConfiguration lineConfiguration;
     private final UserProfileService userProfileService;
+    private final SalesOrderPaymentScheduleService salesOrderPaymentScheduleService;
 
     @Transactional(rollbackFor = Exception.class)
     public InvoiceEntity createInvoice(CreateInvoiceRequest request, String userId)
@@ -111,6 +112,9 @@ public class InvoiceService {
         }
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        SalesOrderPaymentScheduleEntity paymentSchedule = request.getPaymentScheduleId() == null
+                ? null
+                : salesOrderPaymentScheduleService.resolveForInvoice(request.getPaymentScheduleId(), salesOrder.getSalesOrderNo());
 
         LocalDate docDate = request.getDocDate() != null ? request.getDocDate() : LocalDate.now(DateUtil.getTimeZone());
         LocalDate dueDate = request.getDueDate() != null
@@ -125,8 +129,9 @@ public class InvoiceService {
         entity.setDocDate(docDate);
         entity.setDueDate(dueDate);
         entity.setDeliveryDate(request.getDeliveryDate());
-        entity.setInstallmentNo(resolveInstallmentNo(salesOrder, request));
-        entity.setInstallmentCount(resolveInstallmentCount(salesOrder, request));
+        entity.setInstallmentNo(paymentSchedule == null ? resolveInstallmentNo(salesOrder, request) : paymentSchedule.getInstallmentNo());
+        entity.setInstallmentCount(paymentSchedule == null ? resolveInstallmentCount(salesOrder, request)
+                : salesOrder.getPaymentSchedules().size());
         entity.setCurrency(salesOrder.getCurrency());
         entity.setCustomer(salesOrder.getCustomer());
         entity.setCustomerAddress(salesOrder.getCustomerAddress());
@@ -167,6 +172,22 @@ public class InvoiceService {
         entity.setCreatedDate(now);
         entity.setUpdatedDate(now);
         applySummaryOverride(entity, request);
+        if (paymentSchedule != null) {
+            boolean hasSummaryOverride = request.getSubTotal() != null || request.getDiscount() != null
+                    || request.getAmount() != null || request.getVat() != null || request.getGrandTotal() != null;
+            if (!hasSummaryOverride) {
+                BigDecimal expected = paymentSchedule.getExpectedAmount();
+                entity.setSubTotal(expected);
+                entity.setDiscount(BigDecimal.ZERO);
+                entity.setFreight(BigDecimal.ZERO);
+                entity.setAmount(expected);
+                entity.setVat(BigDecimal.ZERO);
+                entity.setGrandTotal(expected);
+                entity.setOutstandingTotal(expected);
+            } else if (defaultIfNull(entity.getGrandTotal()).compareTo(defaultIfNull(paymentSchedule.getExpectedAmount())) > 0) {
+                throw new InvalidRequestException("Invoice amount exceeds payment schedule amount");
+            }
+        }
 
         int lineNo = 1;
         for (SalesOrderDetailEntity salesOrderItem : salesOrder.getItems()) {
@@ -186,7 +207,11 @@ public class InvoiceService {
             entity.addItem(detail);
         }
 
+        entity.setPaymentSchedule(paymentSchedule);
         invoiceRepository.save(entity);
+        if (paymentSchedule != null) {
+            salesOrderPaymentScheduleService.recalculateStatuses(salesOrder.getSalesOrderNo());
+        }
         if (requiresPaymentTermApproval(entity.getCustomerPaymentTerm() == null ? null : entity.getCustomerPaymentTerm().getId().getCode())) {
             try {
                 approvalService.createInvoicePaymentTermApprovalRequest(entity, userId);
@@ -311,6 +336,7 @@ public class InvoiceService {
         invoice.setUpdatedDate(now);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
         salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
         customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
         if (shouldCreateRequiredApproveRequest) {
@@ -399,6 +425,7 @@ public class InvoiceService {
 
         markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, PUBLIC_TOKEN_ACTOR);
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
         customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
@@ -447,6 +474,7 @@ public class InvoiceService {
         invoice.setUpdatedDate(now);
 
         InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
         customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
@@ -610,6 +638,7 @@ public class InvoiceService {
 
         invoice.addPayment(payment);
         InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
         recordReceivePaymentActivity(saved, payment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
 //        sendAwaitingValidationNotifications(saved, savedPayment);
         return mapToDto(saved);
@@ -991,6 +1020,7 @@ public class InvoiceService {
         // Match the installment schedule used on the invoice creation screen.
         int firstInstallmentPercent = switch (paymentTerm) {
             case "DEP50" -> 50;
+            case "DEP_40_60" -> 40;
             case "DEP30_BBS" -> 30;
             case "DEP35_35_30_BBS" -> 35;
             default -> 100;
@@ -1052,6 +1082,7 @@ public class InvoiceService {
         dto.setDeliveryDate(entity.getDeliveryDate() != null ? entity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
         dto.setInstallmentNo(entity.getInstallmentNo());
         dto.setInstallmentCount(entity.getInstallmentCount());
+        dto.setPaymentScheduleId(entity.getPaymentSchedule() == null ? null : entity.getPaymentSchedule().getId());
         dto.setStatus(entity.getStatus());
         dto.setStatusProfile(DocumentStatusResolver.resolveInvoice(entity.getStatus(), entity.getPayments()));
         dto.setCurrency(entity.getCurrency());

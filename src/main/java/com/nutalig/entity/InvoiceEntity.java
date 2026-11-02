@@ -53,6 +53,11 @@ public class InvoiceEntity extends AuditDateEntity {
     @Column(name = "installment_count")
     private Integer installmentCount;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sales_order_payment_schedule_id")
+    @ToString.Exclude
+    private SalesOrderPaymentScheduleEntity paymentSchedule;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30)
     private InvoiceStatus status;

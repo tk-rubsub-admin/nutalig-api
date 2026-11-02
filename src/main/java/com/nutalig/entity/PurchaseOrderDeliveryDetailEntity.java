@@ -29,6 +29,10 @@ public class PurchaseOrderDeliveryDetailEntity {
     @JoinColumn(name = "purchase_order_detail_component_id")
     private PurchaseOrderDetailComponentEntity purchaseOrderDetailComponent;
 
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "scrap_box_id")
+    private PurchaseOrderDeliveryScrapBoxEntity scrapBox;
+
     @Column(name = "product_name_snapshot", nullable = false, length = 255)
     private String productNameSnapshot;
 

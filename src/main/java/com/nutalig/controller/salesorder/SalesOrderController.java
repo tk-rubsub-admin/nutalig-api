@@ -15,6 +15,7 @@ import com.nutalig.controller.salesorder.request.SearchSalesOrderRequest;
 import com.nutalig.controller.salesorder.request.UpdateSalesOrderRequest;
 import com.nutalig.controller.salesorder.response.CreateSalesOrderResponse;
 import com.nutalig.dto.SalesOrderDto;
+import com.nutalig.dto.SalesOrderPaymentScheduleDto;
 import com.nutalig.dto.PurchaseOrderTimelineDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.SalesOrderEntity;
@@ -22,8 +23,9 @@ import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.SalesOrderService;
 import com.nutalig.service.PurchaseOrderService;
+import com.nutalig.service.SalesOrderPaymentScheduleService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,12 +37,27 @@ import static com.nutalig.constant.ResponseStatus.SUCCESS;
 
 @Slf4j
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/v1/sales-orders")
 public class SalesOrderController {
 
     private final SalesOrderService salesOrderService;
     private final PurchaseOrderService purchaseOrderService;
+    private final SalesOrderPaymentScheduleService salesOrderPaymentScheduleService;
+
+    @Autowired
+    public SalesOrderController(
+            SalesOrderService salesOrderService,
+            PurchaseOrderService purchaseOrderService,
+            SalesOrderPaymentScheduleService salesOrderPaymentScheduleService
+    ) {
+        this.salesOrderService = salesOrderService;
+        this.purchaseOrderService = purchaseOrderService;
+        this.salesOrderPaymentScheduleService = salesOrderPaymentScheduleService;
+    }
+
+    public SalesOrderController(SalesOrderService salesOrderService, PurchaseOrderService purchaseOrderService) {
+        this(salesOrderService, purchaseOrderService, null);
+    }
 
     @PostMapping("/search")
     public GeneralResponse<Pageable<SalesOrderDto>> searchSalesOrders(
@@ -90,6 +107,12 @@ public class SalesOrderController {
 
         log.info("=== End get sales order by id {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/payment-schedules")
+    public GeneralResponse<java.util.List<SalesOrderPaymentScheduleDto>> getPaymentSchedules(
+            @PathVariable(name = "id") String id) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, salesOrderPaymentScheduleService.getSchedules(id));
     }
 
     @GetMapping("/{id}/production-timelines")

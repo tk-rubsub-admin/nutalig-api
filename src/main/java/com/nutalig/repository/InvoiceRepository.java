@@ -16,6 +16,7 @@ import org.springframework.data.repository.query.Param;
 @Repository
 public interface InvoiceRepository extends JpaRepository<InvoiceEntity, String>, JpaSpecificationExecutor<InvoiceEntity> {
     List<InvoiceEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
+    List<InvoiceEntity> findByPaymentScheduleId(Long paymentScheduleId);
 
     @Query(value = """
             select count(*)

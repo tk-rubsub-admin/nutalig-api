@@ -21,5 +21,6 @@ public class CreateInvoiceRequest {
     private String customerPaymentTerm;
     private Integer installmentNo;
     private Integer installmentCount;
+    private Long paymentScheduleId;
     private QuotationCustomerSnapshotDto customerSnapshot;
 }

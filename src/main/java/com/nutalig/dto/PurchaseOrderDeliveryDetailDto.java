@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 @Data
 public class PurchaseOrderDeliveryDetailDto {
     private Long id;
+    private Long scrapBoxId;
     private Long purchaseOrderDetailId;
     private Long purchaseOrderDetailComponentId;
     private String productName;

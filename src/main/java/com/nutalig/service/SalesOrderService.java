@@ -105,6 +105,7 @@ public class SalesOrderService {
     private final FileStorageService fileStorageService;
     private final SalesOrderAttachmentRepository salesOrderAttachmentRepository;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
+    private final SalesOrderPaymentScheduleService salesOrderPaymentScheduleService;
 
     record SalesOrderSummary(
             BigDecimal subTotal,
@@ -176,6 +177,8 @@ public class SalesOrderService {
         entity.setVat(summary.vat());
         entity.setGrandTotal(summary.grandTotal());
 
+        salesOrderPaymentScheduleService.initializeSchedules(entity, now);
+
         salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(customer);
         recalculatePaymentSummary(entity.getSalesOrderNo());
@@ -202,7 +205,7 @@ public class SalesOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public SalesOrderDto updateSalesOrder(String salesOrderNo, UpdateSalesOrderRequest request, String userId)
-            throws DataNotFoundException {
+            throws DataNotFoundException, InvalidRequestException {
         log.info("Update sales order {} by {}", salesOrderNo, userId);
 
         SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
@@ -211,6 +214,7 @@ public class SalesOrderService {
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
         Integer oldRevNo = entity.getRevNo();
+        BigDecimal previousGrandTotal = entity.getGrandTotal();
         Map<String, Object> before = buildSalesOrderSnapshot(entity);
 
         if (request.getDocDate() != null) {
@@ -302,6 +306,10 @@ public class SalesOrderService {
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         entity.setUpdatedBy(user);
+
+        if (previousGrandTotal == null || previousGrandTotal.compareTo(entity.getGrandTotal()) != 0) {
+            salesOrderPaymentScheduleService.recalculateExpectedAmounts(entity);
+        }
 
         salesOrderRepository.save(entity);
         refreshCustomerOrderTotal(entity.getCustomer());

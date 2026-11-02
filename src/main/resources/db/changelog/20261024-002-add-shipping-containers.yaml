@@ -1,0 +1,96 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261024-002-shipping-containers
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE shipping_container (
+                id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                version BIGINT NOT NULL DEFAULT 0,
+                container_job_no VARCHAR(50) NOT NULL UNIQUE,
+                container_no VARCHAR(50),
+                active_container_no VARCHAR(50) UNIQUE,
+                seal_no VARCHAR(100),
+                container_size VARCHAR(20) NOT NULL,
+                shipping_method VARCHAR(50) NOT NULL,
+                supplier_shipping_id BIGINT,
+                destination_id BIGINT,
+                carrier_name_snapshot VARCHAR(255),
+                destination_name_snapshot VARCHAR(500),
+                origin VARCHAR(255),
+                planned_departure_date DATE,
+                planned_arrival_date DATE,
+                capacity_cbm DECIMAL(18,6),
+                max_cargo_weight_kg DECIMAL(18,6),
+                status VARCHAR(30) NOT NULL,
+                sealed_at DATETIME(6),
+                departed_at DATETIME(6),
+                received_at DATETIME(6),
+                remark VARCHAR(2000),
+                created_by VARCHAR(100),
+                updated_by VARCHAR(100),
+                created_date DATETIME(6),
+                updated_date DATETIME(6),
+                CONSTRAINT fk_container_shipping FOREIGN KEY (supplier_shipping_id) REFERENCES supplier_shipping(id),
+                CONSTRAINT fk_container_destination FOREIGN KEY (destination_id) REFERENCES supplier_shipping_destination(id),
+                CONSTRAINT ck_container_size CHECK (container_size IN ('20GP','40HQ')),
+                CONSTRAINT ck_container_status CHECK (status IN ('DRAFT','LOADING','SEALED','IN_TRANSIT','RECEIVED','CANCELLED'))
+              );
+              CREATE INDEX idx_container_status_date ON shipping_container(status,created_date);
+              CREATE TABLE shipping_container_load (
+                id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                container_id BIGINT NOT NULL,
+                delivery_id BIGINT NOT NULL,
+                delivery_detail_id BIGINT,
+                scrap_box_id BIGINT,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                active_scrap_box_id BIGINT UNIQUE,
+                uniform_packaging_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+                delivery_no_snapshot VARCHAR(50),
+                purchase_order_no_snapshot VARCHAR(50),
+                component_name_snapshot VARCHAR(255),
+                carton_count DECIMAL(18,6) NOT NULL,
+                quantity DECIMAL(18,5) NOT NULL,
+                net_weight_kg DECIMAL(18,6),
+                gross_weight_kg DECIMAL(18,6),
+                length_cm DECIMAL(18,6),
+                width_cm DECIMAL(18,6),
+                height_cm DECIMAL(18,6),
+                cbm_m3 DECIMAL(18,6),
+                contents_json TEXT NOT NULL,
+                remark VARCHAR(1000),
+                created_date DATETIME(6),
+                updated_date DATETIME(6),
+                CONSTRAINT fk_container_load_container FOREIGN KEY (container_id) REFERENCES shipping_container(id) ON DELETE CASCADE,
+                CONSTRAINT fk_container_load_delivery FOREIGN KEY (delivery_id) REFERENCES purchase_order_delivery(id),
+                CONSTRAINT fk_container_load_detail FOREIGN KEY (delivery_detail_id) REFERENCES purchase_order_delivery_detail(id),
+                CONSTRAINT fk_container_load_scrap FOREIGN KEY (scrap_box_id) REFERENCES purchase_order_delivery_scrap_box(id),
+                CONSTRAINT ck_container_load_source CHECK ((delivery_detail_id IS NOT NULL AND scrap_box_id IS NULL) OR (delivery_detail_id IS NULL AND scrap_box_id IS NOT NULL)),
+                CONSTRAINT ck_container_load_count CHECK (carton_count > 0 AND quantity > 0 AND (scrap_box_id IS NULL OR carton_count = 1))
+              );
+              CREATE INDEX idx_container_load_delivery_active ON shipping_container_load(delivery_id,active);
+              CREATE INDEX idx_container_load_detail_active ON shipping_container_load(delivery_detail_id,active);
+  - changeSet:
+      id: 20261024-003-container-permissions
+      author: codex
+      dbms: mysql
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code,name_th,name_en,`group`,created_at) VALUES
+                ('PERM_CONTAINER_VIEW','ดูตู้คอนเทนเนอร์','View shipping containers','container',NOW(6)),
+                ('PERM_CONTAINER_CREATE','สร้างตู้คอนเทนเนอร์','Create shipping containers','container',NOW(6)),
+                ('PERM_CONTAINER_EDIT','แก้ไขและจัดตู้คอนเทนเนอร์','Edit shipping containers','container',NOW(6)),
+                ('PERM_CONTAINER_DELETE','ยกเลิกตู้คอนเทนเนอร์','Cancel shipping containers','container',NOW(6))
+              ON DUPLICATE KEY UPDATE name_th=VALUES(name_th),name_en=VALUES(name_en),`group`=VALUES(`group`);
+              INSERT IGNORE INTO role_permission(role_code,permission_code)
+                SELECT role_code,'PERM_CONTAINER_VIEW' FROM role_permission WHERE permission_code='PERM_PURCHASE_ORDER_VIEW';
+              INSERT IGNORE INTO role_permission(role_code,permission_code)
+                SELECT role_code,'PERM_CONTAINER_CREATE' FROM role_permission WHERE permission_code='PERM_PURCHASE_ORDER_CREATE';
+              INSERT IGNORE INTO role_permission(role_code,permission_code)
+                SELECT role_code,'PERM_CONTAINER_EDIT' FROM role_permission WHERE permission_code='PERM_PURCHASE_ORDER_START_RUN';
+              INSERT IGNORE INTO role_permission(role_code,permission_code)
+                SELECT role_code,'PERM_CONTAINER_DELETE' FROM role_permission WHERE permission_code='PERM_PURCHASE_ORDER_START_RUN';

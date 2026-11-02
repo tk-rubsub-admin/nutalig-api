@@ -1,0 +1,172 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261102-002-add-sales-order-payment-schedules
+      author: codex
+      changes:
+        - createTable:
+            tableName: sales_order_payment_schedule
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: sales_order_no
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: installment_no
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: payment_type
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: percentage
+                  type: DECIMAL(8,4)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expected_amount
+                  type: DECIMAL(18,5)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: paid_amount
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: outstanding_amount
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  defaultValue: UNINVOICED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: due_date
+                  type: DATE
+              - column:
+                  name: created_date
+                  type: DATETIME(6)
+              - column:
+                  name: updated_date
+                  type: DATETIME(6)
+        - sql:
+            sql: |
+              ALTER TABLE sales_order_payment_schedule
+                CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              ALTER TABLE sales_order_payment_schedule
+                MODIFY sales_order_no VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
+        - addForeignKeyConstraint:
+            baseTableName: sales_order_payment_schedule
+            baseColumnNames: sales_order_no
+            referencedTableName: sales_order
+            referencedColumnNames: sales_order_no
+            constraintName: fk_sales_order_payment_schedule_sales_order
+        - addUniqueConstraint:
+            tableName: sales_order_payment_schedule
+            columnNames: sales_order_no, installment_no
+            constraintName: uk_sales_order_payment_schedule_installment
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column:
+                  name: sales_order_payment_schedule_id
+                  type: BIGINT
+        - addForeignKeyConstraint:
+            baseTableName: invoice
+            baseColumnNames: sales_order_payment_schedule_id
+            referencedTableName: sales_order_payment_schedule
+            referencedColumnNames: id
+            constraintName: fk_invoice_sales_order_payment_schedule
+        - sql:
+            sql: |
+              INSERT INTO sales_order_payment_schedule
+                (sales_order_no, installment_no, payment_type, percentage, expected_amount,
+                 paid_amount, outstanding_amount, status, due_date, created_date, updated_date)
+              SELECT so.sales_order_no, 1, 'DEPOSIT', 35,
+                     ROUND(COALESCE(so.grand_total, 0) * 35 / 100, 5), 0,
+                     ROUND(COALESCE(so.grand_total, 0) * 35 / 100, 5), 'UNINVOICED',
+                     so.payment_schedule_date, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              FROM sales_order so
+              WHERE COALESCE((SELECT i.customer_payment_term FROM invoice i WHERE i.sales_order_no = so.sales_order_no ORDER BY i.created_date, i.invoice_no LIMIT 1), '') = 'DEP35_35_30_BBS'
+                AND NOT EXISTS (SELECT 1 FROM sales_order_payment_schedule s WHERE s.sales_order_no = so.sales_order_no);
+              INSERT INTO sales_order_payment_schedule
+                (sales_order_no, installment_no, payment_type, percentage, expected_amount,
+                 paid_amount, outstanding_amount, status, due_date, created_date, updated_date)
+              SELECT so.sales_order_no, 2, 'INSTALLMENT', 35,
+                     ROUND(COALESCE(so.grand_total, 0) * 35 / 100, 5), 0,
+                     ROUND(COALESCE(so.grand_total, 0) * 35 / 100, 5), 'UNINVOICED',
+                     so.payment_schedule_date, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              FROM sales_order so
+              WHERE COALESCE((SELECT i.customer_payment_term FROM invoice i WHERE i.sales_order_no = so.sales_order_no ORDER BY i.created_date, i.invoice_no LIMIT 1), '') = 'DEP35_35_30_BBS'
+                AND NOT EXISTS (SELECT 1 FROM sales_order_payment_schedule s WHERE s.sales_order_no = so.sales_order_no AND s.installment_no = 2);
+              INSERT INTO sales_order_payment_schedule
+                (sales_order_no, installment_no, payment_type, percentage, expected_amount,
+                 paid_amount, outstanding_amount, status, due_date, created_date, updated_date)
+              SELECT so.sales_order_no, 3, 'BALANCE', 30,
+                     COALESCE(so.grand_total, 0) - ROUND(COALESCE(so.grand_total, 0) * 70 / 100, 5), 0,
+                     COALESCE(so.grand_total, 0) - ROUND(COALESCE(so.grand_total, 0) * 70 / 100, 5), 'UNINVOICED',
+                     so.payment_schedule_date, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              FROM sales_order so
+              WHERE COALESCE((SELECT i.customer_payment_term FROM invoice i WHERE i.sales_order_no = so.sales_order_no ORDER BY i.created_date, i.invoice_no LIMIT 1), '') = 'DEP35_35_30_BBS'
+                AND NOT EXISTS (SELECT 1 FROM sales_order_payment_schedule s WHERE s.sales_order_no = so.sales_order_no AND s.installment_no = 3);
+              INSERT INTO sales_order_payment_schedule
+                (sales_order_no, installment_no, payment_type, percentage, expected_amount,
+                 paid_amount, outstanding_amount, status, due_date, created_date, updated_date)
+              SELECT so.sales_order_no, 1, 'DEPOSIT',
+                     CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 WHEN term = 'DEP30_BBS' THEN 30 ELSE 100 END,
+                     ROUND(COALESCE(so.grand_total, 0) * CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 WHEN term = 'DEP30_BBS' THEN 30 ELSE 100 END / 100, 5), 0,
+                     ROUND(COALESCE(so.grand_total, 0) * CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 WHEN term = 'DEP30_BBS' THEN 30 ELSE 100 END / 100, 5), 'UNINVOICED',
+                     so.payment_schedule_date, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              FROM sales_order so
+              LEFT JOIN (SELECT sales_order_no, MAX(customer_payment_term) term FROM invoice GROUP BY sales_order_no) terms ON terms.sales_order_no = so.sales_order_no
+              WHERE COALESCE(terms.term, '') <> 'DEP35_35_30_BBS'
+                AND NOT EXISTS (SELECT 1 FROM sales_order_payment_schedule s WHERE s.sales_order_no = so.sales_order_no);
+              INSERT INTO sales_order_payment_schedule
+                (sales_order_no, installment_no, payment_type, percentage, expected_amount,
+                 paid_amount, outstanding_amount, status, due_date, created_date, updated_date)
+              SELECT so.sales_order_no, 2, 'BALANCE',
+                     CASE WHEN term IN ('DEP_40_60', 'DEP50', 'DEP30_BBS') THEN 100 - CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 ELSE 30 END ELSE 0 END,
+                     CASE WHEN term IN ('DEP_40_60', 'DEP50', 'DEP30_BBS') THEN COALESCE(so.grand_total, 0) - ROUND(COALESCE(so.grand_total, 0) * CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 ELSE 30 END / 100, 5) ELSE 0 END, 0,
+                     CASE WHEN term IN ('DEP_40_60', 'DEP50', 'DEP30_BBS') THEN COALESCE(so.grand_total, 0) - ROUND(COALESCE(so.grand_total, 0) * CASE WHEN term = 'DEP_40_60' THEN 40 WHEN term = 'DEP50' THEN 50 ELSE 30 END / 100, 5) ELSE 0 END, 'UNINVOICED',
+                     so.payment_schedule_date, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              FROM sales_order so
+              LEFT JOIN (SELECT sales_order_no, MAX(customer_payment_term) term FROM invoice GROUP BY sales_order_no) terms ON terms.sales_order_no = so.sales_order_no
+              WHERE terms.term IN ('DEP_40_60', 'DEP50', 'DEP30_BBS')
+                AND NOT EXISTS (SELECT 1 FROM sales_order_payment_schedule s WHERE s.sales_order_no = so.sales_order_no AND s.installment_no = 2);
+              UPDATE invoice i
+              JOIN sales_order_payment_schedule s ON s.sales_order_no = i.sales_order_no AND s.installment_no = COALESCE(i.installment_no, 1)
+              SET i.sales_order_payment_schedule_id = s.id;
+              UPDATE sales_order_payment_schedule s
+              LEFT JOIN (
+                SELECT i.sales_order_payment_schedule_id schedule_id,
+                       COALESCE(SUM(CASE WHEN p.status = 'APPROVE' THEN p.amount ELSE 0 END), 0) paid_amount,
+                       MAX(CASE WHEN i.status NOT IN ('DRAFT', 'CANCELLED', 'VOID') THEN 1 ELSE 0 END) has_invoice
+                FROM invoice i
+                LEFT JOIN invoice_payment p ON p.invoice_no = i.invoice_no
+                WHERE i.sales_order_payment_schedule_id IS NOT NULL
+                GROUP BY i.sales_order_payment_schedule_id
+              ) totals ON totals.schedule_id = s.id
+              SET s.paid_amount = COALESCE(totals.paid_amount, 0),
+                  s.outstanding_amount = GREATEST(s.expected_amount - COALESCE(totals.paid_amount, 0), 0),
+                  s.status = CASE
+                    WHEN COALESCE(totals.has_invoice, 0) = 0 THEN 'UNINVOICED'
+                    WHEN COALESCE(totals.paid_amount, 0) <= 0 THEN 'UNPAID'
+                    WHEN COALESCE(totals.paid_amount, 0) >= s.expected_amount THEN 'PAID'
+                    ELSE 'PARTIALLY_PAID'
+                  END;

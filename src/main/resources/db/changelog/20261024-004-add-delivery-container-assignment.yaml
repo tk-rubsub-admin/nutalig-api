@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261024-004-delivery-container-assignment
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE purchase_order_delivery ADD COLUMN container_status VARCHAR(30) NULL;
+              ALTER TABLE purchase_order_delivery ADD CONSTRAINT ck_delivery_container_status CHECK (container_status IS NULL OR container_status IN ('NOT_ASSIGNED','PARTIALLY_ASSIGNED','ASSIGNED'));
+              CREATE TABLE purchase_order_delivery_container (
+                delivery_id BIGINT NOT NULL,
+                container_id BIGINT NOT NULL,
+                PRIMARY KEY (delivery_id,container_id),
+                CONSTRAINT fk_delivery_container_delivery FOREIGN KEY (delivery_id) REFERENCES purchase_order_delivery(id),
+                CONSTRAINT fk_delivery_container_container FOREIGN KEY (container_id) REFERENCES shipping_container(id)
+              );
+              CREATE INDEX idx_delivery_container_container ON purchase_order_delivery_container(container_id);
+              INSERT INTO purchase_order_delivery_container(delivery_id,container_id)
+                SELECT DISTINCT delivery_id,container_id FROM shipping_container_load WHERE active=TRUE;
+              UPDATE purchase_order_delivery d SET container_status = CASE
+                WHEN UPPER(d.shipping_method) NOT IN ('SEA_FCL_20GP','SEA_FCL_40HQ') OR d.shipping_method IS NULL THEN NULL
+                WHEN NOT EXISTS (SELECT 1 FROM shipping_container_load l WHERE l.delivery_id=d.id AND l.active=TRUE) THEN 'NOT_ASSIGNED'
+                WHEN EXISTS (
+                  SELECT 1 FROM purchase_order_delivery_detail dd WHERE dd.purchase_order_delivery_id=d.id AND dd.scrap_box_id IS NULL
+                    AND (dd.carton_count IS NULL OR dd.carton_count<=0 OR dd.carton_count<>(SELECT COALESCE(SUM(l.carton_count),0) FROM shipping_container_load l WHERE l.delivery_detail_id=dd.id AND l.active=TRUE))
+                ) OR EXISTS (
+                  SELECT 1 FROM purchase_order_delivery_scrap_box b WHERE b.purchase_order_delivery_id=d.id
+                    AND NOT EXISTS (SELECT 1 FROM shipping_container_load l WHERE l.scrap_box_id=b.id AND l.active=TRUE)
+                ) THEN 'PARTIALLY_ASSIGNED'
+                ELSE 'ASSIGNED' END;

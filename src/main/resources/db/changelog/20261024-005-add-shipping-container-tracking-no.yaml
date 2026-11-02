@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261024-005-shipping-container-tracking-no
+      author: codex
+      changes:
+        - addColumn:
+            tableName: shipping_container
+            columns:
+              - column:
+                  name: tracking_no
+                  type: VARCHAR(50)

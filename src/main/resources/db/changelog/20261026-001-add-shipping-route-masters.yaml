@@ -1,0 +1,75 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261026-001-add-shipping-route-masters
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS shipping_location (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  code VARCHAR(100) DEFAULT NULL,
+                  name VARCHAR(255) NOT NULL,
+                  location_type VARCHAR(30) DEFAULT NULL,
+                  country_code VARCHAR(10) DEFAULT NULL,
+                  province VARCHAR(255) DEFAULT NULL,
+                  district VARCHAR(255) DEFAULT NULL,
+                  address VARCHAR(1000) DEFAULT NULL,
+                  is_active BIT(1) NOT NULL DEFAULT b'1',
+                  created_date DATETIME(6) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_shipping_location_name (name),
+                  KEY idx_shipping_location_code (code),
+                  KEY idx_shipping_location_active (is_active),
+                  CONSTRAINT fk_shipping_location_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_shipping_location_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS shipping_route (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  route_code VARCHAR(100) DEFAULT NULL,
+                  origin_location_id BIGINT NOT NULL,
+                  destination_location_id BIGINT NOT NULL,
+                  is_active BIT(1) NOT NULL DEFAULT b'1',
+                  created_date DATETIME(6) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_shipping_route_origin_destination (origin_location_id, destination_location_id),
+                  KEY idx_shipping_route_destination (destination_location_id),
+                  KEY idx_shipping_route_active (is_active),
+                  CONSTRAINT fk_shipping_route_origin FOREIGN KEY (origin_location_id) REFERENCES shipping_location (id),
+                  CONSTRAINT fk_shipping_route_destination FOREIGN KEY (destination_location_id) REFERENCES shipping_location (id),
+                  CONSTRAINT fk_shipping_route_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_shipping_route_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE IF NOT EXISTS supplier_shipping_route (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  supplier_shipping_id BIGINT NOT NULL,
+                  shipping_route_id BIGINT NOT NULL,
+                  currency VARCHAR(10) DEFAULT NULL,
+                  base_cost DECIMAL(18,4) DEFAULT NULL,
+                  lead_time_day_min INT DEFAULT NULL,
+                  lead_time_day_max INT DEFAULT NULL,
+                  effective_from DATE DEFAULT NULL,
+                  effective_to DATE DEFAULT NULL,
+                  remark VARCHAR(1000) DEFAULT NULL,
+                  is_active BIT(1) NOT NULL DEFAULT b'1',
+                  created_date DATETIME(6) DEFAULT NULL,
+                  created_by VARCHAR(255) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  updated_by VARCHAR(255) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_supplier_shipping_route (supplier_shipping_id, shipping_route_id),
+                  KEY idx_supplier_shipping_route_route (shipping_route_id),
+                  KEY idx_supplier_shipping_route_active (is_active),
+                  CONSTRAINT fk_supplier_shipping_route_shipping FOREIGN KEY (supplier_shipping_id) REFERENCES supplier_shipping (id),
+                  CONSTRAINT fk_supplier_shipping_route_route FOREIGN KEY (shipping_route_id) REFERENCES shipping_route (id),
+                  CONSTRAINT fk_supplier_shipping_route_created_by FOREIGN KEY (created_by) REFERENCES user (id),
+                  CONSTRAINT fk_supplier_shipping_route_updated_by FOREIGN KEY (updated_by) REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

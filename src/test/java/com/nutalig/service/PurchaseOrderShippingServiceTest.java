@@ -44,6 +44,7 @@ class PurchaseOrderShippingServiceTest {
     @Mock private SupplierShippingRepository supplierShippingRepository;
     @Mock private UserRepository userRepository;
     @Mock private PurchaseOrderRepository purchaseOrderRepository;
+    @Mock private PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
     @Mock private RequestPriceDetailRepository requestPriceDetailRepository;
     @Mock private GeneratedIdSequenceService generatedIdSequenceService;
     @Mock private SystemConfigService systemConfigService;

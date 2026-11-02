@@ -3130,3 +3130,19 @@ databaseChangeLog:
       file: db/changelog/20261020-001-add-confirmed-paid-date-to-payment-instruction.yaml
   - include:
       file: db/changelog/20261023-002-rename-supplier-quoted-tier-id-on-rfq-tier-split.yaml
+  - include:
+      file: db/changelog/20261024-001-add-delivery-scrap-boxes.yaml
+  - include:
+      file: db/changelog/20261024-002-add-shipping-containers.yaml
+  - include:
+      file: db/changelog/20261024-004-add-delivery-container-assignment.yaml
+  - include:
+      file: db/changelog/20261024-005-add-shipping-container-tracking-no.yaml
+  - include:
+      file: db/changelog/20261026-001-add-shipping-route-masters.yaml
+  - include:
+      file: db/changelog/20261027-001-map-shipping-location-type-to-system-config.yaml
+  - include:
+      file: db/changelog/20261102-001-backfill-dep-40-60-ready-for-po.yaml
+  - include:
+      file: db/changelog/20261102-002-add-sales-order-payment-schedules.yaml

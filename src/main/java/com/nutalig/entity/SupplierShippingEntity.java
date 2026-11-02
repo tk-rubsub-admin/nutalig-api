@@ -70,6 +70,10 @@ public class SupplierShippingEntity extends AuditDateEntity {
     @ToString.Exclude
     private Set<SupplierShippingDestinationEntity> destinations = new LinkedHashSet<>();
 
+    @OneToMany(mappedBy = "supplierShipping", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private Set<SupplierShippingRouteEntity> routes = new LinkedHashSet<>();
+
     public void addDestination(SupplierShippingDestinationEntity destination) {
         if (destination == null) return;
         destinations.add(destination);

@@ -1,0 +1,73 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261024-001-add-delivery-scrap-boxes
+      author: codex
+      changes:
+        - createTable:
+            tableName: purchase_order_delivery_scrap_box
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: purchase_order_delivery_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: net_weight_kg
+                  type: DECIMAL(18,4)
+              - column:
+                  name: gross_weight_kg
+                  type: DECIMAL(18,4)
+              - column:
+                  name: length_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: width_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: height_cm
+                  type: DECIMAL(18,4)
+              - column:
+                  name: cbm_m3
+                  type: DECIMAL(18,6)
+              - column:
+                  name: sort_order
+                  type: INT
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_delivery_scrap_box
+            baseColumnNames: purchase_order_delivery_id
+            referencedTableName: purchase_order_delivery
+            referencedColumnNames: id
+            constraintName: fk_delivery_scrap_box_delivery
+            onDelete: CASCADE
+        - createIndex:
+            tableName: purchase_order_delivery_scrap_box
+            indexName: idx_delivery_scrap_box_delivery
+            columns:
+              - column:
+                  name: purchase_order_delivery_id
+        - addColumn:
+            tableName: purchase_order_delivery_detail
+            columns:
+              - column:
+                  name: scrap_box_id
+                  type: BIGINT
+        - createIndex:
+            tableName: purchase_order_delivery_detail
+            indexName: idx_delivery_detail_scrap_box
+            columns:
+              - column:
+                  name: scrap_box_id
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_delivery_detail
+            baseColumnNames: scrap_box_id
+            referencedTableName: purchase_order_delivery_scrap_box
+            referencedColumnNames: id
+            constraintName: fk_delivery_detail_scrap_box
+            onDelete: CASCADE

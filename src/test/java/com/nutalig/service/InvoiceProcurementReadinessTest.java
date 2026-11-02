@@ -100,7 +100,7 @@ class InvoiceProcurementReadinessTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"DEP50,10350.00", "DEP30_BBS,6210.00", "DEP35_35_30_BBS,7245.00",
+    @CsvSource({"DEP50,10350.00", "DEP_40_60,8280.00", "DEP30_BBS,6210.00", "DEP35_35_30_BBS,7245.00",
             "AFS100,20700.00", "OTHER,20700.00"})
     void approvingTheFullyPaidFirstInstallmentMakesTheOrderReady(String term, String amount) throws Exception {
         var invoice = invoice("NTL-INV2026100004", term, amount);

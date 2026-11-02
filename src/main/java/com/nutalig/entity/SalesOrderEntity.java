@@ -138,8 +138,18 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "payment_schedule_date")
     private LocalDate paymentScheduleDate;
 
+    @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("installmentNo asc")
+    private Set<SalesOrderPaymentScheduleEntity> paymentSchedules = new LinkedHashSet<>();
+
     @Column(name = "shipping")
     private String shipping;
+
+    public void addPaymentSchedule(SalesOrderPaymentScheduleEntity schedule) {
+        if (schedule == null) return;
+        paymentSchedules.add(schedule);
+        schedule.setSalesOrder(this);
+    }
 
     @Column(name = "is_urgent_request")
     private Boolean urgentRequest;

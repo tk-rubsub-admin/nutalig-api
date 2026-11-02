@@ -23,6 +23,7 @@ import com.nutalig.entity.*;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.SupplierMapper;
+import com.nutalig.mapper.PurchaseOrderDeliveryMapper;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.mapper.UserMapper;
@@ -89,6 +90,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
+    private final ShippingContainerLoadRepository shippingContainerLoadRepository;
     private final LineMessageService lineMessageService;
     private final LineConfiguration lineConfiguration;
 
@@ -1101,7 +1103,7 @@ public class PurchaseOrderService {
         return mapToDto(entity);
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public PurchaseOrderDto markDeliveryInTransit(
             String purchaseOrderNo,
             Long deliveryId,
@@ -1122,10 +1124,13 @@ public class PurchaseOrderService {
         PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
         validateProductionVisibility(purchaseOrder, userId);
-        PurchaseOrderDeliveryEntity delivery = purchaseOrderDeliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new DataNotFoundException("Purchase order delivery " + deliveryId + " not found."));
+        PurchaseOrderDeliveryEntity delivery = purchaseOrderDeliveryRepository.findAllByIdForUpdate(List.of(deliveryId)).stream()
+                .findFirst().orElseThrow(() -> new DataNotFoundException("Purchase order delivery " + deliveryId + " not found."));
         if (!purchaseOrderNo.equals(delivery.getPurchaseOrder().getPurchaseOrderNo())) {
             throw new InvalidRequestException("Delivery does not belong to this purchase order.");
+        }
+        if (shippingContainerLoadRepository.existsByDelivery_IdAndActiveTrue(deliveryId)) {
+            throw new InvalidRequestException("เที่ยวส่งนี้มีรายการจัดตู้แล้ว กรุณาอัปเดตสถานะผ่านตู้คอนเทนเนอร์");
         }
         if (delivery.getStatus() != PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER) {
             throw new InvalidRequestException("Only deliveries handed over to the carrier can be marked in transit.");
@@ -1209,6 +1214,9 @@ public class PurchaseOrderService {
         delivery.setReceivedAt(request.getReceivedDate() == null ? null
                 : request.getReceivedDate().atStartOfDay(DateUtil.getTimeZone()));
         delivery.setShippingMethod(request.getShippingMethod().trim());
+        delivery.setContainerStatus(delivery.requiresContainer()
+                ? DeliveryContainerStatus.NOT_ASSIGNED
+                : null);
         delivery.setShippingLocation(location);
         delivery.setShippingLocationNameSnapshot(StringUtils.defaultIfBlank(
                 location.getDestinationName(), location.getFullAddress()));
@@ -1219,8 +1227,22 @@ public class PurchaseOrderService {
         delivery.setCreatedBy(userId);
         delivery.setUpdatedBy(userId);
 
+        List<PurchaseOrderDeliveryScrapBoxEntity> scrapBoxes = buildDeliveryScrapBoxes(request, delivery);
+        Set<Integer> usedScrapBoxes = new HashSet<>();
+        Set<String> scrapBoxComponents = new HashSet<>();
         Map<String, BigDecimal> requestTotals = new HashMap<>();
         for (CompletePurchaseOrderProductionRequest.Detail detailRequest : request.getDetails()) {
+            if (detailRequest == null) {
+                throw new InvalidRequestException("Delivery detail is required.");
+            }
+            Integer scrapBoxIndex = detailRequest.getScrapBoxIndex();
+            if (scrapBoxIndex != null) {
+                if (scrapBoxIndex < 0 || scrapBoxIndex >= scrapBoxes.size()
+                        || detailRequest.getPurchaseOrderDetailComponentId() == null) {
+                    throw new InvalidRequestException("Scrap box detail must reference a valid box and component.");
+                }
+                usedScrapBoxes.add(scrapBoxIndex);
+            }
             if (detailRequest.getPurchaseOrderDetailId() == null || detailRequest.getQuantity() == null
                     || detailRequest.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new InvalidRequestException("Delivery detail requires a purchase order item and quantity greater than zero.");
@@ -1240,12 +1262,15 @@ public class PurchaseOrderService {
                         .multiply(Optional.ofNullable(component.getQuantityPerItem()).orElse(BigDecimal.ZERO));
             }
             String key = deliveryDetailKey(orderItem.getId(), component == null ? null : component.getId());
+            if (scrapBoxIndex != null && !scrapBoxComponents.add(scrapBoxIndex + ":" + key)) {
+                throw new InvalidRequestException("A component can only appear once in each scrap box.");
+            }
             BigDecimal requestedTotal = requestTotals.merge(key, detailRequest.getQuantity(), BigDecimal::add);
             BigDecimal priorQuantity = alreadyDelivered.getOrDefault(key, BigDecimal.ZERO);
-            if (orderedQuantity != null && priorQuantity.add(requestedTotal).compareTo(orderedQuantity) > 0) {
-                throw new InvalidRequestException("Delivery quantity exceeds the remaining purchase order quantity for "
-                        + (component == null ? orderItem.getName() : component.getComponentName()) + ".");
-            }
+//            if (orderedQuantity != null && priorQuantity.add(requestedTotal).compareTo(orderedQuantity) > 0) {
+//                throw new InvalidRequestException("Delivery quantity exceeds the remaining purchase order quantity for "
+//                        + (component == null ? orderItem.getName() : component.getComponentName()) + ".");
+//            }
             validateNonNegative(detailRequest.getCartonCount(), "cartonCount");
             validateNonNegative(detailRequest.getPiecesPerCarton(), "piecesPerCarton");
             validateNonNegative(detailRequest.getNetWeightKg(), "netWeightKg");
@@ -1261,19 +1286,122 @@ public class PurchaseOrderService {
             detail.setProductNameSnapshot(orderItem.getName());
             detail.setComponentNameSnapshot(component == null ? null : component.getComponentName());
             detail.setQuantity(detailRequest.getQuantity());
-            detail.setCartonCount(detailRequest.getCartonCount());
-            detail.setPiecesPerCarton(detailRequest.getPiecesPerCarton());
-            detail.setNetWeightKg(detailRequest.getNetWeightKg());
-            detail.setGrossWeightKg(detailRequest.getGrossWeightKg());
-            detail.setLengthCm(detailRequest.getLengthCm());
-            detail.setWidthCm(detailRequest.getWidthCm());
-            detail.setHeightCm(detailRequest.getHeightCm());
-            detail.setCbmM3(detailRequest.getCbmM3());
+            if (scrapBoxIndex == null) {
+                detail.setCartonCount(detailRequest.getCartonCount());
+                detail.setPiecesPerCarton(detailRequest.getPiecesPerCarton());
+                detail.setNetWeightKg(detailRequest.getNetWeightKg());
+                detail.setGrossWeightKg(detailRequest.getGrossWeightKg());
+                detail.setLengthCm(detailRequest.getLengthCm());
+                detail.setWidthCm(detailRequest.getWidthCm());
+                detail.setHeightCm(detailRequest.getHeightCm());
+                detail.setCbmM3(detailRequest.getCbmM3());
+            } else {
+                detail.setScrapBox(scrapBoxes.get(scrapBoxIndex));
+            }
             detail.setSortOrder(detailRequest.getSortOrder());
             delivery.addDetail(detail);
         }
+        if (usedScrapBoxes.size() != scrapBoxes.size()) {
+            throw new InvalidRequestException("Each scrap box must contain at least one component.");
+        }
         purchaseOrderDeliveryRepository.save(delivery);
-        return hasNoRemainingDeliveryQuantity(purchaseOrder, alreadyDelivered, requestTotals);
+        boolean allQuantitiesDelivered = hasNoRemainingDeliveryQuantity(purchaseOrder, alreadyDelivered, requestTotals);
+        recordProductionDeliveryActivity(purchaseOrder, delivery, allQuantitiesDelivered, userId);
+        return allQuantitiesDelivered;
+    }
+
+    private void recordProductionDeliveryActivity(
+            PurchaseOrderEntity purchaseOrder,
+            PurchaseOrderDeliveryEntity delivery,
+            boolean allQuantitiesDelivered,
+            String userId
+    ) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("purchaseOrderNo", purchaseOrder.getPurchaseOrderNo());
+        snapshot.put("deliveryId", delivery.getId());
+        snapshot.put("deliveryNo", delivery.getDeliveryNo());
+        snapshot.put("shippedDate", delivery.getShippedAt().toLocalDate().toString());
+        snapshot.put("expectedWarehouseDate", delivery.getExpectedWarehouseDate().toString());
+        snapshot.put("shippingMethod", delivery.getShippingMethod());
+        snapshot.put("shippingLocationId", delivery.getShippingLocation().getId());
+        snapshot.put("shippingLocationName", delivery.getShippingLocationNameSnapshot());
+        snapshot.put("note", delivery.getRemark());
+        snapshot.put("allQuantitiesDelivered", allQuantitiesDelivered);
+        snapshot.put("details", delivery.getDetails().stream().map(item -> {
+            Map<String, Object> values = new LinkedHashMap<>();
+            values.put("purchaseOrderDetailId", item.getPurchaseOrderDetail().getId());
+            values.put("purchaseOrderDetailComponentId", item.getPurchaseOrderDetailComponent() == null
+                    ? null : item.getPurchaseOrderDetailComponent().getId());
+            values.put("productName", item.getProductNameSnapshot());
+            values.put("componentName", item.getComponentNameSnapshot());
+            values.put("quantity", item.getQuantity());
+            values.put("scrapBoxId", item.getScrapBox() == null ? null : item.getScrapBox().getId());
+            values.put("cartonCount", item.getCartonCount());
+            values.put("piecesPerCarton", item.getPiecesPerCarton());
+            values.put("netWeightKg", item.getNetWeightKg());
+            values.put("grossWeightKg", item.getGrossWeightKg());
+            values.put("lengthCm", item.getLengthCm());
+            values.put("widthCm", item.getWidthCm());
+            values.put("heightCm", item.getHeightCm());
+            values.put("cbmM3", item.getCbmM3());
+            return values;
+        }).toList());
+        snapshot.put("scrapBoxes", delivery.getScrapBoxes().stream().map(box -> {
+            Map<String, Object> values = new LinkedHashMap<>();
+            values.put("id", box.getId());
+            values.put("netWeightKg", box.getNetWeightKg());
+            values.put("grossWeightKg", box.getGrossWeightKg());
+            values.put("lengthCm", box.getLengthCm());
+            values.put("widthCm", box.getWidthCm());
+            values.put("heightCm", box.getHeightCm());
+            values.put("cbmM3", box.getCbmM3());
+            return values;
+        }).toList());
+        activityHistoryService.record(
+                ActivityEntityType.PURCHASE_ORDER,
+                purchaseOrder.getPurchaseOrderNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.API,
+                "บันทึกเที่ยวส่ง " + delivery.getDeliveryNo() + " สำหรับใบสั่งซื้อเลขที่ "
+                        + purchaseOrder.getPurchaseOrderNo()
+                        + (allQuantitiesDelivered ? " (ส่งครบแล้ว)" : " (ยังส่งไม่ครบ)"),
+                snapshot
+        );
+    }
+
+    private List<PurchaseOrderDeliveryScrapBoxEntity> buildDeliveryScrapBoxes(
+            CompletePurchaseOrderProductionRequest.PurchaseOrderDelivery request,
+            PurchaseOrderDeliveryEntity delivery
+    ) throws InvalidRequestException {
+        List<PurchaseOrderDeliveryScrapBoxEntity> boxes = new ArrayList<>();
+        for (CompletePurchaseOrderProductionRequest.ScrapBox source :
+                Optional.ofNullable(request.getScrapBoxes()).orElse(List.of())) {
+            if (source == null) throw new InvalidRequestException("Scrap box is required.");
+            validateNonNegative(source.getNetWeightKg(), "scrapBox.netWeightKg");
+            validateNonNegative(source.getGrossWeightKg(), "scrapBox.grossWeightKg");
+            validateNonNegative(source.getLengthCm(), "scrapBox.lengthCm");
+            validateNonNegative(source.getWidthCm(), "scrapBox.widthCm");
+            validateNonNegative(source.getHeightCm(), "scrapBox.heightCm");
+            validateNonNegative(source.getCbmM3(), "scrapBox.cbmM3");
+            PurchaseOrderDeliveryScrapBoxEntity box = new PurchaseOrderDeliveryScrapBoxEntity();
+            box.setSortOrder(boxes.size());
+            box.setNetWeightKg(source.getNetWeightKg());
+            box.setGrossWeightKg(source.getGrossWeightKg());
+            box.setLengthCm(source.getLengthCm());
+            box.setWidthCm(source.getWidthCm());
+            box.setHeightCm(source.getHeightCm());
+            BigDecimal cbm = source.getCbmM3();
+            if (cbm == null && source.getLengthCm() != null && source.getWidthCm() != null && source.getHeightCm() != null) {
+                cbm = source.getLengthCm().multiply(source.getWidthCm()).multiply(source.getHeightCm())
+                        .divide(new BigDecimal("1000000"), 6, RoundingMode.HALF_UP);
+            }
+            box.setCbmM3(cbm);
+            delivery.addScrapBox(box);
+            boxes.add(box);
+        }
+        return boxes;
     }
 
     private boolean hasNoRemainingDeliveryQuantity(
@@ -2111,48 +2239,7 @@ public class PurchaseOrderService {
         dto.setItems(items);
         dto.setDeliveries(purchaseOrderDeliveryRepository.findAllByPurchaseOrder_PurchaseOrderNo(entity.getPurchaseOrderNo())
                 .stream()
-                .map(delivery -> {
-                    PurchaseOrderDeliveryDto deliveryDto = new PurchaseOrderDeliveryDto();
-                    deliveryDto.setId(delivery.getId());
-                    deliveryDto.setDeliveryNo(delivery.getDeliveryNo());
-                    deliveryDto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
-                    deliveryDto.setShippedAt(delivery.getShippedAt());
-                    deliveryDto.setExpectedWarehouseDate(delivery.getExpectedWarehouseDate());
-                    deliveryDto.setReceivedAt(delivery.getReceivedAt());
-                    deliveryDto.setShippingMethod(delivery.getShippingMethod());
-                    deliveryDto.setTrackingNumber(delivery.getTrackingNumber());
-                    deliveryDto.setInTransitDate(delivery.getInTransitDate());
-                    deliveryDto.setShippingLocationId(delivery.getShippingLocation() == null
-                            ? null : delivery.getShippingLocation().getId());
-                    deliveryDto.setShippingLocationName(delivery.getShippingLocationNameSnapshot());
-                    deliveryDto.setStatus(delivery.getStatus());
-                    deliveryDto.setRemark(delivery.getRemark());
-                    deliveryDto.setCreatedBy(delivery.getCreatedBy());
-                    deliveryDto.setUpdatedBy(delivery.getUpdatedBy());
-                    deliveryDto.setCreatedDate(delivery.getCreatedDate());
-                    deliveryDto.setUpdatedDate(delivery.getUpdatedDate());
-                    deliveryDto.setDetails(delivery.getDetails().stream().map(detail -> {
-                        PurchaseOrderDeliveryDetailDto detailDto = new PurchaseOrderDeliveryDetailDto();
-                        detailDto.setId(detail.getId());
-                        detailDto.setPurchaseOrderDetailId(detail.getPurchaseOrderDetail().getId());
-                        detailDto.setPurchaseOrderDetailComponentId(detail.getPurchaseOrderDetailComponent() == null
-                                ? null : detail.getPurchaseOrderDetailComponent().getId());
-                        detailDto.setProductName(detail.getProductNameSnapshot());
-                        detailDto.setComponentName(detail.getComponentNameSnapshot());
-                        detailDto.setQuantity(detail.getQuantity());
-                        detailDto.setCartonCount(detail.getCartonCount());
-                        detailDto.setPiecesPerCarton(detail.getPiecesPerCarton());
-                        detailDto.setNetWeightKg(detail.getNetWeightKg());
-                        detailDto.setGrossWeightKg(detail.getGrossWeightKg());
-                        detailDto.setLengthCm(detail.getLengthCm());
-                        detailDto.setWidthCm(detail.getWidthCm());
-                        detailDto.setHeightCm(detail.getHeightCm());
-                        detailDto.setCbmM3(detail.getCbmM3());
-                        detailDto.setSortOrder(detail.getSortOrder());
-                        return detailDto;
-                    }).toList());
-                    return deliveryDto;
-                })
+                .map(PurchaseOrderDeliveryMapper::toDto)
                 .toList());
         return dto;
     }

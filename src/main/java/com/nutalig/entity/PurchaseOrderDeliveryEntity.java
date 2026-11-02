@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.PurchaseOrderDeliveryStatus;
+import com.nutalig.constant.DeliveryContainerStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -57,6 +58,29 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
     @Column(name = "status", nullable = false, length = 30)
     private PurchaseOrderDeliveryStatus status = PurchaseOrderDeliveryStatus.DRAFT;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "container_status", length = 30)
+    private DeliveryContainerStatus containerStatus;
+
+    // A delivery can be split across several containers. Cancelled allocations are excluded.
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "purchase_order_delivery_container",
+            joinColumns = @JoinColumn(name = "delivery_id"),
+            inverseJoinColumns = @JoinColumn(name = "container_id"))
+    @org.hibernate.annotations.BatchSize(size = 50)
+    private java.util.Set<ShippingContainerEntity> containers = new java.util.LinkedHashSet<>();
+
+    @PrePersist
+    private void initializeContainerStatus() {
+        if (requiresContainer() && containerStatus == null) containerStatus = DeliveryContainerStatus.NOT_ASSIGNED;
+    }
+
+    public boolean requiresContainer() {
+        if (shippingMethod == null) return false;
+        String normalized = shippingMethod.trim().toUpperCase(java.util.Locale.ROOT);
+        return normalized.contains("_FCL") || normalized.equals("FCL");
+    }
+
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
@@ -68,7 +92,18 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
 
     @OneToMany(mappedBy = "purchaseOrderDelivery", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder asc, id asc")
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<PurchaseOrderDeliveryDetailEntity> details = new ArrayList<>();
+
+    @OneToMany(mappedBy = "purchaseOrderDelivery", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder asc, id asc")
+    @org.hibernate.annotations.BatchSize(size = 50)
+    private List<PurchaseOrderDeliveryScrapBoxEntity> scrapBoxes = new ArrayList<>();
+
+    public void addScrapBox(PurchaseOrderDeliveryScrapBoxEntity box) {
+        scrapBoxes.add(box);
+        box.setPurchaseOrderDelivery(this);
+    }
 
     public void addDetail(PurchaseOrderDeliveryDetailEntity detail) {
         if (detail == null) return;

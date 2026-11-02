@@ -3,6 +3,7 @@ package com.nutalig.service;
 import com.nutalig.constant.Status;
 import com.nutalig.constant.ShippingMethod;
 import com.nutalig.constant.ShippingMode;
+import com.nutalig.constant.SystemConstant;
 import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.Pagination;
@@ -16,6 +17,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.ProductFamilyMapper;
 import com.nutalig.mapper.ProductMaterialMapper;
 import com.nutalig.mapper.SupplierMapper;
+import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static com.nutalig.repository.specification.SupplierSpecification.*;
 
@@ -44,12 +47,17 @@ public class SupplierService {
     private final SupplierAttachmentRepository supplierAttachmentRepository;
     private final SupplierCapabilityRepository supplierCapabilityRepository;
     private final SupplierShippingRepository supplierShippingRepository;
+    private final ShippingLocationRepository shippingLocationRepository;
+    private final ShippingRouteRepository shippingRouteRepository;
+    private final SupplierShippingRouteRepository supplierShippingRouteRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final LeadTimeConfigRepository leadTimeConfigRepository;
     private final ProductFamilyRepository productFamilyRepository;
     private final ProductMaterialRepository productMaterialRepository;
     private final ProductFamilyMapper productFamilyMapper;
     private final ProductMaterialMapper productMaterialMapper;
     private final SupplierMapper supplierMapper;
+    private final SystemConfigMapper systemConfigMapper;
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
 
@@ -112,6 +120,42 @@ public class SupplierService {
                 .orElseThrow(() -> new DataNotFoundException("Supplier " + supplierId + " not found."));
 
         return buildSupplierDto(entity);
+    }
+
+    @Transactional
+    public SupplierDto updateSupplier(String supplierId, UpdateSupplierRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null) {
+            throw new InvalidRequestException("Request is required");
+        }
+        SupplierEntity entity = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new DataNotFoundException("Supplier " + supplierId + " not found."));
+        if (request.getFullAddress() != null) {
+            entity.setFullAddress(StringUtils.trimToNull(request.getFullAddress()));
+        }
+        if (request.getContacts() != null) {
+            CreateSupplierContactRequest input = request.getContacts().stream()
+                    .filter(Objects::nonNull)
+                    .filter(contact -> Boolean.TRUE.equals(contact.getIsDefault()))
+                    .findFirst()
+                    .orElse(request.getContacts().stream().filter(Objects::nonNull).findFirst().orElse(null));
+            if (input != null) {
+                SupplierContactEntity contact = entity.getContacts().stream()
+                        .filter(item -> Boolean.TRUE.equals(item.getIsDefault()))
+                        .findFirst().orElse(null);
+                if (contact == null) {
+                    contact = new SupplierContactEntity();
+                    contact.setIsDefault(true);
+                    entity.addContact(contact);
+                }
+                contact.setContactName(StringUtils.trimToNull(input.getContactName()));
+                contact.setContactNumber(StringUtils.trimToNull(input.getContactNumber()));
+                contact.setWechat(StringUtils.trimToNull(input.getWechat()));
+                SupplierContactEntity selectedContact = contact;
+                entity.getContacts().stream().filter(item -> item != selectedContact).forEach(item -> item.setIsDefault(false));
+            }
+        }
+        return buildSupplierDto(supplierRepository.save(entity));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -233,6 +277,227 @@ public class SupplierService {
         return supplierShippingRepository.findAllByActiveTrueOrderByShippingMethodAscIdAsc().stream()
                 .map(this::buildSupplierShippingDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShippingLocationDto> getShippingLocations() {
+        return shippingLocationRepository.findAllByActiveTrueOrderByIdAsc().stream()
+                .map(this::toShippingLocationDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShippingLocationDto> searchShippingLocations(String keyword, String locationType, String countryCode) {
+        String normalizedKeyword = StringUtils.lowerCase(StringUtils.trimToNull(keyword), Locale.ROOT);
+        String normalizedType = StringUtils.upperCase(StringUtils.trimToNull(locationType), Locale.ROOT);
+        String normalizedCountry = StringUtils.upperCase(StringUtils.trimToNull(countryCode), Locale.ROOT);
+        return shippingLocationRepository.findAllByActiveTrueOrderByIdAsc().stream()
+                .filter(location -> normalizedType == null || normalizedType.equalsIgnoreCase(locationTypeCode(location)))
+                .filter(location -> normalizedCountry == null || normalizedCountry.equalsIgnoreCase(location.getCountryCode()))
+                .filter(location -> normalizedKeyword == null || Stream.of(
+                                location.getCode(), location.getName(), locationTypeCode(location),
+                                location.getCountryCode(), location.getProvince(), location.getDistrict(),
+                                location.getAddress())
+                        .filter(Objects::nonNull)
+                        .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(normalizedKeyword)))
+                .map(this::toShippingLocationDto)
+                .toList();
+    }
+
+    @Transactional
+    public List<ShippingLocationDto> createShippingLocation(UpsertShippingLocationRequest request)
+            throws InvalidRequestException {
+        validateShippingLocationRequest(request);
+        ShippingLocationEntity entity = new ShippingLocationEntity();
+        applyShippingLocation(entity, request);
+        shippingLocationRepository.save(entity);
+        return getShippingLocations();
+    }
+
+    @Transactional
+    public List<ShippingLocationDto> updateShippingLocation(Long id, UpsertShippingLocationRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        validateShippingLocationRequest(request);
+        ShippingLocationEntity entity = shippingLocationRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Shipping location " + id + " not found."));
+        applyShippingLocation(entity, request);
+        shippingLocationRepository.save(entity);
+        return getShippingLocations();
+    }
+
+    @Transactional
+    public List<ShippingLocationDto> deleteShippingLocation(Long id) throws DataNotFoundException {
+        ShippingLocationEntity entity = shippingLocationRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Shipping location " + id + " not found."));
+        entity.setActive(Boolean.FALSE);
+        shippingLocationRepository.save(entity);
+        return getShippingLocations();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShippingRouteDto> getShippingRoutes() {
+        return shippingRouteRepository.findAllByActiveTrueOrderByIdAsc().stream()
+                .map(this::toShippingRouteDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShippingRouteDto> searchShippingRoutes(String keyword, Long originLocationId,
+                                                       Long destinationLocationId) {
+        String normalizedKeyword = StringUtils.lowerCase(StringUtils.trimToNull(keyword), Locale.ROOT);
+        return shippingRouteRepository.findAllByActiveTrueOrderByIdAsc().stream()
+                .filter(route -> originLocationId == null
+                        || Objects.equals(route.getOriginLocation().getId(), originLocationId))
+                .filter(route -> destinationLocationId == null
+                        || Objects.equals(route.getDestinationLocation().getId(), destinationLocationId))
+                .filter(route -> normalizedKeyword == null || Stream.of(
+                                route.getRouteCode(),
+                                route.getOriginLocation().getCode(),
+                                route.getOriginLocation().getName(),
+                                route.getDestinationLocation().getCode(),
+                                route.getDestinationLocation().getName())
+                        .filter(Objects::nonNull)
+                        .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(normalizedKeyword)))
+                .map(this::toShippingRouteDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean shippingRouteExists(Long originLocationId, Long destinationLocationId)
+            throws InvalidRequestException {
+        if (originLocationId == null || destinationLocationId == null) {
+            throw new InvalidRequestException("Origin and destination locations are required");
+        }
+        return shippingRouteRepository.existsByOriginLocation_IdAndDestinationLocation_IdAndActiveTrue(
+                originLocationId, destinationLocationId);
+    }
+
+    @Transactional
+    public List<ShippingRouteDto> createShippingRoute(UpsertShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        ShippingRouteEntity entity = new ShippingRouteEntity();
+        applyShippingRoute(entity, request);
+        shippingRouteRepository.save(entity);
+        return getShippingRoutes();
+    }
+
+    @Transactional
+    public List<ShippingRouteDto> updateShippingRoute(Long id, UpsertShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        ShippingRouteEntity entity = shippingRouteRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Shipping route " + id + " not found."));
+        applyShippingRoute(entity, request);
+        shippingRouteRepository.save(entity);
+        return getShippingRoutes();
+    }
+
+    @Transactional
+    public List<ShippingRouteDto> deleteShippingRoute(Long id) throws DataNotFoundException {
+        ShippingRouteEntity entity = shippingRouteRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Shipping route " + id + " not found."));
+        entity.setActive(Boolean.FALSE);
+        shippingRouteRepository.save(entity);
+        return getShippingRoutes();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SupplierShippingRouteDto> getSupplierShippingRoutes(Long supplierShippingId) {
+        List<SupplierShippingRouteEntity> routes = supplierShippingId == null
+                ? supplierShippingRouteRepository.findAllByActiveTrueOrderByIdAsc()
+                : supplierShippingRouteRepository.findAllBySupplierShippingIdAndActiveTrueOrderByIdAsc(supplierShippingId);
+        return routes.stream().map(this::toSupplierShippingRouteDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SupplierShippingRouteDto> searchSupplierShippingsV2(
+            String keyword,
+            String shippingMethod,
+            String shippingMode,
+            Long supplierShippingId
+    ) {
+        String normalizedKeyword = StringUtils.trimToNull(keyword);
+        String normalizedMethod = StringUtils.upperCase(StringUtils.trimToNull(shippingMethod), Locale.ROOT);
+        String normalizedMode = StringUtils.upperCase(StringUtils.trimToNull(shippingMode), Locale.ROOT);
+        return supplierShippingRouteRepository.findAllByActiveTrueOrderByIdAsc().stream()
+                .filter(item -> supplierShippingId == null
+                        || Objects.equals(item.getSupplierShipping().getId(), supplierShippingId))
+                .filter(item -> normalizedMethod == null
+                        || item.getSupplierShipping().getShippingMethod() != null
+                        && item.getSupplierShipping().getShippingMethod().name().equals(normalizedMethod))
+                .filter(item -> normalizedMode == null
+                        || item.getSupplierShipping().getShippingMode() != null
+                        && item.getSupplierShipping().getShippingMode().name().equals(normalizedMode))
+                .filter(item -> matchesSupplierShippingRouteKeyword(item, normalizedKeyword))
+                .map(this::toSupplierShippingRouteDto)
+                .toList();
+    }
+
+    @Transactional
+    public List<SupplierShippingRouteDto> createSupplierShippingV2(CreateSupplierShippingV2Request request)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || request.getShippingMethod() == null) {
+            throw new InvalidRequestException("shippingMethod is required");
+        }
+        if (CollectionUtils.isEmpty(request.getShippingRouteIds())) {
+            throw new InvalidRequestException("At least one shipping route is required");
+        }
+        ShippingMode mode = request.getShippingMode() == null ? ShippingMode.STANDARD : request.getShippingMode();
+        if (request.getShippingMethod() == ShippingMethod.LAND && mode != ShippingMode.STANDARD) {
+            throw new InvalidRequestException("LAND shipping only supports STANDARD mode");
+        }
+        List<ShippingRouteEntity> routes = new ArrayList<>();
+        for (Long routeId : new LinkedHashSet<>(request.getShippingRouteIds())) {
+            routes.add(shippingRouteRepository.findByIdAndActiveTrue(routeId)
+                    .orElseThrow(() -> new DataNotFoundException("Shipping route " + routeId + " not found.")));
+        }
+        SupplierShippingEntity shipping = new SupplierShippingEntity();
+        shipping.setShippingMethod(request.getShippingMethod());
+        shipping.setShippingMode(mode);
+        shipping.setShippingName(StringUtils.trimToNull(request.getShippingName()));
+        shipping.setCarCode(StringUtils.upperCase(StringUtils.trimToNull(request.getCarCode()), Locale.ROOT));
+        shipping.setRemark(StringUtils.trimToNull(request.getRemark()));
+        shipping.setActive(Boolean.TRUE);
+        supplierShippingRepository.saveAndFlush(shipping);
+        List<SupplierShippingRouteEntity> links = routes.stream().map(route -> {
+            SupplierShippingRouteEntity link = new SupplierShippingRouteEntity();
+            link.setSupplierShipping(shipping);
+            link.setShippingRoute(route);
+            link.setActive(Boolean.TRUE);
+            return link;
+        }).toList();
+        supplierShippingRouteRepository.saveAll(links);
+        return getSupplierShippingRoutes(shipping.getId());
+    }
+
+    @Transactional
+    public List<SupplierShippingRouteDto> createSupplierShippingRoute(UpsertSupplierShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        validateSupplierShippingRouteRequest(request);
+        SupplierShippingRouteEntity entity = new SupplierShippingRouteEntity();
+        applySupplierShippingRoute(entity, request);
+        supplierShippingRouteRepository.save(entity);
+        return getSupplierShippingRoutes(request.getSupplierShippingId());
+    }
+
+    @Transactional
+    public List<SupplierShippingRouteDto> updateSupplierShippingRoute(Long id, UpsertSupplierShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        validateSupplierShippingRouteRequest(request);
+        SupplierShippingRouteEntity entity = supplierShippingRouteRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Supplier shipping route " + id + " not found."));
+        applySupplierShippingRoute(entity, request);
+        supplierShippingRouteRepository.save(entity);
+        return getSupplierShippingRoutes(request.getSupplierShippingId());
+    }
+
+    @Transactional
+    public List<SupplierShippingRouteDto> deleteSupplierShippingRoute(Long id)
+            throws DataNotFoundException {
+        SupplierShippingRouteEntity entity = supplierShippingRouteRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new DataNotFoundException("Supplier shipping route " + id + " not found."));
+        entity.setActive(Boolean.FALSE);
+        supplierShippingRouteRepository.save(entity);
+        return getSupplierShippingRoutes(entity.getSupplierShipping().getId());
     }
 
     @Transactional(readOnly = true)
@@ -609,6 +874,171 @@ public class SupplierService {
         if (!hasDestinationName) {
             throw new InvalidRequestException("At least one destination name is required");
         }
+    }
+
+    private void validateShippingLocationRequest(UpsertShippingLocationRequest request)
+            throws InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getName())) {
+            throw new InvalidRequestException("Shipping location name is required");
+        }
+    }
+
+    private void applyShippingLocation(ShippingLocationEntity entity, UpsertShippingLocationRequest request)
+            throws InvalidRequestException {
+        entity.setCode(StringUtils.trimToNull(request.getCode()));
+        entity.setName(StringUtils.trimToNull(request.getName()));
+        String locationTypeCode = StringUtils.upperCase(StringUtils.trimToNull(request.getLocationType()), Locale.ROOT);
+        if (locationTypeCode == null) {
+            entity.setLocationType(null);
+            entity.setLocationTypeCode(null);
+            entity.setLocationTypeGroupCode(null);
+        } else {
+            SystemConfigEntity locationType = systemConfigRepository
+                    .findByIdGroupCodeAndIdCode(SystemConstant.LOCATION_TYPE, locationTypeCode)
+                    .orElseThrow(() -> new InvalidRequestException("Unknown LOCATION_TYPE: " + locationTypeCode));
+            entity.setLocationType(locationType);
+            entity.setLocationTypeCode(locationTypeCode);
+            entity.setLocationTypeGroupCode(SystemConstant.LOCATION_TYPE.name());
+        }
+        entity.setCountryCode(StringUtils.upperCase(StringUtils.trimToNull(request.getCountryCode()), Locale.ROOT));
+        entity.setProvince(StringUtils.trimToNull(request.getProvince()));
+        entity.setDistrict(StringUtils.trimToNull(request.getDistrict()));
+        entity.setAddress(StringUtils.trimToNull(request.getAddress()));
+        entity.setActive(Boolean.TRUE);
+    }
+
+    private void applyShippingRoute(ShippingRouteEntity entity, UpsertShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || request.getOriginLocationId() == null || request.getDestinationLocationId() == null) {
+            throw new InvalidRequestException("Origin and destination locations are required");
+        }
+        if (Objects.equals(request.getOriginLocationId(), request.getDestinationLocationId())) {
+            throw new InvalidRequestException("Origin and destination locations must be different");
+        }
+        ShippingLocationEntity origin = shippingLocationRepository.findByIdAndActiveTrue(request.getOriginLocationId())
+                .orElseThrow(() -> new DataNotFoundException("Origin shipping location not found."));
+        ShippingLocationEntity destination = shippingLocationRepository.findByIdAndActiveTrue(request.getDestinationLocationId())
+                .orElseThrow(() -> new DataNotFoundException("Destination shipping location not found."));
+        entity.setRouteCode(StringUtils.trimToNull(request.getRouteCode()));
+        entity.setOriginLocation(origin);
+        entity.setDestinationLocation(destination);
+        entity.setActive(Boolean.TRUE);
+    }
+
+    private void validateSupplierShippingRouteRequest(UpsertSupplierShippingRouteRequest request)
+            throws InvalidRequestException {
+        if (request == null || request.getSupplierShippingId() == null || request.getShippingRouteId() == null) {
+            throw new InvalidRequestException("supplierShippingId and shippingRouteId are required");
+        }
+        if (request.getBaseCost() != null && request.getBaseCost().signum() < 0) {
+            throw new InvalidRequestException("baseCost cannot be negative");
+        }
+        if (request.getLeadTimeDayMin() != null && request.getLeadTimeDayMin() < 0
+                || request.getLeadTimeDayMax() != null && request.getLeadTimeDayMax() < 0) {
+            throw new InvalidRequestException("Lead time cannot be negative");
+        }
+        if (request.getLeadTimeDayMin() != null && request.getLeadTimeDayMax() != null
+                && request.getLeadTimeDayMin() > request.getLeadTimeDayMax()) {
+            throw new InvalidRequestException("Minimum lead time cannot exceed maximum lead time");
+        }
+        if (request.getEffectiveFrom() != null && request.getEffectiveTo() != null
+                && request.getEffectiveFrom().isAfter(request.getEffectiveTo())) {
+            throw new InvalidRequestException("effectiveFrom cannot be after effectiveTo");
+        }
+    }
+
+    private void applySupplierShippingRoute(SupplierShippingRouteEntity entity,
+                                             UpsertSupplierShippingRouteRequest request)
+            throws DataNotFoundException {
+        SupplierShippingEntity shipping = supplierShippingRepository.findByIdAndActiveTrue(request.getSupplierShippingId())
+                .orElseThrow(() -> new DataNotFoundException("Supplier shipping not found."));
+        ShippingRouteEntity route = shippingRouteRepository.findByIdAndActiveTrue(request.getShippingRouteId())
+                .orElseThrow(() -> new DataNotFoundException("Shipping route not found."));
+        entity.setSupplierShipping(shipping);
+        entity.setShippingRoute(route);
+        entity.setCurrency(StringUtils.upperCase(StringUtils.trimToNull(request.getCurrency()), Locale.ROOT));
+        entity.setBaseCost(request.getBaseCost());
+        entity.setLeadTimeDayMin(request.getLeadTimeDayMin());
+        entity.setLeadTimeDayMax(request.getLeadTimeDayMax());
+        entity.setEffectiveFrom(request.getEffectiveFrom());
+        entity.setEffectiveTo(request.getEffectiveTo());
+        entity.setRemark(StringUtils.trimToNull(request.getRemark()));
+        entity.setActive(Boolean.TRUE);
+    }
+
+    private ShippingLocationDto toShippingLocationDto(ShippingLocationEntity entity) {
+        ShippingLocationDto dto = new ShippingLocationDto();
+        dto.setId(entity.getId());
+        dto.setCode(entity.getCode());
+        dto.setName(entity.getName());
+        dto.setLocationType(entity.getLocationType() == null
+                ? null : systemConfigMapper.toDto(entity.getLocationType()));
+        dto.setCountryCode(entity.getCountryCode());
+        dto.setProvince(entity.getProvince());
+        dto.setDistrict(entity.getDistrict());
+        dto.setAddress(entity.getAddress());
+        dto.setActive(entity.getActive());
+        return dto;
+    }
+
+    private String locationTypeCode(ShippingLocationEntity entity) {
+        return entity.getLocationTypeCode() != null
+                ? entity.getLocationTypeCode()
+                : entity.getLocationType() == null || entity.getLocationType().getId() == null
+                ? null : entity.getLocationType().getId().getCode();
+    }
+
+    private ShippingRouteDto toShippingRouteDto(ShippingRouteEntity entity) {
+        ShippingRouteDto dto = new ShippingRouteDto();
+        dto.setId(entity.getId());
+        dto.setRouteCode(entity.getRouteCode());
+        dto.setOriginLocationId(entity.getOriginLocation().getId());
+        dto.setOriginLocationName(entity.getOriginLocation().getName());
+        dto.setDestinationLocationId(entity.getDestinationLocation().getId());
+        dto.setDestinationLocationName(entity.getDestinationLocation().getName());
+        dto.setActive(entity.getActive());
+        return dto;
+    }
+
+    private SupplierShippingRouteDto toSupplierShippingRouteDto(SupplierShippingRouteEntity entity) {
+        SupplierShippingRouteDto dto = new SupplierShippingRouteDto();
+        ShippingRouteEntity route = entity.getShippingRoute();
+        dto.setId(entity.getId());
+        dto.setSupplierShippingId(entity.getSupplierShipping().getId());
+        dto.setSupplierShippingName(entity.getSupplierShipping().getShippingName());
+        dto.setShippingMethod(entity.getSupplierShipping().getShippingMethod());
+        dto.setShippingMode(entity.getSupplierShipping().getShippingMode());
+        dto.setCarCode(entity.getSupplierShipping().getCarCode());
+        dto.setShippingRouteId(route.getId());
+        dto.setRouteCode(route.getRouteCode());
+        dto.setOriginLocationId(route.getOriginLocation().getId());
+        dto.setOriginLocationName(route.getOriginLocation().getName());
+        dto.setDestinationLocationId(route.getDestinationLocation().getId());
+        dto.setDestinationLocationName(route.getDestinationLocation().getName());
+        dto.setCurrency(entity.getCurrency());
+        dto.setBaseCost(entity.getBaseCost());
+        dto.setLeadTimeDayMin(entity.getLeadTimeDayMin());
+        dto.setLeadTimeDayMax(entity.getLeadTimeDayMax());
+        dto.setEffectiveFrom(entity.getEffectiveFrom());
+        dto.setEffectiveTo(entity.getEffectiveTo());
+        dto.setRemark(entity.getRemark());
+        dto.setActive(entity.getActive());
+        return dto;
+    }
+
+    private boolean matchesSupplierShippingRouteKeyword(SupplierShippingRouteEntity entity, String keyword) {
+        if (keyword == null) return true;
+        ShippingRouteEntity route = entity.getShippingRoute();
+        SupplierShippingEntity shipping = entity.getSupplierShipping();
+        return Stream.of(
+                        shipping.getShippingName(),
+                        shipping.getCarCode(),
+                        route.getRouteCode(),
+                        route.getOriginLocation().getName(),
+                        route.getDestinationLocation().getName()
+                )
+                .filter(Objects::nonNull)
+                .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT)));
     }
 
     private void applySupplierShipping(SupplierShippingEntity shipping, UpsertSupplierShippingRequest request) {

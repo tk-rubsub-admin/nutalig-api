@@ -10,5 +10,6 @@ public enum ActivityEntityType {
     RECEIPT,
     PURCHASE_ORDER,
     PURCHASE_ORDER_PROOF,
+    SHIPPING_CONTAINER,
     APPROVAL_REQUEST
 }

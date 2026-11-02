@@ -23,6 +23,7 @@ public class InvoiceDto {
     private String deliveryDate;
     private Integer installmentNo;
     private Integer installmentCount;
+    private Long paymentScheduleId;
     private InvoiceStatus status;
     private DocumentStatusProfileDto statusProfile;
     private Currency currency;

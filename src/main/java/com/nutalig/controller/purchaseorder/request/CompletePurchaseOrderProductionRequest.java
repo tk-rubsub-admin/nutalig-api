@@ -19,10 +19,22 @@ public class CompletePurchaseOrderProductionRequest {
         private String shippingMethod;
         private Long shippingLocationId;
         private List<Detail> details;
+        private List<ScrapBox> scrapBoxes;
+    }
+
+    @Data
+    public static class ScrapBox {
+        private BigDecimal netWeightKg;
+        private BigDecimal grossWeightKg;
+        private BigDecimal lengthCm;
+        private BigDecimal widthCm;
+        private BigDecimal heightCm;
+        private BigDecimal cbmM3;
     }
 
     @Data
     public static class Detail {
+        private Integer scrapBoxIndex;
         private Long purchaseOrderDetailId;
         private Long purchaseOrderDetailComponentId;
         private BigDecimal quantity;

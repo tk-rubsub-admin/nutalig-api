@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261027-001-map-shipping-location-type-to-system-config
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE shipping_location
+                  ADD COLUMN location_type_group_code VARCHAR(100) DEFAULT NULL AFTER location_type;
+
+              UPDATE shipping_location
+              SET location_type_group_code = 'LOCATION_TYPE'
+              WHERE location_type IS NOT NULL;
+
+              ALTER TABLE shipping_location
+                  ADD KEY idx_shipping_location_type (location_type_group_code, location_type),
+                  ADD CONSTRAINT fk_shipping_location_type
+                      FOREIGN KEY (location_type_group_code, location_type)
+                      REFERENCES system_config (group_code, code);

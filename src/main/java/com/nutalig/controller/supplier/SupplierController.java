@@ -8,6 +8,9 @@ import com.nutalig.dto.SupplierCapabilityDto;
 import com.nutalig.dto.LeadTimeConfigDto;
 import com.nutalig.dto.SupplierDto;
 import com.nutalig.dto.SupplierShippingDto;
+import com.nutalig.dto.ShippingLocationDto;
+import com.nutalig.dto.ShippingRouteDto;
+import com.nutalig.dto.SupplierShippingRouteDto;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.SupplierService;
@@ -49,6 +52,14 @@ public class SupplierController {
 
         log.info("=== End get supplier {} ===", supplierId);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/v1/suppliers/{supplierId}")
+    public GeneralResponse<SupplierDto> updateSupplier(
+            @PathVariable String supplierId,
+            @RequestBody UpdateSupplierRequest request
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.updateSupplier(supplierId, request));
     }
 
     @PostMapping(
@@ -124,6 +135,124 @@ public class SupplierController {
     ) throws DataNotFoundException {
         java.util.List<SupplierShippingDto> response = supplierService.deleteSupplierShipping(shippingId);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/v1/shipping-locations")
+    public GeneralResponse<List<ShippingLocationDto>> getShippingLocations() {
+        return new GeneralResponse<>(SUCCESS, supplierService.getShippingLocations());
+    }
+
+    @GetMapping("/v2/shipping-locations")
+    public GeneralResponse<List<ShippingLocationDto>> searchShippingLocations(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String locationType,
+            @RequestParam(required = false) String countryCode) {
+        return new GeneralResponse<>(SUCCESS,
+                supplierService.searchShippingLocations(keyword, locationType, countryCode));
+    }
+
+    @PostMapping("/v1/shipping-locations")
+    public GeneralResponse<List<ShippingLocationDto>> createShippingLocation(
+            @RequestBody UpsertShippingLocationRequest request) throws InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.createShippingLocation(request));
+    }
+
+    @PatchMapping("/v1/shipping-locations/{id}")
+    public GeneralResponse<List<ShippingLocationDto>> updateShippingLocation(
+            @PathVariable Long id,
+            @RequestBody UpsertShippingLocationRequest request) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.updateShippingLocation(id, request));
+    }
+
+    @DeleteMapping("/v1/shipping-locations/{id}")
+    public GeneralResponse<List<ShippingLocationDto>> deleteShippingLocation(@PathVariable Long id)
+            throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, supplierService.deleteShippingLocation(id));
+    }
+
+    @GetMapping("/v1/shipping-routes")
+    public GeneralResponse<List<ShippingRouteDto>> getShippingRoutes() {
+        return new GeneralResponse<>(SUCCESS, supplierService.getShippingRoutes());
+    }
+
+    @GetMapping("/v2/shipping-routes")
+    public GeneralResponse<List<ShippingRouteDto>> searchShippingRoutes(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long originLocationId,
+            @RequestParam(required = false) Long destinationLocationId) {
+        return new GeneralResponse<>(SUCCESS,
+                supplierService.searchShippingRoutes(keyword, originLocationId, destinationLocationId));
+    }
+
+    @GetMapping("/v2/shipping-routes/check")
+    public GeneralResponse<Boolean> checkShippingRoute(
+            @RequestParam Long originLocationId,
+            @RequestParam Long destinationLocationId) throws InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                supplierService.shippingRouteExists(originLocationId, destinationLocationId));
+    }
+
+    @PostMapping("/v1/shipping-routes")
+    public GeneralResponse<List<ShippingRouteDto>> createShippingRoute(
+            @RequestBody UpsertShippingRouteRequest request) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.createShippingRoute(request));
+    }
+
+    @PatchMapping("/v1/shipping-routes/{id}")
+    public GeneralResponse<List<ShippingRouteDto>> updateShippingRoute(
+            @PathVariable Long id,
+            @RequestBody UpsertShippingRouteRequest request) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.updateShippingRoute(id, request));
+    }
+
+    @DeleteMapping("/v1/shipping-routes/{id}")
+    public GeneralResponse<List<ShippingRouteDto>> deleteShippingRoute(@PathVariable Long id)
+            throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, supplierService.deleteShippingRoute(id));
+    }
+
+    @GetMapping("/v1/supplier-shipping-routes")
+    public GeneralResponse<List<SupplierShippingRouteDto>> getSupplierShippingRoutes(
+            @RequestParam(required = false) Long supplierShippingId) {
+        return new GeneralResponse<>(SUCCESS, supplierService.getSupplierShippingRoutes(supplierShippingId));
+    }
+
+    @GetMapping("/v2/supplier-shippings")
+    public GeneralResponse<List<SupplierShippingRouteDto>> searchSupplierShippingsV2(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String shippingMethod,
+            @RequestParam(required = false) String shippingMode,
+            @RequestParam(required = false) Long supplierShippingId) {
+        return new GeneralResponse<>(SUCCESS, supplierService.searchSupplierShippingsV2(
+                keyword, shippingMethod, shippingMode, supplierShippingId));
+    }
+
+    @PostMapping("/v2/supplier-shippings")
+    public GeneralResponse<List<SupplierShippingRouteDto>> createSupplierShippingV2(
+            @RequestBody CreateSupplierShippingV2Request request)
+            throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.createSupplierShippingV2(request));
+    }
+
+    @PostMapping("/v1/supplier-shipping-routes")
+    public GeneralResponse<List<SupplierShippingRouteDto>> createSupplierShippingRoute(
+            @RequestBody UpsertSupplierShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.createSupplierShippingRoute(request));
+    }
+
+    @PatchMapping("/v1/supplier-shipping-routes/{id}")
+    public GeneralResponse<List<SupplierShippingRouteDto>> updateSupplierShippingRoute(
+            @PathVariable Long id,
+            @RequestBody UpsertSupplierShippingRouteRequest request)
+            throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, supplierService.updateSupplierShippingRoute(id, request));
+    }
+
+    @DeleteMapping("/v1/supplier-shipping-routes/{id}")
+    public GeneralResponse<List<SupplierShippingRouteDto>> deleteSupplierShippingRoute(@PathVariable Long id)
+            throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, supplierService.deleteSupplierShippingRoute(id));
     }
 
     @PostMapping("/v1/suppliers/{supplierId}/capabilities")
