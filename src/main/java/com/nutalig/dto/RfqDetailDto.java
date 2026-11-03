@@ -2,6 +2,7 @@ package com.nutalig.dto;
 
 import lombok.Data;
 import com.nutalig.constant.OrderLineType;
+import com.nutalig.constant.SampleRefundPolicy;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -13,6 +14,11 @@ public class RfqDetailDto {
     private Long id;
     private String optionName;
     private OrderLineType lineType;
+    private SampleRefundPolicy sampleRefundPolicy;
+    private BigDecimal sampleRefundPercent;
+    private BigDecimal sampleRefundMinOrderQty;
+    private String sampleRefundNote;
+    private String sampleRefundConditionText;
     private String plan;
     private String spec;
     private Integer sortOrder;

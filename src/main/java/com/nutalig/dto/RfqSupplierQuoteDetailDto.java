@@ -1,5 +1,7 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.OrderLineType;
+import com.nutalig.constant.SampleRefundPolicy;
 import lombok.Data;
 
 import java.time.ZonedDateTime;
@@ -11,6 +13,12 @@ public class RfqSupplierQuoteDetailDto {
     private Long id;
     private Long rfqDetailId;
     private String optionName;
+    private OrderLineType lineType;
+    private SampleRefundPolicy sampleRefundPolicy;
+    private java.math.BigDecimal sampleRefundPercent;
+    private java.math.BigDecimal sampleRefundMinOrderQty;
+    private String sampleRefundNote;
+    private String sampleRefundConditionText;
     private String plan;
     private String spec;
     private Integer sortOrder;

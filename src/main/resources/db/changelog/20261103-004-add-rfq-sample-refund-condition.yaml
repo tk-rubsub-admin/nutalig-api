@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261103-004-add-rfq-sample-refund-condition
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: sample_refund_policy
+                  type: varchar(20)
+              - column:
+                  name: sample_refund_percent
+                  type: "decimal(5,2)"
+              - column:
+                  name: sample_refund_min_order_qty
+                  type: "decimal(18,5)"
+              - column:
+                  name: sample_refund_note
+                  type: text
+              - column:
+                  name: sample_refund_condition_text
+                  type: text

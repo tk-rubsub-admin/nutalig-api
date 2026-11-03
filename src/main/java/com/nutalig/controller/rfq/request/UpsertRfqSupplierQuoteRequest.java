@@ -1,7 +1,9 @@
 package com.nutalig.controller.rfq.request;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import com.nutalig.constant.RfqSupplierQuoteStatus;
+import com.nutalig.constant.SampleRefundPolicy;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -24,6 +26,11 @@ public class UpsertRfqSupplierQuoteRequest {
     public static class DetailRequest {
         private Long rfqDetailId;
         private String optionName;
+        private OrderLineType lineType = OrderLineType.PRODUCT;
+        private SampleRefundPolicy sampleRefundPolicy;
+        private BigDecimal sampleRefundPercent;
+        private BigDecimal sampleRefundMinOrderQty;
+        private String sampleRefundNote;
         private String plan;
         private String spec;
         private Integer sortOrder;
@@ -67,6 +74,11 @@ public class UpsertRfqSupplierQuoteRequest {
         private String unit;
         private String value;
         private Integer sortOrder;
+        private OrderLineType lineType = OrderLineType.ADDITIONAL_COST;
+        private SampleRefundPolicy sampleRefundPolicy;
+        private BigDecimal sampleRefundPercent;
+        private BigDecimal sampleRefundMinOrderQty;
+        private String sampleRefundNote;
     }
 
     @Data

@@ -3502,6 +3502,11 @@ public class RFQService {
         detailEntity.setLineType(request.getLineType() == null
                 ? com.nutalig.constant.OrderLineType.PRODUCT
                 : request.getLineType());
+        detailEntity.setSampleRefundPolicy(request.getSampleRefundPolicy());
+        detailEntity.setSampleRefundPercent(scaleMoney(request.getSampleRefundPercent()));
+        detailEntity.setSampleRefundMinOrderQty(request.getSampleRefundMinOrderQty());
+        detailEntity.setSampleRefundNote(StringUtils.trimToNull(request.getSampleRefundNote()));
+        detailEntity.setSampleRefundConditionText(StringUtils.trimToNull(request.getSampleRefundConditionText()));
         detailEntity.setPlan(StringUtils.trimToNull(request.getPlan()));
         detailEntity.setSpec(request.getSpec().trim());
         detailEntity.setSortOrder(request.getSortOrder());

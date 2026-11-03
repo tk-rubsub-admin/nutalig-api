@@ -32,6 +32,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.nutalig.utils.ObjectUtil.safeValue;
 import static com.nutalig.utils.RfqUtil.*;
@@ -883,6 +884,12 @@ public class RFQSupplierService {
         dto.setId(entity.getId());
         dto.setRfqDetailId(entity.getRequestPriceDetail() == null ? null : entity.getRequestPriceDetail().getId());
         dto.setOptionName(entity.getOptionName());
+        dto.setLineType(entity.getLineType());
+        dto.setSampleRefundPolicy(entity.getSampleRefundPolicy());
+        dto.setSampleRefundPercent(entity.getSampleRefundPercent());
+        dto.setSampleRefundMinOrderQty(entity.getSampleRefundMinOrderQty());
+        dto.setSampleRefundNote(entity.getSampleRefundNote());
+        dto.setSampleRefundConditionText(entity.getSampleRefundConditionText());
         dto.setPlan(entity.getPlan());
         dto.setSpec(entity.getSpec());
         dto.setSortOrder(entity.getSortOrder());
@@ -1311,6 +1318,28 @@ public class RFQSupplierService {
             detailSortOrder++;
         }
 
+        // Keep the legacy quote-level rows and mirror numeric additional costs
+        // as quote details so downstream detail-based flows can consume them.
+        Set<String> existingAdditionalCostNames = request.getDetails().stream()
+                .filter(detail -> detail != null && detail.getLineType() == OrderLineType.ADDITIONAL_COST)
+                .map(UpsertRfqSupplierQuoteRequest.DetailRequest::getOptionName)
+                .filter(StringUtils::isNotBlank)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        for (UpsertRfqSupplierQuoteRequest.AdditionalCostRequest additionalCostRequest :
+                Optional.ofNullable(request.getAdditionalCosts()).orElse(List.of())) {
+            if (additionalCostRequest == null || StringUtils.isBlank(additionalCostRequest.getDescription())) {
+                continue;
+            }
+            if (existingAdditionalCostNames.contains(additionalCostRequest.getDescription().trim().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            quote.addDetail(buildSupplierQuoteAdditionalCostDetailEntity(
+                    additionalCostRequest,
+                    detailSortOrder++
+            ));
+        }
+
         int additionalCostSortOrder = 1;
         for (UpsertRfqSupplierQuoteRequest.AdditionalCostRequest additionalCostRequest :
                 Optional.ofNullable(request.getAdditionalCosts()).orElse(List.of())) {
@@ -1370,6 +1399,9 @@ public class RFQSupplierService {
             }
         }
         entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
+        entity.setLineType(request.getLineType() == null ? OrderLineType.PRODUCT : request.getLineType());
+        applySampleRefundCondition(entity, entity.getLineType(), request.getSampleRefundPolicy(),
+                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
         entity.setPlan(StringUtils.trimToNull(request.getPlan()));
         entity.setSpec(request.getSpec().trim());
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
@@ -1384,6 +1416,82 @@ public class RFQSupplierService {
             tierSortOrder++;
         }
         return entity;
+    }
+
+    private RfqSupplierQuoteDetailEntity buildSupplierQuoteAdditionalCostDetailEntity(
+            UpsertRfqSupplierQuoteRequest.AdditionalCostRequest request,
+            Integer sortOrder
+    ) throws InvalidRequestException {
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(StringUtils.defaultString(request.getValue(), "0").replace(",", "").trim());
+        } catch (NumberFormatException exception) {
+            throw new InvalidRequestException(
+                    "Supplier quote additional cost value must be numeric: " + request.getDescription()
+            );
+        }
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidRequestException(
+                    "Supplier quote additional cost value must be greater than or equal to zero: "
+                            + request.getDescription()
+            );
+        }
+
+        RfqSupplierQuoteDetailEntity entity = new RfqSupplierQuoteDetailEntity();
+        entity.setOptionName(request.getDescription().trim());
+        OrderLineType lineType = request.getLineType() == null ? OrderLineType.ADDITIONAL_COST : request.getLineType();
+        entity.setLineType(lineType);
+        applySampleRefundCondition(entity, lineType, request.getSampleRefundPolicy(),
+                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
+        entity.setSpec(StringUtils.defaultIfBlank(
+                StringUtils.trimToNull(request.getUnit()),
+                request.getDescription().trim()
+        ));
+        entity.setSortOrder(sortOrder);
+
+        RfqSupplierQuoteTierEntity tier = new RfqSupplierQuoteTierEntity();
+        tier.setQuantity(BigDecimal.ONE);
+        tier.setProductPrice(scaleMoney(amount));
+        tier.setShippingCost(scaleMoney(BigDecimal.ZERO));
+        tier.setProductPriceCurrency(com.nutalig.constant.Currency.THB);
+        tier.setShippingCostCurrency(com.nutalig.constant.Currency.THB);
+        tier.setCurrency(com.nutalig.constant.Currency.THB);
+        tier.setSortOrder(1);
+        entity.addTier(tier);
+        return entity;
+    }
+
+    private void applySampleRefundCondition(
+            RfqSupplierQuoteDetailEntity entity, OrderLineType lineType, SampleRefundPolicy policy,
+            BigDecimal percent, BigDecimal minOrderQty, String note
+    ) throws InvalidRequestException {
+        if (lineType != OrderLineType.SAMPLE_COST) return;
+        SampleRefundPolicy normalizedPolicy = policy == null ? SampleRefundPolicy.NONE : policy;
+        BigDecimal normalizedPercent = percent == null ? BigDecimal.ZERO : percent;
+        BigDecimal normalizedMinQty = minOrderQty == null ? BigDecimal.ZERO : minOrderQty;
+        if (normalizedMinQty.signum() < 0) throw new InvalidRequestException("sampleRefundMinOrderQty must be non-negative.");
+        if (normalizedPercent.signum() < 0 || normalizedPercent.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new InvalidRequestException("sampleRefundPercent must be between 0 and 100.");
+        }
+        if (normalizedPolicy == SampleRefundPolicy.NONE && normalizedPercent.signum() != 0) {
+            throw new InvalidRequestException("sampleRefundPercent must be zero when policy is NONE.");
+        }
+        if (normalizedPolicy == SampleRefundPolicy.PARTIAL
+                && (normalizedPercent.signum() == 0 || normalizedPercent.compareTo(BigDecimal.valueOf(100)) >= 0)) {
+            throw new InvalidRequestException("PARTIAL refund percent must be between 0 and 100.");
+        }
+        if (normalizedPolicy == SampleRefundPolicy.FULL) normalizedPercent = BigDecimal.valueOf(100);
+        entity.setSampleRefundPolicy(normalizedPolicy);
+        entity.setSampleRefundPercent(normalizedPercent);
+        entity.setSampleRefundMinOrderQty(normalizedMinQty);
+        entity.setSampleRefundNote(StringUtils.trimToNull(note));
+        String text = normalizedPolicy == SampleRefundPolicy.NONE
+                ? "คืนเงินไม่ได้"
+                : "คืนเงินได้ " + normalizedPercent.stripTrailingZeros().toPlainString() + "%"
+                + (normalizedMinQty.signum() > 0
+                ? " ถ้าสั่งขั้นต่ำ " + normalizedMinQty.stripTrailingZeros().toPlainString() + " ชิ้น"
+                : " ไม่มีขั้นต่ำ");
+        entity.setSampleRefundConditionText(StringUtils.isBlank(note) ? text : text + " (" + note.trim() + ")");
     }
 
     private RfqSupplierQuoteTierEntity buildSupplierQuoteTierEntity(

@@ -2,6 +2,7 @@ package com.nutalig.entity;
 
 import jakarta.persistence.*;
 import com.nutalig.constant.OrderLineType;
+import com.nutalig.constant.SampleRefundPolicy;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -37,6 +38,22 @@ public class RfqDetailEntity extends AuditDateEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "line_type", length = 30, nullable = false)
     private OrderLineType lineType = OrderLineType.PRODUCT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sample_refund_policy", length = 20)
+    private SampleRefundPolicy sampleRefundPolicy;
+
+    @Column(name = "sample_refund_percent", precision = 5, scale = 2)
+    private BigDecimal sampleRefundPercent;
+
+    @Column(name = "sample_refund_min_order_qty", precision = 18, scale = 5)
+    private BigDecimal sampleRefundMinOrderQty;
+
+    @Column(name = "sample_refund_note", columnDefinition = "TEXT")
+    private String sampleRefundNote;
+
+    @Column(name = "sample_refund_condition_text", columnDefinition = "TEXT")
+    private String sampleRefundConditionText;
 
     @Column(name = "plan", length = 255)
     private String plan;

@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261103-002-add-supplier-quote-detail-line-type
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote_detail
+            columns:
+              - column:
+                  name: line_type
+                  type: varchar(30)
+                  defaultValue: PRODUCT
+                  constraints:
+                    nullable: false
