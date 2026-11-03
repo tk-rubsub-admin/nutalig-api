@@ -17,6 +17,7 @@ public class UpsertRfqSupplierQuoteRequest {
     private RfqSupplierQuoteStatus status;
     private String remark;
     private String recommend;
+    private String sampleRefund;
     private List<DetailRequest> details;
     private List<AdditionalCostRequest> additionalCosts;
     private List<PackageRequest> packages;
@@ -74,11 +75,11 @@ public class UpsertRfqSupplierQuoteRequest {
         private String unit;
         private String value;
         private Integer sortOrder;
-        private OrderLineType lineType = OrderLineType.ADDITIONAL_COST;
-        private SampleRefundPolicy sampleRefundPolicy;
-        private BigDecimal sampleRefundPercent;
-        private BigDecimal sampleRefundMinOrderQty;
-        private String sampleRefundNote;
+        private OrderLineType lineType;
+//        private SampleRefundPolicy sampleRefundPolicy;
+//        private BigDecimal sampleRefundPercent;
+//        private BigDecimal sampleRefundMinOrderQty;
+//        private String sampleRefundNote;
     }
 
     @Data

@@ -3154,3 +3154,5 @@ databaseChangeLog:
       file: db/changelog/20261103-003-add-supplier-quote-sample-refund-condition.yaml
   - include:
       file: db/changelog/20261103-004-add-rfq-sample-refund-condition.yaml
+  - include:
+      file: db/changelog/20261103-005-add-supplier-quote-sample-refund.yaml

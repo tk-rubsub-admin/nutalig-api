@@ -16,6 +16,7 @@ public class RfqSupplierQuoteDto {
     private Integer revisionNo;
     private RfqSupplierQuoteStatus status;
     private String remark;
+    private String sampleRefund;
     private List<RfqSupplierQuoteDetailDto> details;
     private List<RfqSupplierQuoteAdditionalCostDto> additionalCosts;
     private List<RfqSupplierQuotePackageDto> packages;

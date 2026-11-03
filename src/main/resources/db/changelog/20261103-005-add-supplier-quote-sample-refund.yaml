@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261103-005-add-supplier-quote-sample-refund
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_supplier_quote
+            columns:
+              - column:
+                  name: sample_refund
+                  type: text

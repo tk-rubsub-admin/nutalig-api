@@ -505,6 +505,7 @@ public class RFQSupplierService {
         normalized.setStatus(RfqSupplierQuoteStatus.RESPONDED);
         normalized.setRemark(StringUtils.trimToNull(normalized.getRemark()));
         normalized.setRecommend(StringUtils.trimToNull(normalized.getRecommend()));
+        normalized.setSampleRefund(StringUtils.defaultString(normalized.getSampleRefund()));
 
         List<UpsertRfqSupplierQuoteRequest.DetailRequest> normalizedDetails = new ArrayList<>();
         List<UpsertRfqSupplierQuoteRequest.DetailRequest> detailRequests =
@@ -610,6 +611,15 @@ public class RFQSupplierService {
             additionalCost.setDescription(additionalCost.getDescription().trim());
             additionalCost.setUnit(StringUtils.trimToNull(additionalCost.getUnit()));
             additionalCost.setValue(StringUtils.trimToNull(additionalCost.getValue()));
+            if (additionalCost.getLineType() == null) {
+                additionalCost.setLineType(inferAdditionalCostLineType(additionalCost.getDescription()));
+            }
+//            if (additionalCost.getLineType() != OrderLineType.SAMPLE_COST) {
+//                additionalCost.setSampleRefundPolicy(null);
+//                additionalCost.setSampleRefundPercent(null);
+//                additionalCost.setSampleRefundMinOrderQty(null);
+//                additionalCost.setSampleRefundNote(null);
+//            }
             additionalCost.setSortOrder(normalizedAdditionalCosts.size() + 1);
             normalizedAdditionalCosts.add(additionalCost);
         }
@@ -663,6 +673,22 @@ public class RFQSupplierService {
         normalized.setLeadTimes(normalizedLeadTimes);
 
         return normalized;
+    }
+
+    private OrderLineType inferAdditionalCostLineType(String description) {
+        String normalized = StringUtils.defaultString(description).toLowerCase(Locale.ROOT);
+        if (normalized.contains("ตีตัวอย่าง")
+                || normalized.contains("ค่าตัวอย่าง")
+                || normalized.contains("ตัวอย่าง")
+                || normalized.contains("sample")) {
+            return OrderLineType.SAMPLE_COST;
+        }
+        if (normalized.contains("สกรีน")
+                || normalized.contains("screen")
+                || normalized.contains("พิมพ์")) {
+            return OrderLineType.SCREENING_COST;
+        }
+        return OrderLineType.ADDITIONAL_COST;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -854,6 +880,7 @@ public class RFQSupplierService {
         dto.setRevisionNo(entity.getRevisionNo());
         dto.setStatus(entity.getStatus());
         dto.setRemark(entity.getRemark());
+        dto.setSampleRefund(entity.getSampleRefund());
         dto.setDetails(entity.getDetails().stream()
                 .sorted(Comparator.comparing(RfqSupplierQuoteDetailEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(RfqSupplierQuoteDetailEntity::getId, Comparator.nullsLast(Long::compareTo)))
@@ -1306,6 +1333,7 @@ public class RFQSupplierService {
             quote.setStatus(RfqSupplierQuoteStatus.RESPONDED);
         }
         quote.setRemark(StringUtils.trimToNull(request.getRemark()));
+        quote.setSampleRefund(StringUtils.trimToNull(request.getSampleRefund()));
         quote.setUpdatedBy(userProfileService.getNameFromId(userId));
 
         int detailSortOrder = 1;
@@ -1400,8 +1428,8 @@ public class RFQSupplierService {
         }
         entity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
         entity.setLineType(request.getLineType() == null ? OrderLineType.PRODUCT : request.getLineType());
-        applySampleRefundCondition(entity, entity.getLineType(), request.getSampleRefundPolicy(),
-                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
+//        applySampleRefundCondition(entity, entity.getLineType(), request.getSampleRefundPolicy(),
+//                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
         entity.setPlan(StringUtils.trimToNull(request.getPlan()));
         entity.setSpec(request.getSpec().trim());
         entity.setRemark(StringUtils.trimToNull(request.getRemark()));
@@ -1441,8 +1469,8 @@ public class RFQSupplierService {
         entity.setOptionName(request.getDescription().trim());
         OrderLineType lineType = request.getLineType() == null ? OrderLineType.ADDITIONAL_COST : request.getLineType();
         entity.setLineType(lineType);
-        applySampleRefundCondition(entity, lineType, request.getSampleRefundPolicy(),
-                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
+//        applySampleRefundCondition(entity, lineType, request.getSampleRefundPolicy(),
+//                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
         entity.setSpec(StringUtils.defaultIfBlank(
                 StringUtils.trimToNull(request.getUnit()),
                 request.getDescription().trim()

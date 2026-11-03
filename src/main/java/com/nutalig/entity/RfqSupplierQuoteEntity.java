@@ -59,6 +59,9 @@ public class RfqSupplierQuoteEntity extends AuditDateEntity {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 
+    @Column(name = "sample_refund", columnDefinition = "TEXT")
+    private String sampleRefund;
+
     @Column(name = "created_by")
     private String createdBy;
 
