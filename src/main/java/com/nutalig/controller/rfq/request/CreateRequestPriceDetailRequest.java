@@ -1,6 +1,7 @@
 package com.nutalig.controller.rfq.request;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,6 +11,7 @@ import java.util.List;
 public class CreateRequestPriceDetailRequest {
 
     private String optionName;
+    private OrderLineType lineType;
     private String plan;
     private String spec;
     private Integer sortOrder;

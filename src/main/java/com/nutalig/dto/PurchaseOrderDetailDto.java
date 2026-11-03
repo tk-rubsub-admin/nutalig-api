@@ -1,6 +1,7 @@
 package com.nutalig.dto;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ public class PurchaseOrderDetailDto {
     private Long quotationDetailId;
     private String shippingMethod;
     private Long supplierQuoteTierId;
+    private OrderLineType lineType;
     private List<PurchaseOrderPackageSnapshotDto> packages;
     private List<PurchaseOrderDetailComponentDto> components;
 }

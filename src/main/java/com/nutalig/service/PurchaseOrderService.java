@@ -254,6 +254,9 @@ public class PurchaseOrderService {
             detail.setShippingMethod(selection == null ? sourceItem.getShippingMethod()
                     : selection.shippingMethods().get(sourceItem.getId()));
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
+            detail.setLineType(sourceItem.getLineType() == null
+                    ? com.nutalig.constant.OrderLineType.PRODUCT
+                    : sourceItem.getLineType());
             purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
             if (requestedItem != null && requestedItem.getComponents() != null) {
                 replaceComponents(detail, requestedItem.getComponents());
@@ -1251,6 +1254,10 @@ public class PurchaseOrderService {
                     .filter(item -> Objects.equals(item.getId(), detailRequest.getPurchaseOrderDetailId()))
                     .findFirst()
                     .orElseThrow(() -> new InvalidRequestException("Delivery detail item does not belong to this purchase order."));
+            if (orderItem.getLineType() != null
+                    && !com.nutalig.constant.OrderLineType.PRODUCT.equals(orderItem.getLineType())) {
+                throw new InvalidRequestException("Only product lines can be included in delivery details.");
+            }
             PurchaseOrderDetailComponentEntity component = null;
             BigDecimal orderedQuantity = orderItem.getQuantity();
             if (detailRequest.getPurchaseOrderDetailComponentId() != null) {
@@ -1410,6 +1417,10 @@ public class PurchaseOrderService {
             Map<String, BigDecimal> requestTotals
     ) {
         for (PurchaseOrderDetailEntity item : purchaseOrder.getItems()) {
+            if (item.getLineType() != null
+                    && !com.nutalig.constant.OrderLineType.PRODUCT.equals(item.getLineType())) {
+                continue;
+            }
             if (item.getComponents() == null || item.getComponents().isEmpty()) {
                 if (hasRemainingDeliveryQuantity(item.getId(), null, item.getQuantity(), alreadyDelivered, requestTotals)) {
                     return false;
@@ -1675,6 +1686,11 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            detail.setLineType(itemRequest.getLineType() == null
+                    ? (previousItem != null && previousItem.getLineType() != null
+                    ? previousItem.getLineType()
+                    : com.nutalig.constant.OrderLineType.PRODUCT)
+                    : itemRequest.getLineType());
             if (itemRequest.getComponents() != null) {
                 replaceComponents(detail, itemRequest.getComponents());
             } else if (previousItem != null) {
@@ -2219,6 +2235,7 @@ public class PurchaseOrderService {
             item.setQuotationDetailId(detail.getQuotationDetailId());
             item.setShippingMethod(detail.getShippingMethod());
             item.setSupplierQuoteTierId(detail.getSupplierQuoteTierId());
+            item.setLineType(detail.getLineType());
             item.setPackages(detail.getPackages().stream().map(purchaseOrderCbmService::toDto).toList());
             item.setComponents(detail.getComponents().stream().map(component -> {
                 PurchaseOrderDetailComponentDto componentDto = new PurchaseOrderDetailComponentDto();

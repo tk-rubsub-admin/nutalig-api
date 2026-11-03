@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import com.nutalig.constant.OrderLineType;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -71,6 +72,10 @@ public class QuotationDetailEntity {
 
     @Column(name = "source_rfq_id", length = 50)
     private String sourceRfqId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "line_type", length = 30, nullable = false)
+    private OrderLineType lineType = OrderLineType.PRODUCT;
 
     @Override
     public boolean equals(Object o) {

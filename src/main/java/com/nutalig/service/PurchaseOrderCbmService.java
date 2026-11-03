@@ -33,6 +33,13 @@ public class PurchaseOrderCbmService {
         Map<Long, SalesOrderDetailEntity> sourceById = salesOrder.getItems().stream()
                 .collect(Collectors.toMap(SalesOrderDetailEntity::getId, Function.identity()));
         List<PurchaseOrderCbmPreviewRequest.Item> requestedItems = Optional.ofNullable(request.getItems()).orElse(List.of());
+        requestedItems = requestedItems.stream()
+                .filter(item -> {
+                    SalesOrderDetailEntity source = sourceById.get(item.getSalesOrderDetailId());
+                    return source == null || source.getLineType() == null
+                            || com.nutalig.constant.OrderLineType.PRODUCT.equals(source.getLineType());
+                })
+                .toList();
         Set<Long> tierIds = requestedItems.stream()
                 .map(PurchaseOrderCbmPreviewRequest.Item::getSalesOrderDetailId)
                 .map(sourceById::get)

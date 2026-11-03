@@ -3146,3 +3146,5 @@ databaseChangeLog:
       file: db/changelog/20261102-001-backfill-dep-40-60-ready-for-po.yaml
   - include:
       file: db/changelog/20261102-002-add-sales-order-payment-schedules.yaml
+  - include:
+      file: db/changelog/20261103-001-add-order-line-types.yaml

@@ -65,12 +65,17 @@ public class SalesOrderItemShippingService {
         if (ShippingMethodUtil.getShippingMethodCategory(shippingMethod) == null) {
             throw new InvalidRequestException("Invalid purchase order shipping method");
         }
-        boolean supplierHasSplit = items.stream().anyMatch(item -> item.getRfqTierSplitId() != null
+        boolean supplierHasSplit = items.stream().anyMatch(item -> isProduct(item)
+                && item.getRfqTierSplitId() != null
                 && item.getSupplier() != null && StringUtils.equals(item.getSupplier().getId(), supplierId));
         Map<Long, String> methods;
         if (supplierHasSplit) {
             methods = resolveShippingMethods(selected);
             for (SalesOrderDetailEntity item : selected) {
+                if (!isProduct(item)) {
+                    methods.put(item.getId(), shippingMethod);
+                    continue;
+                }
                 if (!StringUtils.equals(methods.get(item.getId()), shippingMethod)) {
                     throw new InvalidRequestException("Sales order item " + item.getId()
                             + " does not match the selected shipping method or its tier split cannot be resolved");
@@ -83,6 +88,11 @@ public class SalesOrderItemShippingService {
         }
         selected.sort(Comparator.comparing(item -> Optional.ofNullable(item.getLineNo()).orElse(0)));
         return new Selection(selected, methods);
+    }
+
+    private boolean isProduct(SalesOrderDetailEntity item) {
+        return item.getLineType() == null
+                || com.nutalig.constant.OrderLineType.PRODUCT.equals(item.getLineType());
     }
 
     public record Selection(List<SalesOrderDetailEntity> items, Map<Long, String> shippingMethods) {}

@@ -1,6 +1,7 @@
 package com.nutalig.dto;
 
 import lombok.Data;
+import com.nutalig.constant.OrderLineType;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -11,6 +12,7 @@ public class RfqDetailDto {
 
     private Long id;
     private String optionName;
+    private OrderLineType lineType;
     private String plan;
     private String spec;
     private Integer sortOrder;

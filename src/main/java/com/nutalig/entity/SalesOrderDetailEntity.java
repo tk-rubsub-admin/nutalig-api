@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -92,6 +93,10 @@ public class SalesOrderDetailEntity {
 
     @Column(name = "supplier_quote_tier_id")
     private Long supplierQuoteTierId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "line_type", length = 30, nullable = false)
+    private OrderLineType lineType = OrderLineType.PRODUCT;
 
     @Override
     public boolean equals(Object o) {

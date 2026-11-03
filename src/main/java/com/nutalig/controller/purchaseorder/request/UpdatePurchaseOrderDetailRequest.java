@@ -1,6 +1,7 @@
 package com.nutalig.controller.purchaseorder.request;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -27,5 +28,6 @@ public class UpdatePurchaseOrderDetailRequest {
     private Long quotationDetailId;
     private String shippingMethod;
     private Long supplierQuoteTierId;
+    private OrderLineType lineType;
     private List<PurchaseOrderDetailComponentRequest> components;
 }

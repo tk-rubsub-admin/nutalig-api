@@ -1430,6 +1430,9 @@ public class RFQService {
         );
 
         detailEntity.setOptionName(updatedDetail.getOptionName());
+        detailEntity.setLineType(updatedDetail.getLineType() == null
+                ? com.nutalig.constant.OrderLineType.PRODUCT
+                : updatedDetail.getLineType());
         detailEntity.setPlan(updatedDetail.getPlan());
         detailEntity.setSpec(updatedDetail.getSpec());
         detailEntity.setSortOrder(updatedDetail.getSortOrder());
@@ -3496,6 +3499,9 @@ public class RFQService {
 
         RfqDetailEntity detailEntity = new RfqDetailEntity();
         detailEntity.setOptionName(StringUtils.trimToNull(request.getOptionName()));
+        detailEntity.setLineType(request.getLineType() == null
+                ? com.nutalig.constant.OrderLineType.PRODUCT
+                : request.getLineType());
         detailEntity.setPlan(StringUtils.trimToNull(request.getPlan()));
         detailEntity.setSpec(request.getSpec().trim());
         detailEntity.setSortOrder(request.getSortOrder());

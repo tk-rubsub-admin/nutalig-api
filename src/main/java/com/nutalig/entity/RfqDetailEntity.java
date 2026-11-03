@@ -1,6 +1,7 @@
 package com.nutalig.entity;
 
 import jakarta.persistence.*;
+import com.nutalig.constant.OrderLineType;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,6 +33,10 @@ public class RfqDetailEntity extends AuditDateEntity {
 
     @Column(name = "option_name", length = 255)
     private String optionName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "line_type", length = 30, nullable = false)
+    private OrderLineType lineType = OrderLineType.PRODUCT;
 
     @Column(name = "plan", length = 255)
     private String plan;

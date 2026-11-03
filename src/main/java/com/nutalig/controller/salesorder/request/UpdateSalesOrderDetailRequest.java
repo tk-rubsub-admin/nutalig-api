@@ -1,6 +1,7 @@
 package com.nutalig.controller.salesorder.request;
 
 import com.nutalig.constant.Currency;
+import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -27,4 +28,5 @@ public class UpdateSalesOrderDetailRequest {
     private BigDecimal supplierShippingCost;
     private BigDecimal supplierTotalUnitCost;
     private Long supplierQuoteTierId;
+    private OrderLineType lineType;
 }

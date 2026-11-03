@@ -943,6 +943,9 @@ public class SalesOrderService {
         detail.setSupplierShippingCost(request.getSupplierShippingCost());
         detail.setSupplierTotalUnitCost(request.getSupplierTotalUnitCost());
         detail.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
+        detail.setLineType(request.getLineType() == null
+                ? com.nutalig.constant.OrderLineType.PRODUCT
+                : request.getLineType());
         return detail;
     }
 
@@ -996,6 +999,9 @@ public class SalesOrderService {
             detail.setSupplierShippingCost(itemRequest.getSupplierShippingCost());
             detail.setSupplierTotalUnitCost(itemRequest.getSupplierTotalUnitCost());
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            detail.setLineType(itemRequest.getLineType() == null
+                    ? com.nutalig.constant.OrderLineType.PRODUCT
+                    : itemRequest.getLineType());
 
             nextItems.add(detail);
         }
@@ -1026,6 +1032,7 @@ public class SalesOrderService {
             request.setSupplierShippingCost(item.getSupplierShippingCost());
             request.setSupplierTotalUnitCost(item.getSupplierTotalUnitCost());
             request.setSupplierQuoteTierId(item.getSupplierQuoteTierId());
+            request.setLineType(item.getLineType());
             requests.add(request);
         }
         return requests;
@@ -1503,6 +1510,7 @@ public class SalesOrderService {
                             detail.getRfqTierSplitId(), detail.getSupplierQuoteTierId()
                     )
             );
+            item.setLineType(detail.getLineType());
             items.add(item);
         }
         dto.setItems(items);

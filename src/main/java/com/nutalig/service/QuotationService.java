@@ -219,6 +219,9 @@ public class QuotationService {
             detailEntity.setTierSplitId(itemRequest.getTierSplitId());
             detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
+            detailEntity.setLineType(itemRequest.getLineType() == null
+                    ? com.nutalig.constant.OrderLineType.PRODUCT
+                    : itemRequest.getLineType());
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
             BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
@@ -453,6 +456,9 @@ public class QuotationService {
             detailEntity.setTierSplitId(itemRequest.getTierSplitId());
             detailEntity.setRfqDetailId(itemRequest.getRfqDetailId());
             detailEntity.setSourceRfqId(StringUtils.trimToNull(itemRequest.getSourceRfqId()));
+            detailEntity.setLineType(itemRequest.getLineType() == null
+                    ? com.nutalig.constant.OrderLineType.PRODUCT
+                    : itemRequest.getLineType());
 
             BigDecimal unitPrice = defaultIfNull(itemRequest.getUnitPrice());
             BigDecimal quantity = defaultIfNull(itemRequest.getQuantity());
@@ -494,6 +500,7 @@ public class QuotationService {
             item.setTierSplitId(detail.getTierSplitId());
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
+            item.setLineType(detail.getLineType());
             itemRequests.add(item);
         }
         return itemRequests;
@@ -1092,6 +1099,7 @@ public class QuotationService {
             item.setTierSplitId(detail.getTierSplitId());
             item.setRfqDetailId(detail.getRfqDetailId());
             item.setSourceRfqId(detail.getSourceRfqId());
+            item.setLineType(detail.getLineType());
             item.setName(detail.getName());
             item.setImagePreview(detail.getImageUrl());
             item.setSpec(detail.getSpec());

@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261103-001-add-order-line-types
+      author: codex
+      changes:
+        - addColumn:
+            tableName: rfq_detail
+            columns:
+              - column:
+                  name: line_type
+                  type: VARCHAR(30)
+                  defaultValue: PRODUCT
+                  value: PRODUCT
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: quotation_detail
+            columns:
+              - column:
+                  name: line_type
+                  type: VARCHAR(30)
+                  defaultValue: PRODUCT
+                  value: PRODUCT
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: sales_order_detail
+            columns:
+              - column:
+                  name: line_type
+                  type: VARCHAR(30)
+                  defaultValue: PRODUCT
+                  value: PRODUCT
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: purchase_order_detail
+            columns:
+              - column:
+                  name: line_type
+                  type: VARCHAR(30)
+                  defaultValue: PRODUCT
+                  value: PRODUCT
+                  constraints:
+                    nullable: false

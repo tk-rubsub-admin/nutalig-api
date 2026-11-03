@@ -1,5 +1,6 @@
 package com.nutalig.dto;
 
+import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -20,4 +21,5 @@ public class QuotationItemRequestDto {
     private Long tierSplitId;
     private Long rfqDetailId;
     private String sourceRfqId;
+    private OrderLineType lineType;
 }
