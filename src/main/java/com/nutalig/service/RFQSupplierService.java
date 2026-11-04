@@ -1471,19 +1471,16 @@ public class RFQSupplierService {
         entity.setLineType(lineType);
 //        applySampleRefundCondition(entity, lineType, request.getSampleRefundPolicy(),
 //                request.getSampleRefundPercent(), request.getSampleRefundMinOrderQty(), request.getSampleRefundNote());
-        entity.setSpec(StringUtils.defaultIfBlank(
-                StringUtils.trimToNull(request.getUnit()),
-                request.getDescription().trim()
-        ));
+        entity.setSpec("");
         entity.setSortOrder(sortOrder);
 
         RfqSupplierQuoteTierEntity tier = new RfqSupplierQuoteTierEntity();
         tier.setQuantity(BigDecimal.ONE);
         tier.setProductPrice(scaleMoney(amount));
         tier.setShippingCost(scaleMoney(BigDecimal.ZERO));
-        tier.setProductPriceCurrency(com.nutalig.constant.Currency.THB);
-        tier.setShippingCostCurrency(com.nutalig.constant.Currency.THB);
-        tier.setCurrency(com.nutalig.constant.Currency.THB);
+        tier.setProductPriceCurrency(com.nutalig.constant.Currency.CNY);
+        tier.setShippingCostCurrency(com.nutalig.constant.Currency.CNY);
+        tier.setCurrency(com.nutalig.constant.Currency.CNY);
         tier.setSortOrder(1);
         entity.addTier(tier);
         return entity;
