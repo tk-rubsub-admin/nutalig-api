@@ -3160,3 +3160,5 @@ databaseChangeLog:
       file: db/changelog/20261104-001-add-sales-order-payment-term.yaml
   - include:
       file: db/changelog/20261105-001-add-sales-order-payment-schedule-vat-breakdown.yaml
+  - include:
+      file: db/changelog/20261105-002-add-invoice-payment-allocation.yaml

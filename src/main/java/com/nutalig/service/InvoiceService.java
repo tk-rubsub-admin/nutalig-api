@@ -419,6 +419,7 @@ public class InvoiceService {
 
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         payment.setStatus(InvoicePaymentStatus.APPROVE);
+        updateAllocationStatuses(payment, "APPROVED");
         payment.setUpdatedBy(null);
         payment.setUpdatedDate(now);
         invoice.setStatus(resolveValidatedInvoiceStatus(invoice));
@@ -467,6 +468,7 @@ public class InvoiceService {
         }
 
         payment.setStatus(InvoicePaymentStatus.REJECT);
+        updateAllocationStatuses(payment, "REJECTED");
         payment.setUpdatedBy(null);
         payment.setUpdatedDate(now);
         invoice.setPaidTotal(nextPaidTotal);
@@ -577,9 +579,8 @@ public class InvoiceService {
         if (currentOutstanding.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidRequestException("Invoice has no outstanding balance");
         }
-        if (amount.compareTo(currentOutstanding) > 0) {
-            throw new InvalidRequestException("amount cannot exceed outstanding total");
-        }
+        BigDecimal appliedAmount = amount.min(currentOutstanding);
+        BigDecimal unallocatedAmount = amount.subtract(appliedAmount).setScale(5, RoundingMode.HALF_UP);
 
         BigDecimal beforePaidTotal = defaultIfNull(invoice.getPaidTotal());
         BigDecimal beforeOutstandingTotal = currentOutstanding;
@@ -588,7 +589,10 @@ public class InvoiceService {
         ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
         InvoicePaymentEntity payment = new InvoicePaymentEntity();
         payment.setPaymentDate(paymentDate);
-        payment.setAmount(amount);
+        // Keep amount as the amount applied to this invoice for backward compatibility.
+        payment.setAmount(appliedAmount);
+        payment.setReceivedAmount(amount);
+        payment.setUnallocatedAmount(unallocatedAmount);
         payment.setPaymentMethod(paymentMethod);
         payment.setChequeBank(StringUtils.trimToNull(chequeBank));
         payment.setChequeNo(StringUtils.trimToNull(chequeNo));
@@ -625,7 +629,7 @@ public class InvoiceService {
             payment.setSlipFileUrl(firstAttachment.getFileUrl());
         }
 
-        BigDecimal nextPaidTotal = beforePaidTotal.add(amount);
+        BigDecimal nextPaidTotal = beforePaidTotal.add(appliedAmount);
         BigDecimal nextOutstandingTotal = defaultIfNull(invoice.getGrandTotal()).subtract(nextPaidTotal);
         if (nextOutstandingTotal.compareTo(BigDecimal.ZERO) < 0) {
             nextOutstandingTotal = BigDecimal.ZERO;
@@ -637,6 +641,30 @@ public class InvoiceService {
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
         markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, userId);
+
+        InvoicePaymentAllocationEntity invoiceAllocation = new InvoicePaymentAllocationEntity();
+        invoiceAllocation.setCustomer(invoice.getCustomer());
+        invoiceAllocation.setInvoice(invoice);
+        invoiceAllocation.setSalesOrder(invoice.getSalesOrder());
+        invoiceAllocation.setPaymentSchedule(invoice.getPaymentSchedule());
+        invoiceAllocation.setAllocationType("INVOICE");
+        invoiceAllocation.setAllocatedAmount(appliedAmount);
+        invoiceAllocation.setStatus("PENDING");
+        invoiceAllocation.setCreatedDate(now);
+        invoiceAllocation.setUpdatedDate(now);
+        payment.addAllocation(invoiceAllocation);
+
+        if (unallocatedAmount.compareTo(BigDecimal.ZERO) > 0) {
+            InvoicePaymentAllocationEntity advanceAllocation = new InvoicePaymentAllocationEntity();
+            advanceAllocation.setCustomer(invoice.getCustomer());
+            advanceAllocation.setSalesOrder(invoice.getSalesOrder());
+            advanceAllocation.setAllocationType("ADVANCE");
+            advanceAllocation.setAllocatedAmount(unallocatedAmount);
+            advanceAllocation.setStatus("PENDING");
+            advanceAllocation.setCreatedDate(now);
+            advanceAllocation.setUpdatedDate(now);
+            payment.addAllocation(advanceAllocation);
+        }
 
         invoice.addPayment(payment);
         InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
@@ -1153,6 +1181,8 @@ public class InvoiceService {
             paymentDto.setId(payment.getId());
             paymentDto.setPaymentDate(payment.getPaymentDate());
             paymentDto.setAmount(payment.getAmount());
+            paymentDto.setReceivedAmount(payment.getReceivedAmount());
+            paymentDto.setUnallocatedAmount(payment.getUnallocatedAmount());
             paymentDto.setPaymentMethod(payment.getPaymentMethod());
             paymentDto.setChequeBank(payment.getChequeBank());
             paymentDto.setChequeNo(payment.getChequeNo());
@@ -1518,6 +1548,11 @@ public class InvoiceService {
                 .filter(item -> Objects.equals(item.getId(), paymentId))
                 .findFirst()
                 .orElseThrow(() -> new DataNotFoundException("Invoice payment " + paymentId + " not found."));
+    }
+
+    private void updateAllocationStatuses(InvoicePaymentEntity payment, String status) {
+        if (payment == null || payment.getAllocations() == null) return;
+        payment.getAllocations().forEach(allocation -> allocation.setStatus(status));
     }
 
     private InvoiceStatus resolveValidatedInvoiceStatus(InvoiceEntity invoice) {

@@ -1,0 +1,128 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261105-002-add-invoice-payment-allocation-fields
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: invoice_payment
+                columnName: received_amount
+      changes:
+        - addColumn:
+            tableName: invoice_payment
+            columns:
+              - column:
+                  name: received_amount
+                  type: DECIMAL(18,5)
+              - column:
+                  name: unallocated_amount
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >-
+              UPDATE invoice_payment
+              SET received_amount = amount,
+                  unallocated_amount = 0
+              WHERE received_amount IS NULL
+
+  - changeSet:
+      id: 20261105-002-create-invoice-payment-allocation
+      author: codex
+      validCheckSum: 9:77c3e40ca7f276801f6e8f14b26b915e
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: invoice_payment_allocation
+      changes:
+        - createTable:
+            tableName: invoice_payment_allocation
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: invoice_payment_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: invoice_no
+                  type: VARCHAR(50)
+              - column:
+                  name: sales_order_no
+                  type: VARCHAR(50)
+              - column:
+                  name: payment_schedule_id
+                  type: BIGINT
+              - column:
+                  name: allocation_type
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: allocated_amount
+                  type: DECIMAL(18,5)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_date
+                  type: datetime
+              - column:
+                  name: updated_date
+                  type: datetime
+        - addForeignKeyConstraint:
+            baseTableName: invoice_payment_allocation
+            baseColumnNames: invoice_payment_id
+            referencedTableName: invoice_payment
+            referencedColumnNames: id
+            constraintName: fk_invoice_payment_allocation_payment
+        - createIndex:
+            tableName: invoice_payment_allocation
+            indexName: idx_invoice_payment_allocation_customer
+            columns:
+              - column:
+                  name: customer_id
+
+  # The customer.id column is VARCHAR(255) in the existing customer table.
+  # This corrective changeset also repairs databases where the table was
+  # created before the customer column type was corrected.
+  - changeSet:
+      id: 20261105-003-fix-invoice-payment-allocation-customer-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: invoice_payment_allocation
+        - not:
+            - indexExists:
+                tableName: invoice_payment_allocation
+                indexName: idx_invoice_payment_allocation_customer
+      changes:
+        - modifyDataType:
+            tableName: invoice_payment_allocation
+            columnName: customer_id
+            newDataType: VARCHAR(255)
+        - createIndex:
+            tableName: invoice_payment_allocation
+            indexName: idx_invoice_payment_allocation_customer
+            columns:
+              - column:
+                  name: customer_id

@@ -14,6 +14,8 @@ public class InvoicePaymentDto {
     private Long id;
     private ZonedDateTime paymentDate;
     private BigDecimal amount;
+    private BigDecimal receivedAmount;
+    private BigDecimal unallocatedAmount;
     private PaymentMethod paymentMethod;
     private String chequeBank;
     private String chequeNo;

@@ -38,6 +38,17 @@ public class InvoicePaymentEntity extends AuditDateEntity {
     @Column(name = "amount", precision = 18, scale = 5, nullable = false)
     private BigDecimal amount;
 
+    @Column(name = "received_amount", precision = 18, scale = 5)
+    private BigDecimal receivedAmount;
+
+    @Column(name = "unallocated_amount", precision = 18, scale = 5, nullable = false)
+    private BigDecimal unallocatedAmount = BigDecimal.ZERO;
+
+    @OneToMany(mappedBy = "invoicePayment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id asc")
+    @ToString.Exclude
+    private Set<InvoicePaymentAllocationEntity> allocations = new LinkedHashSet<>();
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 30, nullable = false)
     private PaymentMethod paymentMethod;
@@ -98,5 +109,11 @@ public class InvoicePaymentEntity extends AuditDateEntity {
         if (attachment == null) return;
         slipFiles.add(attachment);
         attachment.setInvoicePayment(this);
+    }
+
+    public void addAllocation(InvoicePaymentAllocationEntity allocation) {
+        if (allocation == null) return;
+        allocations.add(allocation);
+        allocation.setInvoicePayment(this);
     }
 }
