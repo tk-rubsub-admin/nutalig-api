@@ -15,6 +15,8 @@ public class SalesOrderPaymentScheduleDto {
     private Integer installmentCount;
     private PurchaseOrderPaymentType paymentType;
     private BigDecimal percentage;
+    private BigDecimal expectedSubTotal;
+    private BigDecimal expectedVat;
     private BigDecimal expectedAmount;
     private BigDecimal paidAmount;
     private BigDecimal outstandingAmount;

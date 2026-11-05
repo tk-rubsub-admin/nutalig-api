@@ -36,6 +36,7 @@ public class SalesOrderDto {
     private Boolean requestCoa;
     private Boolean requestPo;
     private String paymentScheduleDate;
+    private SystemConfigDto paymentTerm;
     private ProcurementStatus procurementStatus;
     private String shippingType;
     private BigDecimal vatRate;

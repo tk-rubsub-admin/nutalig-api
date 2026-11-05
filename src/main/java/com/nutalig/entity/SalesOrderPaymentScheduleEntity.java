@@ -38,6 +38,12 @@ public class SalesOrderPaymentScheduleEntity extends AuditDateEntity {
     @Column(name = "percentage", precision = 8, scale = 4, nullable = false)
     private BigDecimal percentage;
 
+    @Column(name = "expected_sub_total", precision = 18, scale = 5, nullable = false)
+    private BigDecimal expectedSubTotal = BigDecimal.ZERO;
+
+    @Column(name = "expected_vat", precision = 18, scale = 5, nullable = false)
+    private BigDecimal expectedVat = BigDecimal.ZERO;
+
     @Column(name = "expected_amount", precision = 18, scale = 5, nullable = false)
     private BigDecimal expectedAmount;
 

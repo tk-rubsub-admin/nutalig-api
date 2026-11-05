@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261104-001-add-sales-order-payment-term
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: payment_term
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column:
+                  name: payment_term
+                  type: VARCHAR(100)
+                  remarks: Customer payment-term System Config code snapshot
+        - sql:
+            sql: >-
+              UPDATE sales_order so
+              JOIN customer c ON c.id = so.customer_id
+              SET so.payment_term = c.customer_payment_term
+              WHERE so.payment_term IS NULL
+                AND c.customer_payment_term IS NOT NULL

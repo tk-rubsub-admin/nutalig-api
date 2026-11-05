@@ -5,6 +5,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.JoinColumnOrFormula;
+import org.hibernate.annotations.JoinColumnsOrFormulas;
+import org.hibernate.annotations.JoinFormula;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,6 +46,14 @@ public class SalesOrderEntity extends AuditDateEntity {
     @JoinColumn(name = "customer_id", referencedColumnName = "id")
     @ToString.Exclude
     private CustomerEntity customer;
+
+    @OneToOne
+    @JoinColumnsOrFormulas({
+            @JoinColumnOrFormula(formula = @JoinFormula(value = "'CUSTOMER_PAYMENT_TERM'", referencedColumnName = "group_code")),
+            @JoinColumnOrFormula(column = @JoinColumn(name = "payment_term", referencedColumnName = "code"))
+    })
+    @ToString.Exclude
+    private SystemConfigEntity paymentTerm;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sales_id", referencedColumnName = "employee_id")

@@ -3156,3 +3156,7 @@ databaseChangeLog:
       file: db/changelog/20261103-004-add-rfq-sample-refund-condition.yaml
   - include:
       file: db/changelog/20261103-005-add-supplier-quote-sample-refund.yaml
+  - include:
+      file: db/changelog/20261104-001-add-sales-order-payment-term.yaml
+  - include:
+      file: db/changelog/20261105-001-add-sales-order-payment-schedule-vat-breakdown.yaml

@@ -23,6 +23,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.SupplierMapper;
+import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.repository.*;
 import com.nutalig.utils.DateUtil;
@@ -96,6 +97,7 @@ public class SalesOrderService {
     private final CustomerMapper customerMapper;
     private final EmployeeMapper employeeMapper;
     private final SupplierMapper supplierMapper;
+    private final SystemConfigMapper systemConfigMapper;
     private final UserMapper userMapper;
     private final ApprovalService approvalService;
     private final ActivityHistoryService activityHistoryService;
@@ -153,6 +155,10 @@ public class SalesOrderService {
         entity.setRequestCoa(Boolean.TRUE.equals(request.getRequestCoa()));
         entity.setRequestPo(Boolean.TRUE.equals(request.getRequestPo()));
         entity.setPaymentScheduleDate(request.getPaymentScheduleDate());
+        String createPaymentTerm = StringUtils.trimToNull(request.getPaymentTerm());
+        entity.setPaymentTerm(createPaymentTerm == null
+                ? customer.getCustomerPaymentTerm()
+                : resolveCustomerPaymentTerm(createPaymentTerm));
         entity.setVatRate(Boolean.TRUE.equals(request.getIsVat()) ? VAT_RATE : BigDecimal.ZERO);
         entity.setProcurementStatus(ProcurementStatus.NOT_READY);
         entity.setPaymentStatus(SalesOrderPaymentStatus.UNPAID);
@@ -244,6 +250,16 @@ public class SalesOrderService {
         if (request.getPaymentScheduleDate() != null) {
             entity.setPaymentScheduleDate(request.getPaymentScheduleDate());
         }
+        boolean paymentTermChanged = false;
+        if (request.getPaymentTerm() != null) {
+            SystemConfigEntity requestedPaymentTerm = resolveCustomerPaymentTerm(request.getPaymentTerm());
+            String currentPaymentTerm = entity.getPaymentTerm() != null && entity.getPaymentTerm().getId() != null
+                    ? entity.getPaymentTerm().getId().getCode() : null;
+            paymentTermChanged = !Objects.equals(currentPaymentTerm, requestedPaymentTerm.getId().getCode());
+            if (paymentTermChanged) {
+                entity.setPaymentTerm(requestedPaymentTerm);
+            }
+        }
         if (request.getQuotationNo() != null) {
             entity.setQuotationNo(StringUtils.trimToNull(request.getQuotationNo()));
         }
@@ -309,6 +325,9 @@ public class SalesOrderService {
 
         if (previousGrandTotal == null || previousGrandTotal.compareTo(entity.getGrandTotal()) != 0) {
             salesOrderPaymentScheduleService.recalculateExpectedAmounts(entity);
+        }
+        if (paymentTermChanged) {
+            salesOrderPaymentScheduleService.replaceSchedulesForPaymentTerm(entity);
         }
 
         salesOrderRepository.save(entity);
@@ -1417,6 +1436,7 @@ public class SalesOrderService {
         dto.setRequestCoa(Boolean.TRUE.equals(entity.getRequestCoa()));
         dto.setRequestPo(Boolean.TRUE.equals(entity.getRequestPo()));
         dto.setPaymentScheduleDate(entity.getPaymentScheduleDate() == null ? null : entity.getPaymentScheduleDate().toString());
+        dto.setPaymentTerm(systemConfigMapper.toDto(entity.getPaymentTerm()));
         dto.setUrgentRequest(Boolean.TRUE.equals(entity.getUrgentRequest()));
         dto.setUrgentRequestReason(entity.getUrgentRequestReason());
         dto.setUrgentRequestStatus(entity.getUrgentRequestStatus());
@@ -1515,6 +1535,18 @@ public class SalesOrderService {
         }
         dto.setItems(items);
         return dto;
+    }
+
+    private SystemConfigEntity resolveCustomerPaymentTerm(String code) throws InvalidRequestException {
+        String normalized = StringUtils.trimToNull(code);
+        if (normalized == null) {
+            throw new InvalidRequestException("Customer payment term is required.");
+        }
+        SystemConfigEntity config = systemConfigService.getConfigEntity(SystemConstant.CUSTOMER_PAYMENT_TERM, normalized);
+        if (config == null) {
+            throw new InvalidRequestException("Customer payment term " + normalized + " not found.");
+        }
+        return config;
     }
 
     private void validateSuperAdmin(String userId) throws DataNotFoundException, InvalidRequestException {

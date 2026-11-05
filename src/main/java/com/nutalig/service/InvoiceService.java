@@ -176,12 +176,14 @@ public class InvoiceService {
             boolean hasSummaryOverride = request.getSubTotal() != null || request.getDiscount() != null
                     || request.getAmount() != null || request.getVat() != null || request.getGrandTotal() != null;
             if (!hasSummaryOverride) {
-                BigDecimal expected = paymentSchedule.getExpectedAmount();
-                entity.setSubTotal(expected);
+                BigDecimal expectedSubTotal = defaultIfNull(paymentSchedule.getExpectedSubTotal());
+                BigDecimal expectedVat = defaultIfNull(paymentSchedule.getExpectedVat());
+                BigDecimal expected = defaultIfNull(paymentSchedule.getExpectedAmount());
+                entity.setSubTotal(expectedSubTotal);
                 entity.setDiscount(BigDecimal.ZERO);
                 entity.setFreight(BigDecimal.ZERO);
-                entity.setAmount(expected);
-                entity.setVat(BigDecimal.ZERO);
+                entity.setAmount(expectedSubTotal);
+                entity.setVat(expectedVat);
                 entity.setGrandTotal(expected);
                 entity.setOutstandingTotal(expected);
             } else if (defaultIfNull(entity.getGrandTotal()).compareTo(defaultIfNull(paymentSchedule.getExpectedAmount())) > 0) {

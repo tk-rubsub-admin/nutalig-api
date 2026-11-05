@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261105-001-add-sales-order-payment-schedule-vat-breakdown
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - tableExists:
+                tableName: sales_order_payment_schedule
+            - not:
+                - columnExists:
+                    tableName: sales_order_payment_schedule
+                    columnName: expected_sub_total
+      changes:
+        - addColumn:
+            tableName: sales_order_payment_schedule
+            columns:
+              - column:
+                  name: expected_sub_total
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expected_vat
+                  type: DECIMAL(18,5)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >-
+              UPDATE sales_order_payment_schedule sops
+              JOIN sales_order so ON so.sales_order_no = sops.sales_order_no
+              SET sops.expected_sub_total = ROUND((COALESCE(so.grand_total, 0) - COALESCE(so.vat, 0)) * sops.percentage / 100, 5),
+                  sops.expected_vat = ROUND(COALESCE(sops.expected_amount, 0) - ((COALESCE(so.grand_total, 0) - COALESCE(so.vat, 0)) * sops.percentage / 100), 5)
+              WHERE sops.expected_sub_total = 0
+                AND sops.expected_vat = 0
+                AND COALESCE(sops.expected_amount, 0) <> 0

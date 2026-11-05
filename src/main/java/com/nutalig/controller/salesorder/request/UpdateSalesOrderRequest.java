@@ -23,6 +23,7 @@ public class UpdateSalesOrderRequest {
     private Boolean requestCoa;
     private Boolean requestPo;
     private LocalDate paymentScheduleDate;
+    private String paymentTerm;
     private String quotationNo;
     private String remark;
     private String shipping;

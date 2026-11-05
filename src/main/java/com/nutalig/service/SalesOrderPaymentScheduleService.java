@@ -59,20 +59,33 @@ public class SalesOrderPaymentScheduleService {
 
     public void initializeSchedules(SalesOrderEntity salesOrder, ZonedDateTime now) {
         if (salesOrder == null || !salesOrder.getPaymentSchedules().isEmpty()) return;
-        String term = salesOrder.getCustomer() != null && salesOrder.getCustomer().getCustomerPaymentTerm() != null
+        String term = salesOrder.getPaymentTerm() != null && salesOrder.getPaymentTerm().getId() != null
+                ? salesOrder.getPaymentTerm().getId().getCode()
+                : salesOrder.getCustomer() != null && salesOrder.getCustomer().getCustomerPaymentTerm() != null
                 && salesOrder.getCustomer().getCustomerPaymentTerm().getId() != null
                 ? salesOrder.getCustomer().getCustomerPaymentTerm().getId().getCode() : null;
         List<BigDecimal> percentages = derivePercentages(term);
-        BigDecimal allocated = BigDecimal.ZERO;
+        BigDecimal allocatedSubTotal = BigDecimal.ZERO;
+        BigDecimal allocatedVat = BigDecimal.ZERO;
         BigDecimal total = defaultAmount(salesOrder.getGrandTotal());
+        BigDecimal totalVat = defaultAmount(salesOrder.getVat());
+        BigDecimal totalSubTotal = total.subtract(totalVat).max(BigDecimal.ZERO);
         for (int index = 0; index < percentages.size(); index++) {
             boolean last = index == percentages.size() - 1;
             BigDecimal percentage = percentages.get(index);
-            BigDecimal expected = last ? total.subtract(allocated) : percentageAmount(total, percentage);
+            BigDecimal expectedSubTotal = last
+                    ? totalSubTotal.subtract(allocatedSubTotal)
+                    : percentageAmount(totalSubTotal, percentage);
+            BigDecimal expectedVat = last
+                    ? totalVat.subtract(allocatedVat)
+                    : percentageAmount(totalVat, percentage);
+            BigDecimal expected = expectedSubTotal.add(expectedVat).setScale(5, RoundingMode.HALF_UP);
             SalesOrderPaymentScheduleEntity schedule = new SalesOrderPaymentScheduleEntity();
             schedule.setInstallmentNo(index + 1);
             schedule.setPaymentType(resolvePaymentType(index, percentages.size(), term));
             schedule.setPercentage(percentage.setScale(4, RoundingMode.HALF_UP));
+            schedule.setExpectedSubTotal(expectedSubTotal.setScale(5, RoundingMode.HALF_UP));
+            schedule.setExpectedVat(expectedVat.setScale(5, RoundingMode.HALF_UP));
             schedule.setExpectedAmount(expected.setScale(5, RoundingMode.HALF_UP));
             schedule.setPaidAmount(BigDecimal.ZERO.setScale(5, RoundingMode.HALF_UP));
             schedule.setOutstandingAmount(expected.setScale(5, RoundingMode.HALF_UP));
@@ -81,8 +94,34 @@ public class SalesOrderPaymentScheduleService {
             schedule.setCreatedDate(now);
             schedule.setUpdatedDate(now);
             salesOrder.addPaymentSchedule(schedule);
-            allocated = allocated.add(expected);
+            allocatedSubTotal = allocatedSubTotal.add(expectedSubTotal);
+            allocatedVat = allocatedVat.add(expectedVat);
         }
+    }
+
+    @Transactional
+    public void replaceSchedulesForPaymentTerm(SalesOrderEntity salesOrder) throws InvalidRequestException {
+        if (salesOrder == null) return;
+        List<InvoiceEntity> invoices = invoiceRepository
+                .findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrder.getSalesOrderNo())
+                .stream().filter(this::isActiveInvoice).toList();
+        if (!invoices.isEmpty() || salesOrder.getPaymentSchedules().stream()
+                .anyMatch(schedule -> defaultAmount(schedule.getPaidAmount()).compareTo(BigDecimal.ZERO) > 0)) {
+            throw new InvalidRequestException("Sales order payment term cannot be changed after payment or invoice creation.");
+        }
+        // Move the old installment numbers out of the unique-key range first.
+        // Hibernate may otherwise flush the replacement INSERT before the old
+        // orphan rows are deleted, even when deleteAll(...).flush() is called.
+        List<SalesOrderPaymentScheduleEntity> oldSchedules = new ArrayList<>(salesOrder.getPaymentSchedules());
+        int temporaryInstallmentNo = -1;
+        for (SalesOrderPaymentScheduleEntity schedule : oldSchedules) {
+            schedule.setInstallmentNo(temporaryInstallmentNo--);
+        }
+        scheduleRepository.flush();
+        scheduleRepository.deleteAll(oldSchedules);
+        scheduleRepository.flush();
+        salesOrder.getPaymentSchedules().clear();
+        initializeSchedules(salesOrder, ZonedDateTime.now());
     }
 
     public void recalculateExpectedAmounts(SalesOrderEntity salesOrder) throws InvalidRequestException {
@@ -95,16 +134,28 @@ public class SalesOrderPaymentScheduleService {
         List<SalesOrderPaymentScheduleEntity> schedules = salesOrder.getPaymentSchedules().stream()
                 .sorted(Comparator.comparing(SalesOrderPaymentScheduleEntity::getInstallmentNo)).toList();
         BigDecimal total = defaultAmount(salesOrder.getGrandTotal());
-        BigDecimal allocated = BigDecimal.ZERO;
+        BigDecimal totalVat = defaultAmount(salesOrder.getVat());
+        BigDecimal totalSubTotal = total.subtract(totalVat).max(BigDecimal.ZERO);
+        BigDecimal allocatedSubTotal = BigDecimal.ZERO;
+        BigDecimal allocatedVat = BigDecimal.ZERO;
         for (int index = 0; index < schedules.size(); index++) {
             SalesOrderPaymentScheduleEntity schedule = schedules.get(index);
             boolean last = index == schedules.size() - 1;
-            BigDecimal expected = last ? total.subtract(allocated) : percentageAmount(total, schedule.getPercentage());
+            BigDecimal expectedSubTotal = last
+                    ? totalSubTotal.subtract(allocatedSubTotal)
+                    : percentageAmount(totalSubTotal, schedule.getPercentage());
+            BigDecimal expectedVat = last
+                    ? totalVat.subtract(allocatedVat)
+                    : percentageAmount(totalVat, schedule.getPercentage());
+            BigDecimal expected = expectedSubTotal.add(expectedVat).setScale(5, RoundingMode.HALF_UP);
+            schedule.setExpectedSubTotal(expectedSubTotal.setScale(5, RoundingMode.HALF_UP));
+            schedule.setExpectedVat(expectedVat.setScale(5, RoundingMode.HALF_UP));
             schedule.setExpectedAmount(expected.setScale(5, RoundingMode.HALF_UP));
             schedule.setPaidAmount(BigDecimal.ZERO.setScale(5, RoundingMode.HALF_UP));
             schedule.setOutstandingAmount(expected.setScale(5, RoundingMode.HALF_UP));
             schedule.setStatus(SalesOrderPaymentScheduleStatus.UNINVOICED);
-            allocated = allocated.add(expected);
+            allocatedSubTotal = allocatedSubTotal.add(expectedSubTotal);
+            allocatedVat = allocatedVat.add(expectedVat);
         }
     }
 
@@ -148,21 +199,27 @@ public class SalesOrderPaymentScheduleService {
         return schedule;
     }
 
-    public List<BigDecimal> derivePercentages(String paymentTermCode) {
+    List<BigDecimal> derivePercentages(String paymentTermCode) {
         String normalized = StringUtils.trimToEmpty(paymentTermCode).toUpperCase(Locale.ROOT);
         if (!normalized.startsWith("DEP")) return List.of(ONE_HUNDRED);
+
         Matcher matcher = NUMBER_PATTERN.matcher(normalized);
         List<BigDecimal> percentages = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal runningTotal = BigDecimal.ZERO;
         while (matcher.find()) {
-            BigDecimal value = new BigDecimal(matcher.group());
-            if (value.signum() <= 0) continue;
-            percentages.add(value);
-            total = total.add(value);
-            if (total.compareTo(ONE_HUNDRED) >= 0) break;
+            BigDecimal percentage = new BigDecimal(matcher.group());
+            if (percentage.compareTo(BigDecimal.ZERO) <= 0) continue;
+            percentages.add(percentage);
+            runningTotal = runningTotal.add(percentage);
+            if (runningTotal.compareTo(ONE_HUNDRED) >= 0) break;
         }
         if (percentages.isEmpty()) return List.of(ONE_HUNDRED);
-        if (percentages.size() == 1 && total.compareTo(ONE_HUNDRED) < 0) percentages.add(ONE_HUNDRED.subtract(total));
+
+        BigDecimal total = percentages.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (percentages.size() == 1 && total.compareTo(ONE_HUNDRED) < 0) {
+            percentages.add(ONE_HUNDRED.subtract(total));
+            return percentages;
+        }
         return total.compareTo(ONE_HUNDRED) == 0 ? percentages : List.of(ONE_HUNDRED);
     }
 
@@ -181,6 +238,8 @@ public class SalesOrderPaymentScheduleService {
         dto.setInstallmentCount(entity.getSalesOrder().getPaymentSchedules().size());
         dto.setPaymentType(entity.getPaymentType());
         dto.setPercentage(entity.getPercentage());
+        dto.setExpectedSubTotal(entity.getExpectedSubTotal());
+        dto.setExpectedVat(entity.getExpectedVat());
         dto.setExpectedAmount(entity.getExpectedAmount());
         dto.setPaidAmount(entity.getPaidAmount());
         dto.setOutstandingAmount(entity.getOutstandingAmount());
