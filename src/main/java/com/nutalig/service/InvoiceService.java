@@ -31,6 +31,7 @@ import com.nutalig.mapper.EmployeeMapper;
 import com.nutalig.mapper.UserMapper;
 import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.repository.InvoiceRepository;
+import com.nutalig.repository.InvoicePaymentAttachmentRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.UserRepository;
@@ -82,6 +83,7 @@ public class InvoiceService {
     private final SystemConfigService systemConfigService;
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
+    private final InvoicePaymentAttachmentRepository invoicePaymentAttachmentRepository;
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
@@ -672,6 +674,85 @@ public class InvoiceService {
         recordReceivePaymentActivity(saved, payment, beforePaidTotal, beforeOutstandingTotal, beforeStatus, userId);
 //        sendAwaitingValidationNotifications(saved, savedPayment);
         return mapToDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto addPaymentAttachments(
+            String invoiceNo,
+            Long paymentId,
+            List<MultipartFile> files,
+            String userId
+    ) throws Exception {
+        if (files == null || files.stream().noneMatch(file -> file != null && !file.isEmpty())) {
+            throw new InvalidRequestException("Attachments are required");
+        }
+
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        InvoicePaymentEntity payment = invoice.getPayments().stream()
+                .filter(item -> Objects.equals(item.getId(), paymentId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Invoice payment " + paymentId + " not found."));
+
+        int sortOrder = payment.getSlipFiles().stream()
+                .map(InvoicePaymentAttachmentEntity::getSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(-1) + 1;
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) continue;
+            UploadFileResponse uploaded = fileStorageService.uploadFile(file);
+            InvoicePaymentAttachmentEntity attachment = new InvoicePaymentAttachmentEntity();
+            attachment.setFileName(uploaded.getFileName());
+            attachment.setOriginalFileName(file.getOriginalFilename());
+            attachment.setFileUrl(uploaded.getUrl());
+            attachment.setContentType(uploaded.getContentType());
+            attachment.setFileSize(file.getSize());
+            attachment.setSortOrder(sortOrder++);
+            attachment.setCreatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+            attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+            payment.addSlipFile(attachment);
+        }
+        syncLegacySlipFields(payment);
+        payment.setUpdatedBy(user);
+        payment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        invoiceRepository.saveAndFlush(invoice);
+        return mapToDto(invoice);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto deletePaymentAttachment(
+            String invoiceNo,
+            Long paymentId,
+            Long attachmentId,
+            String userId
+    ) throws DataNotFoundException {
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        InvoicePaymentEntity payment = invoice.getPayments().stream()
+                .filter(item -> Objects.equals(item.getId(), paymentId))
+                .findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Invoice payment " + paymentId + " not found."));
+        InvoicePaymentAttachmentEntity attachment = invoicePaymentAttachmentRepository
+                .findByIdAndInvoicePaymentId(attachmentId, paymentId)
+                .orElseThrow(() -> new DataNotFoundException("Invoice payment attachment " + attachmentId + " not found."));
+
+        payment.getSlipFiles().remove(attachment);
+        syncLegacySlipFields(payment);
+        payment.setUpdatedBy(user);
+        payment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
+        invoiceRepository.saveAndFlush(invoice);
+        return mapToDto(invoice);
+    }
+
+    private void syncLegacySlipFields(InvoicePaymentEntity payment) {
+        InvoicePaymentAttachmentEntity first = payment.getSlipFiles().stream().findFirst().orElse(null);
+        payment.setSlipFileName(first == null ? null : first.getFileName());
+        payment.setSlipFileUrl(first == null ? null : first.getFileUrl());
     }
 
     @Transactional(rollbackFor = Exception.class)

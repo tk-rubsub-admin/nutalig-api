@@ -28,6 +28,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 import static com.nutalig.constant.ResponseStatus.SUCCESS;
 
 @Slf4j
@@ -209,6 +211,27 @@ public class InvoiceController {
 
         log.info("=== End receive invoice payment {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping(path = "/{id}/payments/{paymentId}/attachments", consumes = "multipart/form-data")
+    public GeneralResponse<InvoiceDto> addPaymentAttachments(
+            @PathVariable(name = "id") String id,
+            @PathVariable(name = "paymentId") Long paymentId,
+            @RequestPart(name = "files") List<MultipartFile> files,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        return new GeneralResponse<>(SUCCESS, invoiceService.addPaymentAttachments(id, paymentId, files, userId));
+    }
+
+    @DeleteMapping("/{id}/payments/{paymentId}/attachments/{attachmentId}")
+    public GeneralResponse<InvoiceDto> deletePaymentAttachment(
+            @PathVariable(name = "id") String id,
+            @PathVariable(name = "paymentId") Long paymentId,
+            @PathVariable(name = "attachmentId") Long attachmentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS,
+                invoiceService.deletePaymentAttachment(id, paymentId, attachmentId, userId));
     }
 
     @PostMapping("/{id}/payments/{paymentId}/send-awaiting-validation-notification")
