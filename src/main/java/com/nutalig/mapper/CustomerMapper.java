@@ -5,10 +5,12 @@ import com.nutalig.dto.CustomerAddressDto;
 import com.nutalig.dto.CustomerContactDto;
 import com.nutalig.dto.CustomerDto;
 import com.nutalig.dto.CustomerBranchDto;
+import com.nutalig.dto.CustomerBillingProfileDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
 import com.nutalig.entity.CustomerEntity;
 import com.nutalig.entity.CustomerBranchEntity;
+import com.nutalig.entity.CustomerBillingProfileEntity;
 import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
@@ -40,6 +42,9 @@ public interface CustomerMapper {
     CustomerContactDto toContactDto(CustomerContactEntity entity);
 
     CustomerBranchDto toBranchDto(CustomerBranchEntity entity);
+
+    @Mapping(target = "customerId", source = "customer.id")
+    CustomerBillingProfileDto toBillingProfileDto(CustomerBillingProfileEntity entity);
 
     default String buildFullAddress(CustomerAddressEntity address) {
         if (address == null) {

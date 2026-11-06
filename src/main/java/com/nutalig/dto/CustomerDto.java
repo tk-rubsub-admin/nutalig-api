@@ -33,6 +33,7 @@ public class CustomerDto {
     private List<CustomerAddressDto> addresses;
     private List<CustomerContactDto> contacts;
     private List<CustomerBranchDto> branches;
+    private List<CustomerBillingProfileDto> billingProfiles;
 
     public CustomerDto(String id, String customerName) {
         this.id = id;

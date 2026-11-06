@@ -428,8 +428,10 @@ public class InvoiceService {
         invoice.setUpdatedBy(null);
         invoice.setUpdatedDate(now);
 
-        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, PUBLIC_TOKEN_ACTOR);
-        InvoiceEntity saved = invoiceRepository.save(invoice);
+        // Persist the approved payment and final invoice status first. The
+        // procurement status transition must only happen after validation.
+        InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
+        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(saved, PUBLIC_TOKEN_ACTOR);
         salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
         salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
         salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
@@ -642,7 +644,6 @@ public class InvoiceService {
         invoice.setStatus(InvoiceStatus.AWAITING_VALIDATION);
         invoice.setUpdatedBy(user);
         invoice.setUpdatedDate(now);
-        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(invoice, userId);
 
         InvoicePaymentAllocationEntity invoiceAllocation = new InvoicePaymentAllocationEntity();
         invoiceAllocation.setCustomer(invoice.getCustomer());
@@ -701,6 +702,7 @@ public class InvoiceService {
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(-1) + 1;
+        List<Map<String, Object>> uploadedFiles = new ArrayList<>();
         for (MultipartFile file : files) {
             if (file == null || file.isEmpty()) continue;
             UploadFileResponse uploaded = fileStorageService.uploadFile(file);
@@ -714,11 +716,30 @@ public class InvoiceService {
             attachment.setCreatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
             attachment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
             payment.addSlipFile(attachment);
+            uploadedFiles.add(Map.of(
+                    "fileName", StringUtils.defaultString(attachment.getFileName()),
+                    "originalFileName", StringUtils.defaultString(attachment.getOriginalFileName()),
+                    "fileUrl", StringUtils.defaultString(attachment.getFileUrl())
+            ));
         }
         syncLegacySlipFields(payment);
         payment.setUpdatedBy(user);
         payment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         invoiceRepository.saveAndFlush(invoice);
+        activityHistoryService.record(
+                ActivityEntityType.INVOICE,
+                invoice.getInvoiceNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.WEB,
+                "เพิ่มไฟล์แนบการรับชำระเงิน Invoice เลขที่ " + invoice.getInvoiceNo(),
+                Map.of(
+                        "paymentId", payment.getId(),
+                        "attachmentCount", uploadedFiles.size(),
+                        "attachments", uploadedFiles
+                )
+        );
         return mapToDto(invoice);
     }
 
@@ -741,11 +762,28 @@ public class InvoiceService {
                 .findByIdAndInvoicePaymentId(attachmentId, paymentId)
                 .orElseThrow(() -> new DataNotFoundException("Invoice payment attachment " + attachmentId + " not found."));
 
+        Map<String, Object> attachmentDetail = new LinkedHashMap<>();
+        attachmentDetail.put("paymentId", paymentId);
+        attachmentDetail.put("attachmentId", attachment.getId());
+        attachmentDetail.put("fileName", attachment.getFileName());
+        attachmentDetail.put("originalFileName", attachment.getOriginalFileName());
+        attachmentDetail.put("fileUrl", attachment.getFileUrl());
+
         payment.getSlipFiles().remove(attachment);
         syncLegacySlipFields(payment);
         payment.setUpdatedBy(user);
         payment.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         invoiceRepository.saveAndFlush(invoice);
+        activityHistoryService.record(
+                ActivityEntityType.INVOICE,
+                invoice.getInvoiceNo(),
+                userId,
+                ActivityActorType.USER,
+                ActivityAction.UPDATE,
+                ActivitySource.WEB,
+                "ลบไฟล์แนบการรับชำระเงิน Invoice เลขที่ " + invoice.getInvoiceNo(),
+                attachmentDetail
+        );
         return mapToDto(invoice);
     }
 

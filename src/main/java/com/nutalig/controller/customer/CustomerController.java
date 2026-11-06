@@ -157,6 +157,24 @@ public class CustomerController {
         return new GeneralResponse<>(SUCCESS, response);
     }
 
+    @PostMapping("/{customerId}/billing-profiles")
+    public GeneralResponse<CustomerDto> addCustomerBillingProfile(
+            @PathVariable String customerId,
+            @RequestBody CreateCustomerBillingProfileRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.addCustomerBillingProfile(customerId, request, userId));
+    }
+
+    @DeleteMapping("/{customerId}/billing-profiles/{profileId}")
+    public GeneralResponse<CustomerDto> deleteCustomerBillingProfile(
+            @PathVariable String customerId,
+            @PathVariable Long profileId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, customerService.deleteCustomerBillingProfile(customerId, profileId, userId));
+    }
+
     @DeleteMapping("/{customerId}/addresses/{addressId}")
     public GeneralResponse<CustomerDto> deleteCustomerAddress(
             @PathVariable String customerId,

@@ -1,0 +1,104 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261105-003-create-customer-billing-profile
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_billing_profile
+      changes:
+        - createTable:
+            tableName: customer_billing_profile
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: profile_name
+                  type: VARCHAR(100)
+              - column:
+                  name: billing_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tax_id
+                  type: VARCHAR(50)
+              - column:
+                  name: branch_code
+                  type: VARCHAR(20)
+              - column:
+                  name: branch_name
+                  type: VARCHAR(255)
+              - column:
+                  name: address_line1
+                  type: VARCHAR(255)
+              - column:
+                  name: address_line2
+                  type: VARCHAR(255)
+              - column:
+                  name: subdistrict
+                  type: VARCHAR(120)
+              - column:
+                  name: district
+                  type: VARCHAR(120)
+              - column:
+                  name: province
+                  type: VARCHAR(120)
+              - column:
+                  name: postcode
+                  type: VARCHAR(10)
+              - column:
+                  name: country
+                  type: VARCHAR(80)
+                  defaultValue: Thailand
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+              - column:
+                  name: phone
+                  type: VARCHAR(100)
+              - column:
+                  name: is_default
+                  type: BIT(1)
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: BIT(1)
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_date
+                  type: datetime
+              - column:
+                  name: updated_date
+                  type: datetime
+        - createIndex:
+            tableName: customer_billing_profile
+            indexName: idx_customer_billing_profile_customer
+            columns:
+              - column:
+                  name: customer_id
+        - createIndex:
+            tableName: customer_billing_profile
+            indexName: idx_customer_billing_profile_default
+            columns:
+              - column:
+                  name: customer_id
+              - column:
+                  name: is_default
+              - column:
+                  name: active

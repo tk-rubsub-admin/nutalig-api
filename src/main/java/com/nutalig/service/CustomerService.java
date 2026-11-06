@@ -10,10 +10,12 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.CustomerDashboardBreakdownDto;
 import com.nutalig.dto.CustomerDashboardDto;
 import com.nutalig.dto.CustomerDto;
+import com.nutalig.dto.CustomerBillingProfileDto;
 import com.nutalig.entity.CustomerBranchEntity;
 import com.nutalig.dto.UserDto;
 import com.nutalig.entity.CustomerAddressEntity;
 import com.nutalig.entity.CustomerContactEntity;
+import com.nutalig.entity.CustomerBillingProfileEntity;
 import com.nutalig.entity.CustomerEntity;
 import com.nutalig.entity.SystemConfigEntity;
 import com.nutalig.exception.DataNotFoundException;
@@ -21,6 +23,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.CustomerRepository;
+import com.nutalig.repository.CustomerBillingProfileRepository;
 import com.nutalig.repository.QuotationRepository;
 import com.nutalig.repository.ReceiptRepository;
 import com.nutalig.repository.SalesOrderRepository;
@@ -60,6 +63,7 @@ public class CustomerService {
     private final CustomerMapper customerMapper;
     private final UserProfileService userProfileService;
     private final ActivityHistoryService activityHistoryService;
+    private final CustomerBillingProfileRepository customerBillingProfileRepository;
 
     @Transactional
     public String createCustomer(CreateCustomerRequest request, String userId) throws InvalidRequestException {
@@ -158,6 +162,61 @@ public class CustomerService {
         }
 
         entity = customerRepository.save(entity);
+
+        if (request.getBillingProfile() != null) {
+            CreateCustomerBillingProfileRequest profileRequest = request.getBillingProfile();
+            CustomerBillingProfileEntity profile = new CustomerBillingProfileEntity();
+            profile.setCustomer(entity);
+            profile.setProfileName(StringUtils.trimToNull(profileRequest.getProfileName()));
+            profile.setBillingProfileType(profileRequest.getBillingProfileType() == null
+                    ? BillingProfileType.VAT
+                    : profileRequest.getBillingProfileType());
+            profile.setBillingName(StringUtils.defaultIfBlank(
+                    StringUtils.trimToNull(profileRequest.getBillingName()), entity.getCustomerName()));
+            profile.setTaxId(StringUtils.trimToNull(profileRequest.getTaxId()));
+            profile.setBranchCode(StringUtils.trimToNull(profileRequest.getBranchCode()));
+            profile.setBranchName(StringUtils.trimToNull(profileRequest.getBranchName()));
+            profile.setAddressLine1(StringUtils.trimToNull(profileRequest.getAddressLine1()));
+            profile.setAddressLine2(StringUtils.trimToNull(profileRequest.getAddressLine2()));
+            profile.setSubdistrict(StringUtils.trimToNull(profileRequest.getSubdistrict()));
+            profile.setDistrict(StringUtils.trimToNull(profileRequest.getDistrict()));
+            profile.setProvince(StringUtils.trimToNull(profileRequest.getProvince()));
+            profile.setPostcode(StringUtils.trimToNull(profileRequest.getPostcode()));
+            profile.setCountry(StringUtils.defaultIfBlank(profileRequest.getCountry(), "Thailand"));
+            profile.setEmail(StringUtils.trimToNull(profileRequest.getEmail()));
+            profile.setPhone(StringUtils.trimToNull(profileRequest.getPhone()));
+            profile.setIsDefault(!Boolean.FALSE.equals(profileRequest.getIsDefault()));
+            profile.setActive(true);
+            customerBillingProfileRepository.save(profile);
+        }
+
+        if (CollectionUtils.isNotEmpty(request.getBillingProfiles())) {
+            for (CreateCustomerBillingProfileRequest profileRequest : request.getBillingProfiles()) {
+                if (profileRequest == null) continue;
+                CustomerBillingProfileEntity profile = new CustomerBillingProfileEntity();
+                profile.setCustomer(entity);
+                profile.setProfileName(StringUtils.trimToNull(profileRequest.getProfileName()));
+                profile.setBillingProfileType(profileRequest.getBillingProfileType() == null
+                        ? BillingProfileType.VAT : profileRequest.getBillingProfileType());
+                profile.setBillingName(StringUtils.defaultIfBlank(
+                        StringUtils.trimToNull(profileRequest.getBillingName()), entity.getCustomerName()));
+                profile.setTaxId(StringUtils.trimToNull(profileRequest.getTaxId()));
+                profile.setBranchCode(StringUtils.trimToNull(profileRequest.getBranchCode()));
+                profile.setBranchName(StringUtils.trimToNull(profileRequest.getBranchName()));
+                profile.setAddressLine1(StringUtils.trimToNull(profileRequest.getAddressLine1()));
+                profile.setAddressLine2(StringUtils.trimToNull(profileRequest.getAddressLine2()));
+                profile.setSubdistrict(StringUtils.trimToNull(profileRequest.getSubdistrict()));
+                profile.setDistrict(StringUtils.trimToNull(profileRequest.getDistrict()));
+                profile.setProvince(StringUtils.trimToNull(profileRequest.getProvince()));
+                profile.setPostcode(StringUtils.trimToNull(profileRequest.getPostcode()));
+                profile.setCountry(StringUtils.defaultIfBlank(profileRequest.getCountry(), "Thailand"));
+                profile.setEmail(StringUtils.trimToNull(profileRequest.getEmail()));
+                profile.setPhone(StringUtils.trimToNull(profileRequest.getPhone()));
+                profile.setIsDefault(Boolean.TRUE.equals(profileRequest.getIsDefault()));
+                profile.setActive(true);
+                customerBillingProfileRepository.save(profile);
+            }
+        }
 
         activityHistoryService.record(
                 ActivityEntityType.CUSTOMER,
@@ -300,7 +359,17 @@ public class CustomerService {
         CustomerEntity entity = customerRepository.findById(custId)
                 .orElseThrow(() -> new DataNotFoundException("Customer " + custId + " not found."));
 
-        return customerMapper.toDto(entity);
+        return toCustomerDtoWithBillingProfiles(entity);
+    }
+
+    private CustomerDto toCustomerDtoWithBillingProfiles(CustomerEntity entity) {
+        CustomerDto customerDto = customerMapper.toDto(entity);
+        customerDto.setBillingProfiles(customerBillingProfileRepository
+                .findByCustomerIdAndActiveTrueOrderByIsDefaultDescIdAsc(entity.getId())
+                .stream()
+                .map(customerMapper::toBillingProfileDto)
+                .toList());
+        return customerDto;
     }
 
     @Transactional
@@ -523,6 +592,75 @@ public class CustomerService {
         recordCustomerAddressCreateHistory(entity.getId(), address, "เพิ่มที่อยู่ลูกค้า ");
         log.info("Add customer address success to customer {}", customerId);
         return customerMapper.toDto(entity);
+    }
+
+    @Transactional
+    public CustomerDto addCustomerBillingProfile(String customerId, CreateCustomerBillingProfileRequest request,
+                                                  String userId) throws DataNotFoundException, InvalidRequestException {
+        CustomerEntity customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new DataNotFoundException("Customer " + customerId + " not found."));
+        if (request == null || StringUtils.isBlank(request.getBillingName())) {
+            throw new InvalidRequestException("Billing name is required.");
+        }
+
+        CustomerBillingProfileEntity profile = new CustomerBillingProfileEntity();
+        profile.setCustomer(customer);
+        profile.setProfileName(StringUtils.trimToNull(request.getProfileName()));
+        profile.setBillingProfileType(request.getBillingProfileType() == null
+                ? BillingProfileType.VAT : request.getBillingProfileType());
+        profile.setBillingName(StringUtils.trimToNull(request.getBillingName()));
+        profile.setTaxId(StringUtils.trimToNull(request.getTaxId()));
+        profile.setBranchCode(StringUtils.trimToNull(request.getBranchCode()));
+        profile.setBranchName(StringUtils.trimToNull(request.getBranchName()));
+        profile.setAddressLine1(StringUtils.trimToNull(request.getAddressLine1()));
+        profile.setAddressLine2(StringUtils.trimToNull(request.getAddressLine2()));
+        profile.setSubdistrict(StringUtils.trimToNull(request.getSubdistrict()));
+        profile.setDistrict(StringUtils.trimToNull(request.getDistrict()));
+        profile.setProvince(StringUtils.trimToNull(request.getProvince()));
+        profile.setPostcode(StringUtils.trimToNull(request.getPostcode()));
+        profile.setCountry(StringUtils.defaultIfBlank(request.getCountry(), "Thailand"));
+        profile.setEmail(StringUtils.trimToNull(request.getEmail()));
+        profile.setPhone(StringUtils.trimToNull(request.getPhone()));
+        profile.setIsDefault(Boolean.TRUE.equals(request.getIsDefault()));
+        profile.setActive(true);
+
+        if (Boolean.TRUE.equals(profile.getIsDefault())) {
+            customerBillingProfileRepository.findByCustomerIdAndActiveTrueOrderByIsDefaultDescIdAsc(customerId)
+                    .forEach(existing -> existing.setIsDefault(false));
+        }
+        customerBillingProfileRepository.save(profile);
+        activityHistoryService.record(
+                ActivityEntityType.CUSTOMER, customerId,
+                StringUtils.defaultIfBlank(userId, "SYSTEM"), ActivityActorType.USER,
+                ActivityAction.CREATE, ActivitySource.API,
+                "เพิ่มหัวบิลของลูกค้า " + customerId, Map.of("billingProfileId", profile.getId(), "billingName", profile.getBillingName())
+        );
+        return toCustomerDtoWithBillingProfiles(customer);
+    }
+
+    @Transactional
+    public CustomerDto deleteCustomerBillingProfile(String customerId, Long profileId, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        customerRepository.findById(customerId)
+                .orElseThrow(() -> new DataNotFoundException("Customer " + customerId + " not found."));
+        CustomerBillingProfileEntity profile = customerBillingProfileRepository
+                .findById(profileId)
+                .filter(item -> item.getCustomer() != null && customerId.equals(item.getCustomer().getId()) && Boolean.TRUE.equals(item.getActive()))
+                .orElseThrow(() -> new DataNotFoundException("Customer billing profile " + profileId + " not found."));
+        if (Boolean.TRUE.equals(profile.getIsDefault())) {
+            throw new InvalidRequestException("Default billing profile cannot be deleted.");
+        }
+        profile.setActive(false);
+        customerBillingProfileRepository.save(profile);
+        activityHistoryService.record(
+                ActivityEntityType.CUSTOMER, customerId,
+                StringUtils.defaultIfBlank(userId, "SYSTEM"), ActivityActorType.USER,
+                ActivityAction.DELETE, ActivitySource.API,
+                "ลบหัวบิลของลูกค้า " + customerId, Map.of("billingProfileId", profileId, "billingName", profile.getBillingName())
+        );
+        CustomerEntity customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new DataNotFoundException("Customer " + customerId + " not found."));
+        return toCustomerDtoWithBillingProfiles(customer);
     }
 
     @Transactional

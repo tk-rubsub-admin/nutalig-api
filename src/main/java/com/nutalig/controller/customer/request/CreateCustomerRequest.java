@@ -21,6 +21,8 @@ public class CreateCustomerRequest {
     private String customerSegment;
     private String customerTier;
     private CreateCustomerAddressRequest address;
+    private CreateCustomerBillingProfileRequest billingProfile;
+    private List<CreateCustomerBillingProfileRequest> billingProfiles;
     private List<CreateCustomerContactRequest> contacts;
     private String salesAccount;
     private List<String> salesAccounts;

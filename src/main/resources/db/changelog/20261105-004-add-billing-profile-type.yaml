@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261105-004-add-billing-profile-type
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: customer_billing_profile
+        - not:
+            - columnExists:
+                tableName: customer_billing_profile
+                columnName: billing_profile_type
+      changes:
+        - addColumn:
+            tableName: customer_billing_profile
+            columns:
+              - column:
+                  name: billing_profile_type
+                  type: VARCHAR(20)
+                  defaultValue: VAT
+                  constraints:
+                    nullable: false

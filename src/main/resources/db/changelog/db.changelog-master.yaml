@@ -3162,3 +3162,7 @@ databaseChangeLog:
       file: db/changelog/20261105-001-add-sales-order-payment-schedule-vat-breakdown.yaml
   - include:
       file: db/changelog/20261105-002-add-invoice-payment-allocation.yaml
+  - include:
+      file: db/changelog/20261105-003-create-customer-billing-profile.yaml
+  - include:
+      file: db/changelog/20261105-004-add-billing-profile-type.yaml
