@@ -56,7 +56,7 @@ public class ProcurementNotificationService {
 
             String salesOrderNo = salesOrder.getSalesOrderNo();
             String userId = user.getId();
-            String detailUrl = buildSalesOrderUrl(salesOrderNo);
+            String detailUrl = buildCreatePurchaseOrderUrl(salesOrderNo);
             String statusLabel = status == ProcurementStatus.READY_FOR_PO_OVERRIDE
                     ? "พร้อมสร้าง PO (Override)" : "พร้อมสร้าง PO";
             String altText = "SO " + salesOrderNo + " " + statusLabel;
@@ -95,11 +95,11 @@ public class ProcurementNotificationService {
         }
     }
 
-    private String buildSalesOrderUrl(String salesOrderNo) {
+    private String buildCreatePurchaseOrderUrl(String salesOrderNo) {
         URI loginSuccessUri = URI.create(lineConfiguration.getLoginSuccessUrl());
         return UriComponentsBuilder
                 .fromUriString(loginSuccessUri.getScheme() + "://" + loginSuccessUri.getAuthority())
-                .pathSegment("sales-order", salesOrderNo)
+                .pathSegment("purchase-order-create", salesOrderNo)
                 .build()
                 .toUriString();
     }
