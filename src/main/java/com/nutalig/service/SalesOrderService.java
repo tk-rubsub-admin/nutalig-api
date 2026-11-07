@@ -111,6 +111,7 @@ public class SalesOrderService {
 
     record SalesOrderSummary(
             BigDecimal subTotal,
+            BigDecimal productSubTotal,
             BigDecimal vat,
             BigDecimal grandTotal
     ) {}
@@ -179,7 +180,8 @@ public class SalesOrderService {
 
         SalesOrderSummary summary = calculate(request.getItems(), entity.getDiscount(), entity.getFreight(), request.getIsVat());
         entity.setSubTotal(summary.subTotal());
-        entity.setAmount(summary.subTotal.subtract(entity.getFreight()));
+        entity.setAmount(summary.productSubTotal().subtract(entity.getFreight())
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
         entity.setVat(summary.vat());
         entity.setGrandTotal(summary.grandTotal());
 
@@ -317,7 +319,8 @@ public class SalesOrderService {
         entity.setVat(vatAmount);
         entity.setGrandTotal(taxableAmount.add(vatAmount).setScale(2, RoundingMode.HALF_UP));
         if (request.getAmount() == null) {
-            entity.setAmount(effectiveSubTotal.subtract(defaultIfNull(entity.getFreight())).setScale(2, RoundingMode.HALF_UP));
+            entity.setAmount(summary.productSubTotal().subtract(defaultIfNull(entity.getFreight()))
+                    .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
         }
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
@@ -1064,14 +1067,17 @@ public class SalesOrderService {
             Boolean isVat
     ) {
         BigDecimal subTotal = BigDecimal.ZERO;
+        BigDecimal productSubTotal = BigDecimal.ZERO;
         for (CreateSalesOrderDetailRequest item : Optional.ofNullable(items).orElseGet(List::of)) {
             BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
                     .multiply(defaultIfNull(item.getQuantity()));
             subTotal = subTotal.add(lineTotal);
+            if (item.getLineType() == null || OrderLineType.PRODUCT.equals(item.getLineType())) {
+                productSubTotal = productSubTotal.add(lineTotal);
+            }
         }
 
         BigDecimal discount = defaultIfNull(requestDiscount);
-        BigDecimal freight = defaultIfNull(requestFreight);
         BigDecimal taxableAmount = subTotal.subtract(discount);
         if (taxableAmount.compareTo(BigDecimal.ZERO) < 0) {
             taxableAmount = BigDecimal.ZERO;
@@ -1083,7 +1089,12 @@ public class SalesOrderService {
         }
 
         BigDecimal grandTotal = taxableAmount.add(vat).setScale(2, RoundingMode.HALF_UP);
-        return new SalesOrderSummary(subTotal.setScale(2, RoundingMode.HALF_UP), vat, grandTotal);
+        return new SalesOrderSummary(
+                subTotal.setScale(2, RoundingMode.HALF_UP),
+                productSubTotal.setScale(2, RoundingMode.HALF_UP),
+                vat,
+                grandTotal
+        );
     }
 
     private SalesOrderSummary calculateForUpdate(
@@ -1093,10 +1104,14 @@ public class SalesOrderService {
             Boolean isVat
     ) {
         BigDecimal subTotal = BigDecimal.ZERO;
+        BigDecimal productSubTotal = BigDecimal.ZERO;
         for (UpdateSalesOrderDetailRequest item : Optional.ofNullable(items).orElseGet(List::of)) {
             BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
                     .multiply(defaultIfNull(item.getQuantity()));
             subTotal = subTotal.add(lineTotal);
+            if (item.getLineType() == null || OrderLineType.PRODUCT.equals(item.getLineType())) {
+                productSubTotal = productSubTotal.add(lineTotal);
+            }
         }
 
         BigDecimal discount = defaultIfNull(requestDiscount);
@@ -1112,7 +1127,12 @@ public class SalesOrderService {
         }
 
         BigDecimal grandTotal = taxableAmount.add(vat).add(freight).setScale(2, RoundingMode.HALF_UP);
-        return new SalesOrderSummary(subTotal.setScale(2, RoundingMode.HALF_UP), vat, grandTotal);
+        return new SalesOrderSummary(
+                subTotal.setScale(2, RoundingMode.HALF_UP),
+                productSubTotal.setScale(2, RoundingMode.HALF_UP),
+                vat,
+                grandTotal
+        );
     }
 
     private void linkRfq(String rfqId, String salesOrderNo, String userId, ZonedDateTime updatedDate)

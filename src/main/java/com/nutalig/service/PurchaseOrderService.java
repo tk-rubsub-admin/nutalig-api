@@ -254,9 +254,11 @@ public class PurchaseOrderService {
             detail.setShippingMethod(selection == null ? sourceItem.getShippingMethod()
                     : selection.shippingMethods().get(sourceItem.getId()));
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
-            detail.setLineType(sourceItem.getLineType() == null
-                    ? com.nutalig.constant.OrderLineType.PRODUCT
-                    : sourceItem.getLineType());
+            detail.setLineType(resolvePurchaseOrderLineType(
+                    requestedItem == null ? null : requestedItem.getLineType(),
+                    sourceItem.getLineType(),
+                    detail.getName()
+            ));
             purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
             if (requestedItem != null && requestedItem.getComponents() != null) {
                 replaceComponents(detail, requestedItem.getComponents());
@@ -278,6 +280,11 @@ public class PurchaseOrderService {
             detail.setSupplierUnitPrice(defaultIfNull(requestedItem.getSupplierUnitPrice()));
             detail.setSupplierShippingCost(defaultIfNull(requestedItem.getSupplierShippingCost()));
             detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
+            detail.setLineType(resolvePurchaseOrderLineType(
+                    requestedItem.getLineType(),
+                    null,
+                    detail.getName()
+            ));
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
@@ -1635,6 +1642,20 @@ public class PurchaseOrderService {
         }
     }
 
+    private OrderLineType resolvePurchaseOrderLineType(
+            OrderLineType requestedLineType,
+            OrderLineType previousLineType,
+            String itemName
+    ) {
+        if (StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(itemName), "delivery")) {
+            return OrderLineType.ADDITIONAL_COST;
+        }
+        if (requestedLineType != null) {
+            return requestedLineType;
+        }
+        return previousLineType == null ? OrderLineType.PRODUCT : previousLineType;
+    }
+
     private String generatePurchaseOrderNo() {
         for (int attempt = 0; attempt < 10_000; attempt++) {
             String purchaseOrderNo = generatedIdSequenceService.getNextIdWithMonth(PURCHASE_ORDER_PREFIX, 4);
@@ -1686,11 +1707,11 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
-            detail.setLineType(itemRequest.getLineType() == null
-                    ? (previousItem != null && previousItem.getLineType() != null
-                    ? previousItem.getLineType()
-                    : com.nutalig.constant.OrderLineType.PRODUCT)
-                    : itemRequest.getLineType());
+            detail.setLineType(resolvePurchaseOrderLineType(
+                    itemRequest.getLineType(),
+                    previousItem == null ? null : previousItem.getLineType(),
+                    detail.getName()
+            ));
             if (itemRequest.getComponents() != null) {
                 replaceComponents(detail, itemRequest.getComponents());
             } else if (previousItem != null) {
