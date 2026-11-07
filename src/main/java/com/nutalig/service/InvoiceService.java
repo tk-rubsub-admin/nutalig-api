@@ -102,6 +102,7 @@ public class InvoiceService {
     private final LineConfiguration lineConfiguration;
     private final UserProfileService userProfileService;
     private final SalesOrderPaymentScheduleService salesOrderPaymentScheduleService;
+    private final ProcurementNotificationService procurementNotificationService;
 
     @Transactional(rollbackFor = Exception.class)
     public InvoiceEntity createInvoice(CreateInvoiceRequest request, String userId)
@@ -1129,6 +1130,60 @@ public class InvoiceService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    /**
+     * Evaluates whether the sales order currently satisfies the same business
+     * conditions used when payment approval moves it to READY_FOR_PO.
+     *
+     * This intentionally does not read salesOrder.procurementStatus. The
+     * endpoint is used to recalculate eligibility from invoices and approved
+     * payments when the stored status may be stale.
+     */
+    @Transactional(readOnly = true)
+    public boolean canSalesOrderBecomeReadyForProcurement(String salesOrderNo)
+            throws DataNotFoundException {
+        SalesOrderEntity salesOrder = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+
+        if (salesOrder.getStatus() == SalesOrderStatus.CANCELLED
+                || salesOrder.getStatus() == SalesOrderStatus.REJECTED) {
+            return false;
+        }
+
+        return invoiceRepository.findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(salesOrderNo).stream()
+                .filter(invoice -> invoice.getStatus() == InvoiceStatus.PAID)
+                .filter(this::isFirstInstallmentInvoice)
+                .anyMatch(invoice -> {
+                    BigDecimal approvedPaid = invoice.getPayments().stream()
+                            .filter(payment -> payment.getStatus() == InvoicePaymentStatus.APPROVE)
+                            .map(payment -> defaultIfNull(payment.getAmount()))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal invoiceTotal = defaultIfNull(invoice.getGrandTotal());
+                    return invoiceTotal.signum() > 0 && approvedPaid.compareTo(invoiceTotal) >= 0;
+                });
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void markSalesOrderReadyForProcurement(String salesOrderNo, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        SalesOrderEntity salesOrder = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+
+        // Re-check immediately before changing the status. This protects the
+        // write endpoint even when the frontend check was made earlier.
+        if (salesOrder.getStatus() == SalesOrderStatus.CANCELLED
+                || salesOrder.getStatus() == SalesOrderStatus.REJECTED
+                || salesOrder.getProcurementStatus() != ProcurementStatus.NOT_READY
+                || !canSalesOrderBecomeReadyForProcurement(salesOrderNo)) {
+            throw new InvalidRequestException("Sales order is not ready for purchase order creation.");
+        }
+
+        ProcurementStatus beforeStatus = salesOrder.getProcurementStatus();
+        salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
+        salesOrderRepository.save(salesOrder);
+        recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
+        procurementNotificationService.notifyReadyForPurchaseOrder(salesOrder, ProcurementStatus.READY_FOR_PO);
+    }
+
     private int defaultRevNo(Integer revNo) {
         return revNo == null ? 0 : revNo;
     }
@@ -1158,25 +1213,34 @@ public class InvoiceService {
         salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
         salesOrderRepository.save(salesOrder);
         recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
+        procurementNotificationService.notifyReadyForPurchaseOrder(salesOrder, ProcurementStatus.READY_FOR_PO);
     }
 
     private boolean isFirstInstallmentInvoice(InvoiceEntity invoice) {
-        BigDecimal remainingAmount = defaultIfNull(invoice.getSubTotal())
-                .subtract(defaultIfNull(invoice.getDiscount())).max(BigDecimal.ZERO);
-        String paymentTerm = invoice.getCustomerPaymentTerm() != null
-                && invoice.getCustomerPaymentTerm().getId() != null
-                ? StringUtils.trimToEmpty(invoice.getCustomerPaymentTerm().getId().getCode()) : "";
-        // Match the installment schedule used on the invoice creation screen.
-        int firstInstallmentPercent = switch (paymentTerm) {
-            case "DEP50" -> 50;
-            case "DEP_40_60" -> 40;
-            case "DEP30_BBS" -> 30;
-            case "DEP35_35_30_BBS" -> 35;
-            default -> 100;
-        };
-        BigDecimal expectedFirstAmount = remainingAmount.multiply(BigDecimal.valueOf(firstInstallmentPercent))
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        BigDecimal actualAmount = defaultIfNull(invoice.getAmount()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal expectedFirstAmount;
+        SalesOrderPaymentScheduleEntity paymentSchedule = invoice.getPaymentSchedule();
+        if (paymentSchedule != null) {
+            if (!Objects.equals(paymentSchedule.getInstallmentNo(), 1)) {
+                return false;
+            }
+            expectedFirstAmount = defaultIfNull(paymentSchedule.getExpectedAmount())
+                    .setScale(2, RoundingMode.HALF_UP);
+        } else {
+            String paymentTerm = invoice.getCustomerPaymentTerm() != null
+                    && invoice.getCustomerPaymentTerm().getId() != null
+                    ? StringUtils.trimToEmpty(invoice.getCustomerPaymentTerm().getId().getCode()) : "";
+            int firstInstallmentPercent = switch (paymentTerm) {
+                case "DEP50" -> 50;
+                case "DEP_40_60" -> 40;
+                case "DEP30_BBS" -> 30;
+                case "DEP35_35_30_BBS" -> 35;
+                default -> 100;
+            };
+            expectedFirstAmount = defaultIfNull(invoice.getSalesOrder().getGrandTotal())
+                    .multiply(BigDecimal.valueOf(firstInstallmentPercent))
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        }
+        BigDecimal actualAmount = defaultIfNull(invoice.getGrandTotal()).setScale(2, RoundingMode.HALF_UP);
         if (expectedFirstAmount.signum() <= 0 || actualAmount.compareTo(expectedFirstAmount) != 0) {
             return false;
         }

@@ -88,6 +88,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
     private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    private final ProcurementNotificationService procurementNotificationService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
     private final ShippingContainerLoadRepository shippingContainerLoadRepository;
@@ -851,6 +852,8 @@ public class PurchaseOrderService {
             entity.getSalesOrder().setProcurementStatus(ProcurementStatus.READY_FOR_PO);
             entity.getSalesOrder().setUpdatedBy(user);
             entity.getSalesOrder().setUpdatedDate(now);
+            procurementNotificationService.notifyReadyForPurchaseOrder(
+                    entity.getSalesOrder(), ProcurementStatus.READY_FOR_PO);
         }
 
         purchaseOrderRepository.save(entity);

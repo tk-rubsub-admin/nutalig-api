@@ -48,6 +48,7 @@ public class ApprovalBusinessService {
     private final UserTodoService userTodoService;
     private final UserProfileService userProfileService;
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    private final ProcurementNotificationService procurementNotificationService;
 
     @Transactional
     public void handleApproved(ApprovalRequestEntity approvalRequest, String actorUserId, ApprovalSource source)
@@ -439,6 +440,7 @@ public class ApprovalBusinessService {
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);
         salesOrderRepository.save(entity);
+        procurementNotificationService.notifyReadyForPurchaseOrder(entity, ProcurementStatus.READY_FOR_PO_OVERRIDE);
 
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("urgentRequestStatus", entity.getUrgentRequestStatus());

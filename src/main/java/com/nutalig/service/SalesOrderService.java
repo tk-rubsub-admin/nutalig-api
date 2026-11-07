@@ -211,6 +211,13 @@ public class SalesOrderService {
         return mapToDto(entity);
     }
 
+    @Transactional(readOnly = true)
+    public boolean isReadyForPurchaseOrder(String salesOrderNo) throws DataNotFoundException {
+        SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
+        return entity.getProcurementStatus() == ProcurementStatus.READY_FOR_PO;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public SalesOrderDto updateSalesOrder(String salesOrderNo, UpdateSalesOrderRequest request, String userId)
             throws DataNotFoundException, InvalidRequestException {

@@ -24,6 +24,7 @@ import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.service.SalesOrderService;
 import com.nutalig.service.PurchaseOrderService;
 import com.nutalig.service.SalesOrderPaymentScheduleService;
+import com.nutalig.service.InvoiceService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
@@ -43,20 +44,23 @@ public class SalesOrderController {
     private final SalesOrderService salesOrderService;
     private final PurchaseOrderService purchaseOrderService;
     private final SalesOrderPaymentScheduleService salesOrderPaymentScheduleService;
+    private final InvoiceService invoiceService;
 
     @Autowired
     public SalesOrderController(
             SalesOrderService salesOrderService,
             PurchaseOrderService purchaseOrderService,
-            SalesOrderPaymentScheduleService salesOrderPaymentScheduleService
+            SalesOrderPaymentScheduleService salesOrderPaymentScheduleService,
+            InvoiceService invoiceService
     ) {
         this.salesOrderService = salesOrderService;
         this.purchaseOrderService = purchaseOrderService;
         this.salesOrderPaymentScheduleService = salesOrderPaymentScheduleService;
+        this.invoiceService = invoiceService;
     }
 
     public SalesOrderController(SalesOrderService salesOrderService, PurchaseOrderService purchaseOrderService) {
-        this(salesOrderService, purchaseOrderService, null);
+        this(salesOrderService, purchaseOrderService, null, null);
     }
 
     @PostMapping("/search")
@@ -107,6 +111,22 @@ public class SalesOrderController {
 
         log.info("=== End get sales order by id {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/{id}/procurement-ready")
+    public GeneralResponse<Boolean> checkProcurementReady(
+            @PathVariable(name = "id") String id
+    ) throws DataNotFoundException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.canSalesOrderBecomeReadyForProcurement(id));
+    }
+
+    @PatchMapping("/{id}/procurement-ready")
+    public GeneralResponse<Void> markProcurementReady(
+            @PathVariable(name = "id") String id,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        invoiceService.markSalesOrderReadyForProcurement(id, userId);
+        return new GeneralResponse<>(SUCCESS);
     }
 
     @GetMapping("/{id}/payment-schedules")
