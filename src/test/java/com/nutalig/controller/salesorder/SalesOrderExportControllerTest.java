@@ -48,7 +48,7 @@ class SalesOrderExportControllerTest {
                         .content("""
                                 {"salesOrderNo":"NTL-SO2026100006", "docDateStart":"2026-10-01",
                                  "docDateEnd":"2026-10-31", "customerId":"NTL-CUST-00070", "salesId":"EMP-001",
-                                 "status":"CREATED", "statuses":["CREATED","ISSUED"],
+                                 "status":"CREATED", "statuses":["CREATED","WAITING_PAYMENT"],
                                  "urgentRequestStatus":"APPROVED", "procurementStatus":["READY_FOR_PO"],
                                  "shippingType":"LAND", "keyword":"ขวด"}
                                 """))
@@ -65,7 +65,7 @@ class SalesOrderExportControllerTest {
         assertEquals("NTL-CUST-00070", criteria.getCustomerId());
         assertEquals("EMP-001", criteria.getSalesId());
         assertEquals(SalesOrderStatus.CREATED, criteria.getStatus());
-        assertEquals(List.of(SalesOrderStatus.CREATED, SalesOrderStatus.ISSUED), criteria.getStatuses());
+        assertEquals(List.of(SalesOrderStatus.CREATED, SalesOrderStatus.WAITING_PAYMENT), criteria.getStatuses());
         assertEquals(UrgentRequestStatus.APPROVED, criteria.getUrgentRequestStatus());
         assertEquals(List.of(ProcurementStatus.READY_FOR_PO), criteria.getProcurementStatus());
         assertEquals("LAND", criteria.getShippingType());
