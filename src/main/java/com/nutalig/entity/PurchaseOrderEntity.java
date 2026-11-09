@@ -55,6 +55,9 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "doc_date", nullable = false)
     private LocalDate docDate;
 
+    @Column(name = "po_month", length = 7)
+    private String poMonth;
+
     @Column(name = "production_lead_time_day")
     private Integer productionLeadTimeDay;
 

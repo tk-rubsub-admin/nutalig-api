@@ -72,8 +72,7 @@ public class SalesOrderService {
     private static final Set<SalesOrderStatus> EXCLUDED_CUSTOMER_ORDER_TOTAL_STATUSES =
             EnumSet.of(SalesOrderStatus.REJECTED, SalesOrderStatus.CANCELLED);
     private static final Set<SalesOrderStatus> CANCELLABLE_SALES_ORDER_STATUSES =
-            EnumSet.of(SalesOrderStatus.DRAFT, SalesOrderStatus.CREATED, SalesOrderStatus.ISSUED,
-                    SalesOrderStatus.SENT, SalesOrderStatus.ACCEPTED);
+            EnumSet.of(SalesOrderStatus.DRAFT, SalesOrderStatus.CREATED);
     private static final String SALES_ADMIN_POSITION_CODE = "SALES_ADMIN";
 
     private final GeneratedIdSequenceService generatedIdSequenceService;

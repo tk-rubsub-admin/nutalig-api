@@ -1216,7 +1216,7 @@ public class RFQService {
         entity.setConfirmedShippingMethod(primarySelection.getShippingMethod());
         entity.setConfirmedPrice(scaleMoney(primarySelection.getConfirmedPrice()));
         entity.setConfirmedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
-        entity.setStatus(RfqStatus.COMPLETED);
+        entity.setStatus(RfqStatus.CONFIRMED_PRICE);
         entity.setUpdatedBy(userProfileService.getNameFromId(userId));
         entity.setUpdatedDate(ZonedDateTime.now(DateUtil.getTimeZone()));
         requestPriceHeaderRepository.save(entity);
@@ -1257,7 +1257,7 @@ public class RFQService {
                 activityDetail
         );
 
-        saveRfqStatusTimeline(entity, RfqStatus.COMPLETED, entity.getConfirmedDate());
+        saveRfqStatusTimeline(entity, RfqStatus.CONFIRMED_PRICE, entity.getConfirmedDate());
 
         return mapToDto(entity);
     }
@@ -1300,7 +1300,7 @@ public class RFQService {
         entity.setConfirmedShippingMethod(null);
         entity.setConfirmedPrice(null);
         entity.setConfirmedDate(null);
-        if (RfqStatus.COMPLETED.equals(entity.getStatus())) {
+        if (RfqStatus.CONFIRMED_PRICE.equals(entity.getStatus())) {
             entity.setStatus(RfqStatus.QUOTED);
             saveRfqStatusTimeline(entity, RfqStatus.QUOTED, now);
         }
@@ -2226,7 +2226,7 @@ public class RFQService {
     public String getCustomerQuoted(String rfqId, String userId) throws DataNotFoundException, InvalidRequestException {
         RfqHeaderEntity rfq = getEntityById(rfqId);
 
-        if (!List.of(RfqStatus.QUOTED, RfqStatus.COMPLETED).contains(rfq.getStatus())) {
+        if (!List.of(RfqStatus.QUOTED, RfqStatus.QUOTATION_ISSUED, RfqStatus.CONFIRMED_PRICE).contains(rfq.getStatus())) {
             throw new InvalidRequestException("Cannot get customer quoted for rfq isn't QUOTED.");
         }
         return buildThaiCustomerQuoteMessage(rfq);
@@ -4236,9 +4236,10 @@ public class RFQService {
             case SUPPLIER_QUOTED -> "ซัพพลายเออร์ตอบแล้ว";
             case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case QUOTED -> "เสนอราคาแล้ว";
+            case QUOTATION_ISSUED -> "ออกใบเสนอราคาแล้ว";
             case SPECIAL_PRICE_REVIEW -> "รอทบทวนราคาพิเศษ";
             case CLOSED -> "ปิดงาน";
-            case COMPLETED -> "เสร็จสิ้น";
+            case CONFIRMED_PRICE -> "ยืนยันราคาแล้ว";
         };
     }
 

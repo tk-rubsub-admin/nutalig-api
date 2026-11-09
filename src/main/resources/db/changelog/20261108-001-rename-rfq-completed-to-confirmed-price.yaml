@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261108-001-rename-rfq-completed-to-confirmed-price
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE rfq_header
+              SET status = 'CONFIRMED_PRICE'
+              WHERE status = 'COMPLETED';
+        - sql:
+            sql: |
+              UPDATE rfq_status_timeline
+              SET status = 'CONFIRMED_PRICE'
+              WHERE status = 'COMPLETED';

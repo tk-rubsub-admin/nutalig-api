@@ -14,6 +14,7 @@ import com.nutalig.controller.response.Pagination;
 import com.nutalig.dto.*;
 import com.nutalig.dto.document.*;
 import com.nutalig.entity.*;
+import com.nutalig.entity.id.RfqStatusTimelineId;
 import com.nutalig.exception.DataNotFoundException;
 import com.nutalig.exception.InvalidRequestException;
 import com.nutalig.mapper.CustomerMapper;
@@ -66,6 +67,7 @@ public class QuotationService {
     private final UserProfileService userProfileService;
     private final QuotationRepository quotationRepository;
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
+    private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
     private final SupplierShippingRepository supplierShippingRepository;
@@ -246,7 +248,7 @@ public class QuotationService {
 
         quotationRepository.save(quotationEntity);
         for (String rfqId : rfqIds) {
-            updateRfqQuotationNo(rfqId, docId, createdBy);
+            updateRfqQuotationNo(rfqId, docId, createdBy, QuotationStatus.ISSUED.equals(status));
         }
         recordCreateQuotationActivity(quotationEntity, requestDto, createdBy);
 
@@ -522,7 +524,12 @@ public class QuotationService {
         return new ArrayList<>(rfqIds);
     }
 
-    private void updateRfqQuotationNo(String rfqId, String quotationNo, String updatedBy) throws DataNotFoundException {
+    private void updateRfqQuotationNo(
+            String rfqId,
+            String quotationNo,
+            String updatedBy,
+            boolean quotationIssued
+    ) throws DataNotFoundException {
         if (StringUtils.isBlank(rfqId)) {
             return;
         }
@@ -531,8 +538,17 @@ public class QuotationService {
 
         RfqHeaderEntity rfq = requestPriceHeaderRepository.findById(rfqId)
                 .orElseThrow(() -> new DataNotFoundException("RFQ " + rfqId + " not found."));
+        boolean isFirstQuotationForRfq = StringUtils.isBlank(rfq.getQuotationNo());
         rfq.setQuotationNo(quotationNo);
         rfq.setQuotedDate(now);
+        if (quotationIssued
+                && isFirstQuotationForRfq
+                && rfq.getStatus() != RfqStatus.CONFIRMED_PRICE
+                && rfq.getStatus() != RfqStatus.CLOSED
+                && rfq.getStatus() != RfqStatus.QUOTATION_ISSUED) {
+            rfq.setStatus(RfqStatus.QUOTATION_ISSUED);
+            saveRfqStatusTimeline(rfq, RfqStatus.QUOTATION_ISSUED, now);
+        }
         rfq.setUpdatedDate(now);
         requestPriceHeaderRepository.save(rfq);
 
@@ -546,6 +562,23 @@ public class QuotationService {
                 "สร้างใบเสนอราคาเลขที่ " + quotationNo,
                 null
         );
+    }
+
+    private void saveRfqStatusTimeline(RfqHeaderEntity rfq, RfqStatus status, ZonedDateTime statusDatetime) {
+        if (rfq == null || status == null || statusDatetime == null
+                || rfqStatusTimelineRepository.findByIdRfqIdAndIdStatus(rfq.getId(), status).isPresent()) {
+            return;
+        }
+
+        RfqStatusTimelineId timelineId = new RfqStatusTimelineId();
+        timelineId.setRfqId(rfq.getId());
+        timelineId.setStatus(status);
+
+        RfqStatusTimelineEntity timeline = new RfqStatusTimelineEntity();
+        timeline.setId(timelineId);
+        timeline.setRfqHeader(rfq);
+        timeline.setStatusDatetime(statusDatetime);
+        rfqStatusTimelineRepository.save(timeline);
     }
 
     @Transactional(readOnly = true)

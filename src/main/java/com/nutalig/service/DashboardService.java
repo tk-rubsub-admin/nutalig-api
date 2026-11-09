@@ -211,6 +211,16 @@ public class DashboardService {
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
+                        "rfq-quotation-issued",
+                        "dashboard.rfq.metrics.quotationIssued.title",
+                        countByStatus(rfqs, RfqStatus.QUOTATION_ISSUED),
+                        "dashboard.rfq.metrics.quotationIssued.subtitle",
+                        null,
+                        "info",
+                        buildRfqManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.QUOTATION_ISSUED.name())),
+                        ALL_RFQ_VISIBLE_TO
+                ),
+                metric(
                         "rfq-special-price",
                         "dashboard.rfq.metrics.specialPrice.title",
                         countByStatus(rfqs, RfqStatus.SPECIAL_PRICE_REVIEW),
@@ -223,11 +233,11 @@ public class DashboardService {
                 metric(
                         "rfq-completed",
                         "dashboard.rfq.metrics.completed.title",
-                        countByStatus(rfqs, RfqStatus.COMPLETED),
+                        countByStatus(rfqs, RfqStatus.CONFIRMED_PRICE),
                         "dashboard.rfq.metrics.completed.subtitle",
                         null,
                         "success",
-                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.COMPLETED.name())),
+                        buildPriceInquiryManagementHref(startDate, endDate, selectedFilters, Map.of("statuses", RfqStatus.CONFIRMED_PRICE.name())),
                         ALL_RFQ_VISIBLE_TO
                 ),
                 metric(
@@ -299,7 +309,8 @@ public class DashboardService {
                 series("ใหม่", BRAND_SAND, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.NEW).count()),
                 series("กำลังดำเนินการ", BRAND_GREEN, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.IN_PROGRESS).count()),
                 series("ซัพตอบแล้ว", "#6B7E77", dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.SUPPLIER_QUOTED).count()),
-                series("เสนอราคาแล้ว", BRAND_TERRACOTTA, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count())
+                series("ได้ราคาแล้ว", BRAND_TERRACOTTA, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTED).count()),
+                series("เสนอราคาแล้ว", BRAND_CHARCOAL, dates, rfqByDate, items -> (double) items.stream().filter(item -> item.getStatus() == RfqStatus.QUOTATION_ISSUED).count())
         ));
         stageChart.setVisibleTo(StringUtils.equals(roleCode, "PROCUREMENT") ? PROCUREMENT_VISIBLE_TO : SALES_VISIBLE_TO);
 
@@ -512,6 +523,20 @@ public class DashboardService {
                 ALL_RFQ_VISIBLE_TO
         ));
 
+        charts.add(distributionChart(
+                "rfq-by-close-reason",
+                "dashboard.rfq.charts.closeReason.title",
+                "dashboard.rfq.charts.closeReason.subtitle",
+                buildBreakdown(
+                        rfqs.stream()
+                                .filter(rfq -> rfq.getStatus() == RfqStatus.CLOSED)
+                                .toList(),
+                        this::getCloseReasonLabel,
+                        Integer.MAX_VALUE
+                ),
+                ALL_RFQ_VISIBLE_TO
+        ));
+
         boolean procurementView = StringUtils.equals(roleCode, "PROCUREMENT");
         charts.add(distributionChart(
                 procurementView ? "rfq-by-sales" : "rfq-by-procurement",
@@ -545,6 +570,20 @@ public class DashboardService {
             case "SALES_OFFLINE" -> "LINE Offline";
             default -> "LINE";
         };
+    }
+
+    private String getCloseReasonLabel(RfqHeaderEntity rfq) {
+        if (rfq == null || rfq.getCloseReason() == null) {
+            return "ไม่ระบุเหตุผล";
+        }
+
+        SystemConfigEntity closeReason = rfq.getCloseReason();
+        return StringUtils.firstNonBlank(
+                closeReason.getNameTh(),
+                closeReason.getNameEn(),
+                closeReason.getId() != null ? closeReason.getId().getCode() : null,
+                "ไม่ระบุเหตุผล"
+        );
     }
 
     private List<DashboardDistributionItemDto> buildRfqTypeBreakdown(List<RfqHeaderEntity> rfqs) {
@@ -957,7 +996,7 @@ public class DashboardService {
             return null;
         }
 
-        List<DashboardDistributionItemDto> items = buildBreakdown(
+         List<DashboardDistributionItemDto> items = buildBreakdown(
                 rfqs,
                 this::getCustomerTypeLabel,
                 12
@@ -1001,9 +1040,10 @@ public class DashboardService {
             case SUPPLIER_QUOTED -> "ซัพตอบแล้ว";
             case REQUESTED_INFO -> "ขอข้อมูลเพิ่มเติม";
             case SPECIAL_PRICE_REVIEW -> "รอทบทวนราคาพิเศษ";
-            case QUOTED -> "เสนอราคาแล้ว";
+            case QUOTED -> "ได้ราคาแล้ว";
+            case QUOTATION_ISSUED -> "เสนอราคาแล้ว";
             case CLOSED -> "ปิดงาน";
-            case COMPLETED -> "เสร็จสิ้น";
+            case CONFIRMED_PRICE -> "ยืนยันราคาแล้ว";
         };
     }
 
@@ -1014,6 +1054,7 @@ public class DashboardService {
             case "ซัพตอบแล้ว" -> "#27ae60";
             case "ขอข้อมูลเพิ่มเติม" -> "#f2994a";
             case "รอทบทวนราคาพิเศษ" -> "#eb5757";
+            case "ได้ราคาแล้ว" -> "#6fcf97";
             case "เสนอราคาแล้ว" -> "#6fcf97";
             case "ยกเลิก", "ปฏิเสธ", "ปิดงาน" -> "#bdbdbd";
             case "เสร็จสิ้น" -> "#219653";

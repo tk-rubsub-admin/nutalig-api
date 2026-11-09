@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261108-002-add-purchase-order-month
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: purchase_order
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: po_month
+                  type: VARCHAR(7)
+        - createIndex:
+            tableName: purchase_order
+            indexName: idx_purchase_order_po_month
+            columns:
+              - column:
+                  name: po_month
+        - sql:
+            sql: |
+              UPDATE purchase_order po
+              JOIN purchase_order_detail pod
+                ON pod.purchase_order_no = po.purchase_order_no
+              JOIN rfq_detail rd
+                ON rd.id = pod.rfq_detail_id
+              JOIN rfq_header rh
+                ON rh.id = rd.rfq_header_id
+              SET po.po_month = DATE_FORMAT(rh.requested_date, '%Y-%m')
+              WHERE po.po_month IS NULL
+                AND rh.requested_date IS NOT NULL;

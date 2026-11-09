@@ -97,9 +97,9 @@ public final class DocumentStatusResolver {
         }
         return switch (status) {
             case DRAFT -> DocumentLifecycleStatus.DRAFT;
-            case ACCEPTED, REJECTED -> DocumentLifecycleStatus.FINALIZED;
+            case COMPLETED,  REJECTED -> DocumentLifecycleStatus.FINALIZED;
             case CANCELLED -> DocumentLifecycleStatus.CANCELLED;
-            case CREATED, ISSUED, SENT -> DocumentLifecycleStatus.OPEN;
+            case CREATED, WAITING_PAYMENT, IN_PROGRESS, READY_FOR_PO -> DocumentLifecycleStatus.OPEN;
         };
     }
 
@@ -108,10 +108,8 @@ public final class DocumentStatusResolver {
             return CommercialOutcomeStatus.NONE;
         }
         return switch (status) {
-            case SENT -> CommercialOutcomeStatus.SENT;
-            case ACCEPTED -> CommercialOutcomeStatus.ACCEPTED;
             case REJECTED -> CommercialOutcomeStatus.REJECTED;
-            case DRAFT, CREATED, ISSUED -> CommercialOutcomeStatus.PENDING;
+            case DRAFT, CREATED, WAITING_PAYMENT, IN_PROGRESS, COMPLETED, READY_FOR_PO -> CommercialOutcomeStatus.PENDING;
             case CANCELLED -> CommercialOutcomeStatus.NONE;
         };
     }

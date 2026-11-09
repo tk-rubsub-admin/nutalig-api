@@ -1,5 +1,12 @@
 package com.nutalig.constant;
 
 public enum SalesOrderStatus {
-    DRAFT, CREATED, ISSUED, SENT, ACCEPTED, REJECTED, CANCELLED
+    DRAFT,
+    CREATED,
+    WAITING_PAYMENT,
+    READY_FOR_PO,
+    IN_PROGRESS,
+    COMPLETED,
+    REJECTED,
+    CANCELLED
 }

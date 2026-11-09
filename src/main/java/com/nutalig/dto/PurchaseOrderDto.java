@@ -14,6 +14,7 @@ public class PurchaseOrderDto {
     private String purchaseOrderNo;
     private String salesOrderNo;
     private String docDate;
+    private String poMonth;
     private Integer productionLeadTimeDay;
     private Integer shippingLeadTimeDay;
     private PurchaseOrderStatus status;

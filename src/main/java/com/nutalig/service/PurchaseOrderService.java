@@ -52,6 +52,7 @@ import java.math.RoundingMode;
 import java.net.URI;
 import java.net.URL;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -177,11 +178,13 @@ public class PurchaseOrderService {
         LocalDate docDate = request.getDocDate() != null
                 ? request.getDocDate()
                 : LocalDate.now(DateUtil.getTimeZone());
+        String poMonth = resolvePoMonth(sourceItems);
         ZonedDateTime now = now(DateUtil.getTimeZone());
 
         PurchaseOrderEntity entity = new PurchaseOrderEntity();
         entity.setPurchaseOrderNo(generatePurchaseOrderNo());
         entity.setSalesOrder(salesOrder);
+        entity.setPoMonth(poMonth);
         entity.setSupplier(supplier);
         entity.setSupplierShipping(supplierShipping);
         entity.setPaymentTerm(resolveSupplierPaymentTerm(request.getPaymentTerm()));
@@ -2161,6 +2164,7 @@ public class PurchaseOrderService {
         dto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
         dto.setSalesOrderNo(entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setPoMonth(entity.getPoMonth());
         dto.setProductionLeadTimeDay(entity.getProductionLeadTimeDay());
         dto.setShippingLeadTimeDay(entity.getShippingLeadTimeDay());
         dto.setStatus(entity.getStatus());
@@ -2283,6 +2287,35 @@ public class PurchaseOrderService {
                 .map(PurchaseOrderDeliveryMapper::toDto)
                 .toList());
         return dto;
+    }
+
+    private String resolvePoMonth(List<SalesOrderDetailEntity> sourceItems) {
+        if (sourceItems == null || sourceItems.isEmpty()) {
+            return null;
+        }
+
+        Set<Long> rfqDetailIds = sourceItems.stream()
+                .map(SalesOrderDetailEntity::getRfqDetailId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (rfqDetailIds.isEmpty()) {
+            return null;
+        }
+
+        Map<Long, RfqDetailEntity> rfqDetailsById = requestPriceDetailRepository.findAllById(rfqDetailIds).stream()
+                .collect(java.util.stream.Collectors.toMap(RfqDetailEntity::getId, detail -> detail));
+        return sourceItems.stream()
+                .map(SalesOrderDetailEntity::getRfqDetailId)
+                .map(rfqDetailsById::get)
+                .filter(Objects::nonNull)
+                .map(RfqDetailEntity::getRequestPriceHeader)
+                .filter(Objects::nonNull)
+                .map(RfqHeaderEntity::getRequestedDate)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(requestedDate -> requestedDate.withZoneSameInstant(DateUtil.getTimeZone())
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM")))
+                .orElse(null);
     }
 
     private Integer defaultRevNo(Integer revNo) {

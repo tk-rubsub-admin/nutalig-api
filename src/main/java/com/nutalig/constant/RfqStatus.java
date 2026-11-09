@@ -7,6 +7,7 @@ public enum RfqStatus {
     REQUESTED_INFO,
     SPECIAL_PRICE_REVIEW,
     QUOTED,
+    QUOTATION_ISSUED,
     CLOSED,
-    COMPLETED
+    CONFIRMED_PRICE
 }
