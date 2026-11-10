@@ -165,10 +165,15 @@ public class AddressService {
     public List<SubDistrictDto> getSubDistrictByDistrict(String districtId) {
         log.info("Get SubDistrict by District id : {}", districtId);
 
-        return getSubDistrictByDistrict(null, districtId);
+        return getSubDistrictByDistrictInternal(null, districtId, false);
     }
 
     public List<SubDistrictDto> getSubDistrictByDistrict(String provinceId, String districtId) {
+        return getSubDistrictByDistrictInternal(provinceId, districtId, true);
+    }
+
+    private List<SubDistrictDto> getSubDistrictByDistrictInternal(
+            String provinceId, String districtId, boolean inferProvinceFromMasterData) {
         log.info("Get SubDistrict by province id : {}, district id : {}", provinceId, districtId);
 
         if (geothaiEnabled) {
@@ -198,7 +203,9 @@ public class AddressService {
                             dto.setNameTh(subdistrict.nameTh());
                             dto.setNameEn(subdistrict.nameEn());
                             dto.setZipCode(subdistrict.zipCode());
-                            addSubDistrictPrefix(dto, provinceId);
+                            addSubDistrictPrefix(dto, inferProvinceFromMasterData
+                                    ? StringUtils.defaultIfBlank(provinceId, district.provinceId())
+                                    : provinceId);
                             return dto;
                         });
                     })
@@ -217,8 +224,16 @@ public class AddressService {
 
         return SubDistrictEntities
                 .stream()
-                .map(addressMapper::toSubDistrictDto)
-                .peek(subdistrict -> addSubDistrictPrefix(subdistrict, provinceId))
+                .map(entity -> {
+                    SubDistrictDto subdistrict = addressMapper.toSubDistrictDto(entity);
+                    String entityProvinceId = entity.getDistrict() == null || entity.getDistrict().getProvince() == null
+                            ? null
+                            : entity.getDistrict().getProvince().getId();
+                    addSubDistrictPrefix(subdistrict, inferProvinceFromMasterData
+                            ? StringUtils.defaultIfBlank(provinceId, entityProvinceId)
+                            : provinceId);
+                    return subdistrict;
+                })
                 .toList();
     }
 
@@ -286,7 +301,11 @@ public class AddressService {
 
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record GeoThaiDistrictWithSubDistricts(String id, List<GeoThaiSubDistrict> subdistricts) {
+    private record GeoThaiDistrictWithSubDistricts(
+            String id,
+            String provinceId,
+            List<GeoThaiSubDistrict> subdistricts
+    ) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
