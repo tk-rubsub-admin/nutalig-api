@@ -208,7 +208,7 @@ public class DashboardService {
         }
         return distributionChart(
                 "purchase-order-by-creator",
-                "สัดส่วน PO ตามผู้จัดซื้อที่เปิดบิล",
+                "สัดส่วน PO ตามจัดซื้อที่เปิดบิล",
                 "นับจากผู้สร้าง PO (createdBy)",
                 items,
                 ALL_RFQ_VISIBLE_TO
@@ -218,7 +218,7 @@ public class DashboardService {
     private String getPurchaseOrderCreatorLabel(UserEntity user) {
         if (user == null) return "ไม่ระบุผู้สร้าง";
         return StringUtils.defaultIfBlank(
-                StringUtils.defaultIfBlank(user.getDisplayName(), user.getUsername()),
+                user.getEmployeeEntity().getNickName(),
                 user.getId()
         );
     }
