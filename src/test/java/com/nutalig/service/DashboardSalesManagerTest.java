@@ -32,6 +32,7 @@ class DashboardSalesManagerTest {
     @Mock ApprovalRequestRepository approvalRequestRepository;
     @Mock RequestPriceHeaderRepository requestPriceHeaderRepository;
     @Mock QuotationRepository quotationRepository;
+    @Mock PurchaseOrderRepository purchaseOrderRepository;
     @Mock RfqStatusTimelineRepository rfqStatusTimelineRepository;
     @Mock BusinessDurationService businessDurationService;
     @Spy AppProperties appProperties = new AppProperties();

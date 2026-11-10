@@ -670,12 +670,24 @@ public class PurchaseOrderService {
 
         Integer oldRevNo = entity.getRevNo();
         Map<String, Object> before = buildPurchaseOrderSnapshot(entity);
+        boolean paymentTermChanged = false;
 
         if (request.getDocDate() != null) {
             entity.setDocDate(request.getDocDate());
         }
         entity.setProductionLeadTimeDay(request.getProductionLeadTimeDay());
         entity.setShippingLeadTimeDay(request.getShippingLeadTimeDay());
+        if (request.getPaymentTerm() != null) {
+            SystemConfigEntity requestedPaymentTerm = resolveSupplierPaymentTerm(request.getPaymentTerm());
+            String currentPaymentTerm = entity.getPaymentTerm() != null && entity.getPaymentTerm().getId() != null
+                    ? entity.getPaymentTerm().getId().getCode() : null;
+            String requestedPaymentTermCode = requestedPaymentTerm == null || requestedPaymentTerm.getId() == null
+                    ? null : requestedPaymentTerm.getId().getCode();
+            paymentTermChanged = !Objects.equals(currentPaymentTerm, requestedPaymentTermCode);
+            if (paymentTermChanged) {
+                entity.setPaymentTerm(requestedPaymentTerm);
+            }
+        }
         if (request.getRemark() != null) {
             entity.setRemark(StringUtils.trimToNull(request.getRemark()));
         }
@@ -688,6 +700,9 @@ public class PurchaseOrderService {
 
         recalculateTotals(entity);
         purchaseOrderPaymentService.validateAndRecalculateAfterOrderTotalChange(entity);
+        if (paymentTermChanged) {
+            purchaseOrderPaymentScheduleService.replaceSchedulesForPaymentTerm(entity);
+        }
         entity.setRevNo(defaultRevNo(oldRevNo) + 1);
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now(DateUtil.getTimeZone()));
@@ -2361,6 +2376,8 @@ public class PurchaseOrderService {
         snapshot.put("docDate", entity.getDocDate() != null ? entity.getDocDate().toString() : null);
         snapshot.put("productionLeadTimeDay", entity.getProductionLeadTimeDay());
         snapshot.put("shippingLeadTimeDay", entity.getShippingLeadTimeDay());
+        snapshot.put("paymentTerm", entity.getPaymentTerm() != null && entity.getPaymentTerm().getId() != null
+                ? entity.getPaymentTerm().getId().getCode() : null);
         snapshot.put("currency", entity.getCurrency() != null ? entity.getCurrency().name() : null);
         snapshot.put("subTotal", entity.getSubTotal());
         snapshot.put("subTotalThb", entity.getSubTotalThb());

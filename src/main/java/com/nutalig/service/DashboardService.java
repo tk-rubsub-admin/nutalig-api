@@ -7,6 +7,7 @@ import com.nutalig.config.AppProperties;
 import com.nutalig.dto.*;
 import com.nutalig.entity.*;
 import com.nutalig.repository.QuotationRepository;
+import com.nutalig.repository.PurchaseOrderRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.RfqStatusTimelineRepository;
 import com.nutalig.repository.ApprovalRequestRepository;
@@ -72,6 +73,7 @@ public class DashboardService {
 
     private final RequestPriceHeaderRepository requestPriceHeaderRepository;
     private final QuotationRepository quotationRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
     private final RfqStatusTimelineRepository rfqStatusTimelineRepository;
     private final BusinessDurationService businessDurationService;
     private final AppProperties appProperties;
@@ -133,6 +135,10 @@ public class DashboardService {
                 .collect(Collectors.toSet());
 
         List<LocalDate> months = enumerateMonths(startDate, endDate);
+        String fromPoMonth = months.getFirst().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        String toPoMonth = months.getLast().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        List<PurchaseOrderEntity> purchaseOrders = purchaseOrderRepository
+                .findByPoMonthBetween(fromPoMonth, toPoMonth);
         DashboardDataDto dashboard = new DashboardDataDto();
         dashboard.setRange("CUSTOM");
         dashboard.setDateFrom(startDate.toString());
@@ -141,15 +147,80 @@ public class DashboardService {
         dashboard.setSource("api");
         dashboard.setMetrics(buildMetrics(rfqs, startDate, endDate, selectedFilters));
         dashboard.setTrendCharts(buildTrendCharts(rfqs, startDate, endDate, roleCode));
+        dashboard.setPurchaseOrderCountChart(buildPurchaseOrderCountChart(purchaseOrders, startDate, endDate));
         dashboard.setAcceptWorkDurationChart(buildAcceptWorkDurationChart(rfqs, roleCode, months));
         dashboard.setSupplierQuoteDurationChart(buildSupplierQuoteDurationChart(rfqs, roleCode, months));
         dashboard.setProcurementKpiChart(buildProcurementKpiChart(rfqs, months));
         dashboard.setSalesCountChart(buildSalesCountChart(rfqs, roleCode, months));
         dashboard.setCustomerTypeCountChart(buildCustomerTypeCountChart(rfqs, roleCode, months));
-        dashboard.setDistributionCharts(buildDistributionCharts(rfqs, roleCode));
+        List<DashboardDistributionChartDto> distributionCharts = buildDistributionCharts(rfqs, roleCode);
+        distributionCharts.add(buildPurchaseOrderCreatorChart(purchaseOrders));
+        dashboard.setDistributionCharts(distributionCharts);
         dashboard.setWorkQueues(buildWorkQueues(rfqs, startDate, endDate, selectedFilters, rfqIdsWithQuotation));
         dashboard.setQuickLinks(buildQuickLinks(roleCode, startDate, endDate, selectedFilters));
         return dashboard;
+    }
+
+    private DashboardTrendChartDto buildPurchaseOrderCountChart(
+            List<PurchaseOrderEntity> purchaseOrders, LocalDate startDate, LocalDate endDate) {
+        List<LocalDate> months = enumerateMonths(startDate, endDate);
+        Map<String, Long> countsByPoMonth = purchaseOrders
+                .stream()
+                .filter(po -> StringUtils.isNotBlank(po.getPoMonth()))
+                .collect(Collectors.groupingBy(PurchaseOrderEntity::getPoMonth, Collectors.counting()));
+
+        DashboardTrendChartDto chart = new DashboardTrendChartDto();
+        chart.setId("purchase-order-count");
+        chart.setTitle("จำนวน PO ที่เปิดรายเดือน");
+        chart.setSubtitle("นับจากเดือน PO (po_month)");
+        chart.setUnit("COUNT");
+        chart.setLabels(months.stream().map(month -> month.format(REQUEST_DATE_FORMAT)).toList());
+        DashboardSeriesDto poSeries = new DashboardSeriesDto();
+        poSeries.setName("จำนวน PO");
+        poSeries.setColor(BRAND_GREEN);
+        poSeries.setData(months.stream()
+                .map(month -> countsByPoMonth
+                        .getOrDefault(month.format(DateTimeFormatter.ofPattern("yyyy-MM")), 0L)
+                        .doubleValue())
+                .toList());
+        chart.setSeries(List.of(poSeries));
+        chart.setVisibleTo(ALL_RFQ_VISIBLE_TO);
+        return chart;
+    }
+
+    private DashboardDistributionChartDto buildPurchaseOrderCreatorChart(List<PurchaseOrderEntity> purchaseOrders) {
+        List<DashboardDistributionItemDto> items = purchaseOrders.stream()
+                .map(PurchaseOrderEntity::getCreatedBy)
+                .map(this::getPurchaseOrderCreatorLabel)
+                .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(entry -> {
+                    DashboardDistributionItemDto item = new DashboardDistributionItemDto();
+                    item.setLabel(entry.getKey());
+                    item.setValue(entry.getValue());
+                    return item;
+                })
+                .toList();
+        for (int index = 0; index < items.size(); index++) {
+            items.get(index).setColor(distributionPaletteColor(index));
+        }
+        return distributionChart(
+                "purchase-order-by-creator",
+                "สัดส่วน PO ตามผู้จัดซื้อที่เปิดบิล",
+                "นับจากผู้สร้าง PO (createdBy)",
+                items,
+                ALL_RFQ_VISIBLE_TO
+        );
+    }
+
+    private String getPurchaseOrderCreatorLabel(UserEntity user) {
+        if (user == null) return "ไม่ระบุผู้สร้าง";
+        return StringUtils.defaultIfBlank(
+                StringUtils.defaultIfBlank(user.getDisplayName(), user.getUsername()),
+                user.getId()
+        );
     }
 
     private List<DashboardMetricDto> buildMetrics(

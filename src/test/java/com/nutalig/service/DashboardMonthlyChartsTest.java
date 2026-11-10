@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 class DashboardMonthlyChartsTest {
     @Mock RequestPriceHeaderRepository rfqRepository;
     @Mock QuotationRepository quotationRepository;
+    @Mock PurchaseOrderRepository purchaseOrderRepository;
     @Mock ApprovalRequestRepository approvalRequestRepository;
     @Mock RfqStatusTimelineRepository timelineRepository;
     @Mock BusinessDurationService businessDurationService;
@@ -307,7 +308,7 @@ class DashboardMonthlyChartsTest {
         config.getRfqPendingAcceptance().setNextDayStartTime(LocalTime.parse(nextDayStart));
         var realDurationService = new BusinessDurationService(calendarRepository);
         var dashboardService = new DashboardService(
-                approvalRequestRepository, rfqRepository, quotationRepository, timelineRepository,
+                approvalRequestRepository, rfqRepository, quotationRepository, purchaseOrderRepository, timelineRepository,
                 realDurationService, config
         );
         var row = rfq("CUTOFF", requestedAt, "A", null, 30L);

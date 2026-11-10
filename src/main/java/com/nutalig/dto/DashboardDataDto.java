@@ -14,6 +14,7 @@ public class DashboardDataDto {
     private String source;
     private List<DashboardMetricDto> metrics;
     private List<DashboardTrendChartDto> trendCharts;
+    private DashboardTrendChartDto purchaseOrderCountChart;
     private DashboardTrendChartDto acceptWorkDurationChart;
     private DashboardTrendChartDto supplierQuoteDurationChart;
     private DashboardTrendChartDto procurementKpiChart;

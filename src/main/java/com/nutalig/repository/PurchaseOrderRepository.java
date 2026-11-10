@@ -20,6 +20,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrderEnti
     List<PurchaseOrderEntity> findBySalesOrderSalesOrderNoAndSupplierShippingIdOrderByCreatedDateDesc(String salesOrderNo, Long supplierShippingId);
     List<PurchaseOrderEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
     List<PurchaseOrderEntity> findBySalesOrderSalesOrderNoIn(Collection<String> salesOrderNos);
+    List<PurchaseOrderEntity> findByPoMonthBetween(String fromPoMonth, String toPoMonth);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select po from PurchaseOrderEntity po where po.purchaseOrderNo = :purchaseOrderNo")

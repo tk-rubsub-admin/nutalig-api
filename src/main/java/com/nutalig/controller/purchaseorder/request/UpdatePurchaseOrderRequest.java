@@ -10,6 +10,7 @@ public class UpdatePurchaseOrderRequest {
     private LocalDate docDate;
     private Integer productionLeadTimeDay;
     private Integer shippingLeadTimeDay;
+    private String paymentTerm;
     private String remark;
     private String lateStartReason;
     private List<UpdatePurchaseOrderDetailRequest> items;

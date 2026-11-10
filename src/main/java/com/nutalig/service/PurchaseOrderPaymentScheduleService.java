@@ -3,6 +3,7 @@ package com.nutalig.service;
 import com.nutalig.constant.PurchaseOrderPaymentScheduleStatus;
 import com.nutalig.constant.PurchaseOrderPaymentStatus;
 import com.nutalig.constant.PurchaseOrderPaymentType;
+import com.nutalig.constant.PurchaseOrderPaymentInstructionStatus;
 import com.nutalig.dto.PurchaseOrderPaymentScheduleDto;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.PurchaseOrderPaymentEntity;
@@ -173,6 +174,44 @@ public class PurchaseOrderPaymentScheduleService {
             allocated = allocated.add(amount);
             allocatedThb = allocatedThb.add(amountThb);
         }
+    }
+
+    @Transactional
+    public void replaceSchedulesForPaymentTerm(PurchaseOrderEntity purchaseOrder)
+            throws com.nutalig.exception.InvalidRequestException {
+        if (purchaseOrder == null) return;
+
+        boolean hasPayment = purchaseOrder.getPayments().stream()
+                .anyMatch(payment -> payment.getStatus() == PurchaseOrderPaymentStatus.PENDING
+                        || payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED);
+        if (hasPayment) {
+            throw new com.nutalig.exception.InvalidRequestException(
+                    "Purchase order payment term cannot be changed after payment creation.");
+        }
+
+        List<Long> scheduleIds = purchaseOrder.getPaymentSchedules().stream()
+                .map(PurchaseOrderPaymentScheduleEntity::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (instructionRepository != null && !scheduleIds.isEmpty()) {
+            boolean hasInstruction = instructionRepository.findBySchedule_IdIn(scheduleIds).stream()
+                    .anyMatch(instruction -> instruction.getStatus() != PurchaseOrderPaymentInstructionStatus.CANCELLED);
+            if (hasInstruction) {
+                throw new com.nutalig.exception.InvalidRequestException(
+                        "Purchase order payment term cannot be changed after payment instruction creation.");
+            }
+        }
+
+        List<PurchaseOrderPaymentScheduleEntity> oldSchedules = new ArrayList<>(purchaseOrder.getPaymentSchedules());
+        int temporaryInstallmentNo = -1;
+        for (PurchaseOrderPaymentScheduleEntity schedule : oldSchedules) {
+            schedule.setInstallmentNo(temporaryInstallmentNo--);
+        }
+        scheduleRepository.flush();
+        scheduleRepository.deleteAll(oldSchedules);
+        scheduleRepository.flush();
+        purchaseOrder.getPaymentSchedules().clear();
+        initializeSchedules(purchaseOrder, ZonedDateTime.now());
     }
 
     List<BigDecimal> derivePercentages(String paymentTermCode) {
