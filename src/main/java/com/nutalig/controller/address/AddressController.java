@@ -60,7 +60,8 @@ public class AddressController {
             @PathVariable("amphureId") String amphureId) {
         log.info("=== Start get tumbon by province and amphure ===");
 
-        List<SubDistrictDto> SubDistrictDtos = addressService.getSubDistrictByDistrict(amphureId.trim());
+        List<SubDistrictDto> SubDistrictDtos = addressService.getSubDistrictByDistrict(
+                provinceId.trim(), amphureId.trim());
 
         log.info("=== End get tumbon by province and amphure ===");
         return new GeneralResponse<>(SUCCESS, SubDistrictDtos);

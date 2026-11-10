@@ -117,6 +117,7 @@ public class AddressService {
                         }
                         return province.districts().stream().map(district -> {
                             district.setProvinceId(province.id());
+                            addDistrictPrefix(district, province.id());
                             return district;
                         });
                     })
@@ -136,11 +137,39 @@ public class AddressService {
         return districtEntities
                 .stream()
                 .map(addressMapper::toDistrictDto)
+                .peek(district -> addDistrictPrefix(district, provinceId))
                 .toList();
+    }
+
+    /**
+     * Keeps the district label consistent for address dropdowns without
+     * changing the master data stored in the database or returned by GeoThai.
+     * Province id 1 is Bangkok, where districts are called "เขต". Other
+     * provinces use "อำเภอ".
+     */
+    private void addDistrictPrefix(DistrictDto district, String provinceId) {
+        if (district == null || StringUtils.isBlank(district.getNameTh())) {
+            return;
+        }
+
+        String name = district.getNameTh().trim();
+        if (name.startsWith("เขต") || name.startsWith("อำเภอ")) {
+            district.setNameTh(name);
+            return;
+        }
+
+        String prefix = "1".equals(StringUtils.trimToEmpty(provinceId)) ? "เขต" : "อำเภอ";
+        district.setNameTh(prefix + name);
     }
 
     public List<SubDistrictDto> getSubDistrictByDistrict(String districtId) {
         log.info("Get SubDistrict by District id : {}", districtId);
+
+        return getSubDistrictByDistrict(null, districtId);
+    }
+
+    public List<SubDistrictDto> getSubDistrictByDistrict(String provinceId, String districtId) {
+        log.info("Get SubDistrict by province id : {}, district id : {}", provinceId, districtId);
 
         if (geothaiEnabled) {
             String normalizedDistrictId = StringUtils.trimToEmpty(districtId);
@@ -169,6 +198,7 @@ public class AddressService {
                             dto.setNameTh(subdistrict.nameTh());
                             dto.setNameEn(subdistrict.nameEn());
                             dto.setZipCode(subdistrict.zipCode());
+                            addSubDistrictPrefix(dto, provinceId);
                             return dto;
                         });
                     })
@@ -188,7 +218,30 @@ public class AddressService {
         return SubDistrictEntities
                 .stream()
                 .map(addressMapper::toSubDistrictDto)
+                .peek(subdistrict -> addSubDistrictPrefix(subdistrict, provinceId))
                 .toList();
+    }
+
+    /**
+     * Keeps the subdistrict label consistent for address dropdowns. Province
+     * id 1 is Bangkok, where subdistricts are called "แขวง". Other provinces
+     * use "ตำบล". A null/blank province id preserves the legacy service
+     * method behaviour for internal callers that only provide district id.
+     */
+    private void addSubDistrictPrefix(SubDistrictDto subdistrict, String provinceId) {
+        if (subdistrict == null || StringUtils.isBlank(provinceId)
+                || StringUtils.isBlank(subdistrict.getNameTh())) {
+            return;
+        }
+
+        String name = subdistrict.getNameTh().trim();
+        if (name.startsWith("แขวง") || name.startsWith("ตำบล")) {
+            subdistrict.setNameTh(name);
+            return;
+        }
+
+        String prefix = "1".equals(StringUtils.trimToEmpty(provinceId)) ? "แขวง" : "ตำบล";
+        subdistrict.setNameTh(prefix + name);
     }
 
     public ProvinceEntity getProvinceEntity(String provinceId) throws DataNotFoundException {
