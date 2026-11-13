@@ -1615,6 +1615,7 @@ public class RFQService {
         BigDecimal shippingCost = Optional.ofNullable(request.getShippingCost()).orElse(BigDecimal.ZERO);
         String actor = userProfileService.getNameFromId(userId);
         tierSplitEntity.setSupplier(supplier);
+        tierSplitEntity.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
         tierSplitEntity.setQuantity(request.getQuantity());
         tierSplitEntity.setProductPrice(scaleMoney(request.getProductPrice()));
         tierSplitEntity.setSellPrice(scaleMoney(request.getSellPrice()));
@@ -3643,6 +3644,7 @@ public class RFQService {
     ) throws InvalidRequestException {
         RfqTierSplitEntity tier = new RfqTierSplitEntity();
         tier.setSupplier(supplier);
+        tier.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
         tier.setQuantity(quantity);
         tier.setProductPrice(scaleMoney(request.getProductPrice()));
         tier.setSellPrice(scaleMoney(request.getSellPrice()));

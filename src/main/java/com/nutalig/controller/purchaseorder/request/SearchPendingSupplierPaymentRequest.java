@@ -1,5 +1,6 @@
 package com.nutalig.controller.purchaseorder.request;
 
+import com.nutalig.constant.PurchaseOrderPaymentScheduleStatus;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -10,4 +11,5 @@ public class SearchPendingSupplierPaymentRequest {
     private LocalDate docDateStart;
     private LocalDate docDateEnd;
     private String keyword;
+    private PurchaseOrderPaymentScheduleStatus scheduleStatus;
 }

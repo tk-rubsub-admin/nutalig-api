@@ -44,9 +44,9 @@ public class IdWithMonthGenerator implements IdentifierGenerator,Configurable {
                 .max(Long::compareTo) // Get the max number
                 .orElse(0L);
         if (max == 0L && localDate.isEqual(localDate.withDayOfMonth(1))) {
-            return idPrefix + monthStr +  String.format("%06d",(0L + 1));
+            return idPrefix + monthStr + String.format("%04d", 1L);
         }
-        return idPrefix + monthStr +  String.format("%06d",(max + 1));
+        return idPrefix + monthStr + String.format("%04d", max + 1);
     }
 
     @Override

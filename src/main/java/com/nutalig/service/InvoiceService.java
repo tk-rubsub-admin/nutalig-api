@@ -18,6 +18,7 @@ import com.nutalig.dto.InvoiceDetailDto;
 import com.nutalig.dto.InvoiceDto;
 import com.nutalig.dto.InvoicePaymentDto;
 import com.nutalig.dto.InvoicePaymentSlipFileDto;
+import com.nutalig.dto.InvoicePendingPaymentDto;
 import com.nutalig.dto.QuotationCustomerSnapshotDto;
 import com.nutalig.dto.SystemConfigDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
@@ -32,6 +33,7 @@ import com.nutalig.mapper.UserMapper;
 import com.nutalig.mapper.SystemConfigMapper;
 import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.InvoicePaymentAttachmentRepository;
+import com.nutalig.repository.InvoicePaymentRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.UserRepository;
@@ -84,6 +86,7 @@ public class InvoiceService {
     private final ReportService reportService;
     private final FileStorageService fileStorageService;
     private final InvoicePaymentAttachmentRepository invoicePaymentAttachmentRepository;
+    private final InvoicePaymentRepository invoicePaymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
@@ -497,6 +500,98 @@ public class InvoiceService {
                 .invoice(mapToDto(saved))
                 .paymentId(payment.getId())
                 .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto approveAwaitingValidation(String invoiceNo, Long paymentId, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        InvoicePaymentEntity payment = resolvePayment(invoice, paymentId);
+        if (payment.getStatus() != InvoicePaymentStatus.PENDING) {
+            throw new InvalidRequestException("Invoice payment is already processed.");
+        }
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        payment.setStatus(InvoicePaymentStatus.APPROVE);
+        updateAllocationStatuses(payment, "APPROVED");
+        payment.setUpdatedBy(userRepository.findById(userId).orElse(null));
+        payment.setUpdatedDate(now);
+        invoice.setStatus(resolveValidatedInvoiceStatus(invoice));
+        invoice.setUpdatedBy(userRepository.findById(userId).orElse(null));
+        invoice.setUpdatedDate(now);
+        InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
+        markSalesOrderReadyForProcurementIfFirstInstallmentPaid(saved, userId);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
+        salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
+        recordAwaitingValidationDecisionActivity(saved, payment, ActivityAction.APPROVE,
+                "อนุมัติการรับชำระเงินในระบบ");
+        return mapToDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto rejectAwaitingValidation(String invoiceNo, Long paymentId, String reason, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (StringUtils.isBlank(reason)) {
+            throw new InvalidRequestException("reason is required.");
+        }
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        InvoicePaymentEntity payment = resolvePayment(invoice, paymentId);
+        if (payment.getStatus() != InvoicePaymentStatus.PENDING) {
+            throw new InvalidRequestException("Invoice payment is already processed.");
+        }
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        BigDecimal nextPaidTotal = defaultIfNull(invoice.getPaidTotal()).subtract(defaultIfNull(payment.getAmount()));
+        if (nextPaidTotal.compareTo(BigDecimal.ZERO) < 0) nextPaidTotal = BigDecimal.ZERO;
+        BigDecimal nextOutstandingTotal = defaultIfNull(invoice.getGrandTotal()).subtract(nextPaidTotal);
+        if (nextOutstandingTotal.compareTo(BigDecimal.ZERO) < 0) nextOutstandingTotal = BigDecimal.ZERO;
+        payment.setStatus(InvoicePaymentStatus.REJECT);
+        updateAllocationStatuses(payment, "REJECTED");
+        payment.setUpdatedBy(userRepository.findById(userId).orElse(null));
+        payment.setUpdatedDate(now);
+        invoice.setPaidTotal(nextPaidTotal);
+        invoice.setOutstandingTotal(nextOutstandingTotal);
+        invoice.setStatus(resolveValidatedInvoiceStatus(invoice));
+        invoice.setUpdatedBy(userRepository.findById(userId).orElse(null));
+        invoice.setUpdatedDate(now);
+        InvoiceEntity saved = invoiceRepository.save(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
+        salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
+        recordAwaitingValidationDecisionActivity(saved, payment, ActivityAction.REJECT,
+                "ปฏิเสธการรับชำระเงินในระบบ: " + reason.trim());
+        return mapToDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InvoicePendingPaymentDto> getPendingInvoicePayments() {
+        return invoicePaymentRepository.findByStatusOrderByCreatedDateAsc(InvoicePaymentStatus.PENDING)
+                .stream()
+                .map(payment -> {
+                    InvoiceEntity invoice = payment.getInvoice();
+                    InvoicePendingPaymentDto dto = new InvoicePendingPaymentDto();
+                    dto.setPaymentId(payment.getId());
+                    dto.setInvoiceNo(invoice.getInvoiceNo());
+                    dto.setSalesOrderNo(invoice.getSalesOrder() == null ? null : invoice.getSalesOrder().getSalesOrderNo());
+                    dto.setCustomerId(invoice.getCustomer() == null ? null : invoice.getCustomer().getId());
+                    dto.setCustomerName(invoice.getCustomerNameSnapshot() != null
+                            ? invoice.getCustomerNameSnapshot()
+                            : invoice.getCustomer() == null ? null : invoice.getCustomer().getCustomerName());
+                    dto.setAmount(payment.getAmount());
+                    dto.setReceivedAmount(payment.getReceivedAmount());
+                    dto.setUnallocatedAmount(payment.getUnallocatedAmount());
+                    dto.setPaymentMethod(payment.getPaymentMethod());
+                    dto.setPaymentDate(payment.getPaymentDate());
+                    dto.setCreatedDate(payment.getCreatedDate());
+                    dto.setStatus(payment.getStatus());
+                    dto.setSlipFileName(payment.getSlipFileName());
+                    dto.setSlipFileUrl(payment.getSlipFileUrl());
+                    return dto;
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

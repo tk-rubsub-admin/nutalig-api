@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 
 @Data
 public class UpdateRequestPriceTierSplitRequest {
+    private Long supplierQuoteTierId;
     private BigDecimal quantity;
     private BigDecimal productPrice;
     private BigDecimal sellPrice;

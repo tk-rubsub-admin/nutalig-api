@@ -2519,12 +2519,14 @@ public class PurchaseOrderService {
     }
 
     private String buildPaymentTermLabel(String code) {
-        if (code.startsWith("DEP_50")) {
+        if (code.startsWith("DEP50")) {
             return "Dep 50%";
         } else if (code.startsWith("DEP_30")) {
             return "Dep 30%";
+        } else if (code.startsWith("DEP_40")) {
+            return "Dep 40%";
         } else {
-            return null;
+            return "Full payment";
         }
     }
 }

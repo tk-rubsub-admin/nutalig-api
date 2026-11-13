@@ -8,6 +8,7 @@ import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionReq
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
 import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
 import com.nutalig.controller.invoice.request.RejectInvoiceRequiredApproveRequest;
+import com.nutalig.controller.invoice.request.RejectInvoicePaymentRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.invoice.response.CreateInvoiceResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -15,6 +16,7 @@ import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.dto.InvoiceDto;
+import com.nutalig.dto.InvoicePendingPaymentDto;
 import com.nutalig.dto.document.DownloadDocumentDto;
 import com.nutalig.entity.InvoiceEntity;
 import com.nutalig.exception.DataNotFoundException;
@@ -75,6 +77,11 @@ public class InvoiceController {
 
         log.info("=== End get invoice by id {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @GetMapping("/pending-payments")
+    public GeneralResponse<List<InvoicePendingPaymentDto>> getPendingInvoicePayments() {
+        return new GeneralResponse<>(SUCCESS, invoiceService.getPendingInvoicePayments());
     }
 
     @PatchMapping("/{id}")
@@ -142,6 +149,26 @@ public class InvoiceController {
 
         log.info("=== End reject awaiting validation by token {} ===", response.getInvoice().getInvoiceNo());
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PostMapping("/{id}/payments/{paymentId}/approve")
+    public GeneralResponse<InvoiceDto> approveAwaitingValidation(
+            @PathVariable String id,
+            @PathVariable Long paymentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.approveAwaitingValidation(id, paymentId, userId));
+    }
+
+    @PostMapping("/{id}/payments/{paymentId}/reject")
+    public GeneralResponse<InvoiceDto> rejectAwaitingValidation(
+            @PathVariable String id,
+            @PathVariable Long paymentId,
+            @RequestBody RejectInvoicePaymentRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,
+                invoiceService.rejectAwaitingValidation(id, paymentId, request == null ? null : request.getReason(), userId));
     }
 
     @GetMapping("/sales-orders/{salesOrderId}")

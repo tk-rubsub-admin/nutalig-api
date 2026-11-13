@@ -29,7 +29,10 @@ public final class PendingSupplierPaymentSpecification {
             Join<PurchaseOrderPaymentScheduleEntity, PurchaseOrderEntity> purchaseOrder =
                     root.join("purchaseOrder", JoinType.INNER);
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP));
+            PurchaseOrderPaymentScheduleStatus scheduleStatus = request != null && request.getScheduleStatus() != null
+                    ? request.getScheduleStatus()
+                    : PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP;
+            predicates.add(cb.equal(root.get("status"), scheduleStatus));
             predicates.add(purchaseOrder.get("status").in(PurchaseOrderStatus.CANCELLED, PurchaseOrderStatus.CLOSED)
                     .not());
 

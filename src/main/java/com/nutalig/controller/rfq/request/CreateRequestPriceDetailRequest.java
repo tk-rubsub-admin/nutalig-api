@@ -53,6 +53,7 @@ public class CreateRequestPriceDetailRequest {
     @Data
     public static class CreateRequestPriceTierSplitRequest {
         private String supplierId;
+        private Long supplierQuoteTierId;
         private BigDecimal quantity;
         private BigDecimal productPrice;
         private BigDecimal sellPrice;

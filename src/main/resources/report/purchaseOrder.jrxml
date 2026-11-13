@@ -882,7 +882,7 @@ PURCHASE ORDER]]></text>
 				<rightPen lineWidth="0.5" lineStyle="Solid" lineColor="#000000"/>
 			</box>
 		</element>
-		<element kind="textField" uuid="345a5de3-3c26-4a11-bcc7-88055b698f85" x="417" y="20" width="52" height="20" fontName="Arial" fontSize="10.0" blankWhenNull="true" hTextAlign="Left" vTextAlign="Middle">
+		<element kind="textField" uuid="345a5de3-3c26-4a11-bcc7-88055b698f85" x="417" y="20" width="52" height="20" fontName="Arial" fontSize="10.0" textAdjust="ScaleFont" blankWhenNull="true" hTextAlign="Left" vTextAlign="Middle">
 			<paragraph lineSpacing="1_1_2" lineSpacingSize="2.0"/>
 			<expression><![CDATA[$P{paymentTerm}]]></expression>
 			<property name="com.jaspersoft.studio.unit.x" value="px"/>
