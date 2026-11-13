@@ -85,6 +85,7 @@ public class SalesOrderService {
     private final RequestPriceTierSplitRepository requestPriceTierSplitRepository;
     private final RFQService rfqService;
     private final RequestPriceTierRepository requestPriceTierRepository;
+    private final RfqSupplierQuoteTierRepository supplierQuoteTierRepository;
     private final QuotationRepository quotationRepository;
     private final CustomerRepository customerRepository;
     private final CustomerTierService customerTierService;
@@ -966,11 +967,9 @@ public class SalesOrderService {
         detail.setRfqTierSplitId(request.getRfqTierSplitId());
         detail.setQuotationDetailId(request.getQuotationDetailId());
         detail.setShippingMethod(normalizeShippingType(request.getShippingMethod()));
-        detail.setSupplierCurrency(request.getSupplierCurrency());
-        detail.setSupplierUnitPrice(request.getSupplierUnitPrice());
-        detail.setSupplierShippingCost(request.getSupplierShippingCost());
-        detail.setSupplierTotalUnitCost(request.getSupplierTotalUnitCost());
         detail.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
+        applySupplierQuoteTierCost(detail, request.getSupplierCurrency(), request.getSupplierUnitPrice(),
+                request.getSupplierShippingCost(), request.getSupplierTotalUnitCost());
         detail.setLineType(request.getLineType() == null
                 ? com.nutalig.constant.OrderLineType.PRODUCT
                 : request.getLineType());
@@ -1022,11 +1021,9 @@ public class SalesOrderService {
             detail.setRfqTierSplitId(itemRequest.getRfqTierSplitId());
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(normalizeShippingType(itemRequest.getShippingMethod()));
-            detail.setSupplierCurrency(itemRequest.getSupplierCurrency());
-            detail.setSupplierUnitPrice(itemRequest.getSupplierUnitPrice());
-            detail.setSupplierShippingCost(itemRequest.getSupplierShippingCost());
-            detail.setSupplierTotalUnitCost(itemRequest.getSupplierTotalUnitCost());
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            applySupplierQuoteTierCost(detail, itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
+                    itemRequest.getSupplierShippingCost(), itemRequest.getSupplierTotalUnitCost());
             detail.setLineType(itemRequest.getLineType() == null
                     ? com.nutalig.constant.OrderLineType.PRODUCT
                     : itemRequest.getLineType());
@@ -1034,6 +1031,31 @@ public class SalesOrderService {
             nextItems.add(detail);
         }
 
+    }
+
+    private void applySupplierQuoteTierCost(
+            SalesOrderDetailEntity detail,
+            Currency requestedCurrency,
+            BigDecimal requestedUnitPrice,
+            BigDecimal requestedShippingCost,
+            BigDecimal requestedTotalUnitCost
+    ) throws DataNotFoundException {
+        if (detail.getSupplierQuoteTierId() == null) {
+            detail.setSupplierCurrency(requestedCurrency);
+            detail.setSupplierUnitPrice(requestedUnitPrice);
+            detail.setSupplierShippingCost(requestedShippingCost);
+            detail.setSupplierTotalUnitCost(requestedTotalUnitCost);
+            return;
+        }
+
+        RfqSupplierQuoteTierEntity tier = supplierQuoteTierRepository.findById(detail.getSupplierQuoteTierId())
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Supplier quote tier " + detail.getSupplierQuoteTierId() + " not found."));
+        BigDecimal shippingCost = defaultIfNull(tier.getShippingCost());
+        detail.setSupplierCurrency(tier.getCurrency());
+        detail.setSupplierUnitPrice(tier.getProductPrice());
+        detail.setSupplierShippingCost(shippingCost);
+        detail.setSupplierTotalUnitCost(tier.getProductPrice().add(shippingCost));
     }
 
     private List<UpdateSalesOrderDetailRequest> toUpdateItemRequests(Set<SalesOrderDetailEntity> items) {

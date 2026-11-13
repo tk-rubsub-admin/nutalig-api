@@ -232,16 +232,9 @@ public class PurchaseOrderService {
             detail.setQuantity(requestedItem == null || requestedItem.getQuantity() == null
                     ? defaultIfNull(sourceItem.getQuantity())
                     : requestedItem.getQuantity());
-            detail.setSupplierCurrency(requestedItem == null || requestedItem.getSupplierCurrency() == null
-                    ? sourceItem.getSupplierCurrency()
-                    : requestedItem.getSupplierCurrency());
-            detail.setSupplierUnitPrice(requestedItem == null || requestedItem.getSupplierUnitPrice() == null
-                    ? defaultIfNull(sourceItem.getSupplierUnitPrice())
-                    : requestedItem.getSupplierUnitPrice());
-            detail.setSupplierShippingCost(requestedItem == null || requestedItem.getSupplierShippingCost() == null
-                    ? defaultIfNull(sourceItem.getSupplierShippingCost())
-                    : requestedItem.getSupplierShippingCost());
-            detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
+            applySupplierQuoteTierCost(detail, sourceItem.getSupplierQuoteTierId(),
+                    sourceItem.getSupplierCurrency(), sourceItem.getSupplierUnitPrice(),
+                    sourceItem.getSupplierShippingCost(), sourceItem.getSupplierTotalUnitCost());
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
@@ -1663,6 +1656,33 @@ public class PurchaseOrderService {
         }
     }
 
+    private void applySupplierQuoteTierCost(
+            PurchaseOrderDetailEntity detail,
+            Long supplierQuoteTierId,
+            Currency requestedCurrency,
+            BigDecimal requestedUnitPrice,
+            BigDecimal requestedShippingCost,
+            BigDecimal requestedTotalUnitCost
+    ) throws DataNotFoundException {
+        if (supplierQuoteTierId == null) {
+            detail.setSupplierCurrency(requestedCurrency);
+            detail.setSupplierUnitPrice(requestedUnitPrice);
+            detail.setSupplierShippingCost(requestedShippingCost);
+            detail.setSupplierTotalUnitCost(requestedTotalUnitCost != null
+                    ? requestedTotalUnitCost
+                    : defaultIfNull(requestedUnitPrice).add(defaultIfNull(requestedShippingCost)));
+            return;
+        }
+
+        RfqSupplierQuoteTierEntity tier = rfqSupplierQuoteTierRepository.findById(supplierQuoteTierId)
+                .orElseThrow(() -> new DataNotFoundException("Supplier quote tier " + supplierQuoteTierId + " not found."));
+        BigDecimal shippingCost = defaultIfNull(tier.getShippingCost());
+        detail.setSupplierCurrency(tier.getCurrency());
+        detail.setSupplierUnitPrice(tier.getProductPrice());
+        detail.setSupplierShippingCost(shippingCost);
+        detail.setSupplierTotalUnitCost(tier.getProductPrice().add(shippingCost));
+    }
+
     private OrderLineType resolvePurchaseOrderLineType(
             OrderLineType requestedLineType,
             OrderLineType previousLineType,
@@ -1688,7 +1708,8 @@ public class PurchaseOrderService {
         throw new IllegalStateException("Cannot generate an unused purchase order number");
     }
 
-    private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests) throws InvalidRequestException {
+    private void replacePurchaseOrderItems(PurchaseOrderEntity entity, List<UpdatePurchaseOrderDetailRequest> itemRequests)
+            throws DataNotFoundException, InvalidRequestException {
         Map<Long, PurchaseOrderDetailEntity> existingById = new HashMap<>();
         for (PurchaseOrderDetailEntity item : entity.getItems()) {
             if (item.getId() != null) {
@@ -1716,10 +1737,6 @@ public class PurchaseOrderService {
             detail.setSize(StringUtils.trimToNull(itemRequest.getSize()));
             detail.setSpec(StringUtils.trimToNull(itemRequest.getSpec()));
             detail.setQuantity(defaultIfNull(itemRequest.getQuantity()));
-            detail.setSupplierCurrency(itemRequest.getSupplierCurrency() != null ? itemRequest.getSupplierCurrency() : entity.getCurrency());
-            detail.setSupplierUnitPrice(defaultIfNull(itemRequest.getSupplierUnitPrice()));
-            detail.setSupplierShippingCost(defaultIfNull(itemRequest.getSupplierShippingCost()));
-            detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
             detail.setImageUrl(StringUtils.trimToNull(itemRequest.getImageUrl()));
             detail.setRfqDetailId(itemRequest.getRfqDetailId());
             detail.setRfqTierId(itemRequest.getRfqTierId());
@@ -1728,6 +1745,9 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
+            applySupplierQuoteTierCost(detail, detail.getSupplierQuoteTierId(),
+                    itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
+                    itemRequest.getSupplierShippingCost(), null);
             detail.setLineType(resolvePurchaseOrderLineType(
                     itemRequest.getLineType(),
                     previousItem == null ? null : previousItem.getLineType(),
