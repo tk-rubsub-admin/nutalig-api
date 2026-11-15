@@ -3172,3 +3172,7 @@ databaseChangeLog:
       file: db/changelog/20261105-003-create-customer-billing-profile.yaml
   - include:
       file: db/changelog/20261105-004-add-billing-profile-type.yaml
+  - include:
+      file: db/changelog/20261115-001-sync-sales-order-status-from-procurement.yaml
+  - include:
+      file: db/changelog/20261115-002-backfill-po-start-run-status.yaml

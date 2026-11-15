@@ -4,6 +4,7 @@ import com.nutalig.constant.PurchaseOrderPaymentScheduleStatus;
 import com.nutalig.constant.PurchaseOrderPaymentStatus;
 import com.nutalig.constant.PurchaseOrderPaymentType;
 import com.nutalig.constant.PurchaseOrderPaymentInstructionStatus;
+import com.nutalig.constant.PurchaseOrderStatus;
 import com.nutalig.dto.PurchaseOrderPaymentScheduleDto;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.entity.PurchaseOrderPaymentEntity;
@@ -149,6 +150,32 @@ public class PurchaseOrderPaymentScheduleService {
             } else {
                 schedule.setStatus(PurchaseOrderPaymentScheduleStatus.PARTIALLY_PAID);
             }
+        }
+        syncPurchaseOrderStatus(purchaseOrder);
+    }
+
+    private void syncPurchaseOrderStatus(PurchaseOrderEntity purchaseOrder) {
+        if (purchaseOrder.getStatus() == PurchaseOrderStatus.CANCELLED
+                || purchaseOrder.getStatus() == PurchaseOrderStatus.CLOSED
+                || purchaseOrder.getStatus() == PurchaseOrderStatus.JOB_STARTED
+                || purchaseOrder.getStatus() == PurchaseOrderStatus.PRODUCTION_RUNNING
+                || purchaseOrder.getStatus() == PurchaseOrderStatus.PRODUCTION_COMPLETED) {
+            return;
+        }
+        PurchaseOrderPaymentScheduleEntity firstSchedule = purchaseOrder.getPaymentSchedules().stream()
+                .filter(schedule -> Objects.equals(schedule.getInstallmentNo(), 1))
+                .findFirst()
+                .orElse(null);
+        if (firstSchedule == null) return;
+
+        if (firstSchedule.getStatus() == PurchaseOrderPaymentScheduleStatus.PAID) {
+            purchaseOrder.setStatus(PurchaseOrderStatus.AWAITING_START_RUN);
+        } else if (firstSchedule.getStatus() == PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT
+                || firstSchedule.getStatus() == PurchaseOrderPaymentScheduleStatus.PARTIALLY_PAID) {
+            purchaseOrder.setStatus(PurchaseOrderStatus.AWAITING_PAYMENT);
+        } else if (firstSchedule.getStatus() == PurchaseOrderPaymentScheduleStatus.AWAITING_PAYMENT_SETUP
+                && purchaseOrder.getStatus() == PurchaseOrderStatus.AWAITING_PAYMENT) {
+            purchaseOrder.setStatus(PurchaseOrderStatus.CREATED);
         }
     }
 

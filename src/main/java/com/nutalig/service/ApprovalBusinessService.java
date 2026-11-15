@@ -436,6 +436,7 @@ public class ApprovalBusinessService {
         entity.setUrgentRejectedBy(null);
         entity.setUrgentRejectedDate(null);
         entity.setUrgentRejectReason(null);
+        entity.setStatus(SalesOrderStatus.READY_FOR_PO);
         entity.setProcurementStatus(ProcurementStatus.READY_FOR_PO_OVERRIDE);
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);

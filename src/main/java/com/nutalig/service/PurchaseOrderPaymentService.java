@@ -455,10 +455,12 @@ public class PurchaseOrderPaymentService {
 
         if (purchaseOrder.getStatus() != PurchaseOrderStatus.CANCELLED
                 && purchaseOrder.getStatus() != PurchaseOrderStatus.CLOSED
-                && purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING) {
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.AWAITING_START_RUN
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.JOB_STARTED
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_COMPLETED) {
             purchaseOrder.setStatus(purchaseOrder.getPaymentStatus() == PurchaseOrderPaymentLifecycleStatus.PAID
-                    ? PurchaseOrderStatus.PAID
-                    : PurchaseOrderStatus.AWAITING_PAYMENT);
+                    ? PurchaseOrderStatus.PAID : PurchaseOrderStatus.AWAITING_PAYMENT);
         }
     }
 

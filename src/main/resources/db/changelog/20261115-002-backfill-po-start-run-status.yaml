@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261115-002-backfill-po-start-run-status
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE purchase_order po
+              SET status = 'AWAITING_START_RUN', updated_date = CURRENT_TIMESTAMP
+              WHERE po.status = 'PAID'
+                AND EXISTS (
+                    SELECT 1
+                    FROM purchase_order_payment_schedule schedule
+                    WHERE schedule.purchase_order_no = po.purchase_order_no
+                      AND schedule.installment_no = 1
+                      AND schedule.status = 'PAID'
+                );

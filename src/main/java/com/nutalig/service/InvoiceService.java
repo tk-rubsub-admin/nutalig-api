@@ -217,6 +217,10 @@ public class InvoiceService {
 
         entity.setPaymentSchedule(paymentSchedule);
         invoiceRepository.save(entity);
+        salesOrder.setStatus(SalesOrderStatus.WAITING_PAYMENT);
+        salesOrder.setUpdatedBy(user);
+        salesOrder.setUpdatedDate(now);
+        salesOrderRepository.save(salesOrder);
         if (paymentSchedule != null) {
             salesOrderPaymentScheduleService.recalculateStatuses(salesOrder.getSalesOrderNo());
         }
@@ -1273,6 +1277,7 @@ public class InvoiceService {
         }
 
         ProcurementStatus beforeStatus = salesOrder.getProcurementStatus();
+        salesOrder.setStatus(SalesOrderStatus.READY_FOR_PO);
         salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
         salesOrderRepository.save(salesOrder);
         recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);
@@ -1305,6 +1310,7 @@ public class InvoiceService {
         }
 
         ProcurementStatus beforeStatus = salesOrder.getProcurementStatus();
+        salesOrder.setStatus(SalesOrderStatus.READY_FOR_PO);
         salesOrder.setProcurementStatus(ProcurementStatus.READY_FOR_PO);
         salesOrderRepository.save(salesOrder);
         recordReadyForProcurementActivity(salesOrder, beforeStatus, userId);

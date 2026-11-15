@@ -213,6 +213,7 @@ public class PurchaseOrderMilestoneService {
                 requireProofResolved(milestones, PurchaseOrderMilestoneCode.ON_PRESS_COLOR_CHECK,
                         "On-press color check must be approved or skipped first.");
                 purchaseOrder.setProductionCompletedDate(actualDate);
+                purchaseOrder.setStatus(PurchaseOrderStatus.PRODUCTION_COMPLETED);
                 mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_COMPLETED,
                         PurchaseOrderMilestoneStatus.COMPLETED, null, actualAt, note, userId);
                 mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_IN_PROGRESS,
@@ -251,7 +252,7 @@ public class PurchaseOrderMilestoneService {
     }
 
     private void startProductionIfProofsResolved(PurchaseOrderEntity purchaseOrder, String userId) {
-        if (purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING
+        if (purchaseOrder.getStatus() != PurchaseOrderStatus.JOB_STARTED
                 || purchaseOrder.getProductionStartedDate() != null
                 || purchaseOrder.getProductionCompletedDate() != null) {
             return;
@@ -292,6 +293,7 @@ public class PurchaseOrderMilestoneService {
             String note,
             String userId
     ) {
+        purchaseOrder.setStatus(PurchaseOrderStatus.PRODUCTION_RUNNING);
         purchaseOrder.setProductionStartedDate(actualAt.toLocalDate());
         purchaseOrder.setProductionExpectedEndDate(expectedEnd);
         mark(purchaseOrder, PurchaseOrderMilestoneCode.PRODUCTION_STARTED,

@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261115-001-sync-sales-order-status-from-procurement
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE sales_order
+              SET status = 'READY_FOR_PO', updated_date = CURRENT_TIMESTAMP
+              WHERE procurement_status IN ('READY_FOR_PO', 'READY_FOR_PO_OVERRIDE')
+                AND status NOT IN ('CANCELLED', 'REJECTED');
+        - sql:
+            sql: |
+              UPDATE sales_order
+              SET status = 'IN_PROGRESS', updated_date = CURRENT_TIMESTAMP
+              WHERE procurement_status = 'PO_CREATED'
+                AND status NOT IN ('CANCELLED', 'REJECTED', 'COMPLETED');

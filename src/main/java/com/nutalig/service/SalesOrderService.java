@@ -215,7 +215,7 @@ public class SalesOrderService {
     public boolean isReadyForPurchaseOrder(String salesOrderNo) throws DataNotFoundException {
         SalesOrderEntity entity = salesOrderRepository.findById(salesOrderNo)
                 .orElseThrow(() -> new DataNotFoundException("Sales order " + salesOrderNo + " not found."));
-        return entity.getProcurementStatus() == ProcurementStatus.READY_FOR_PO;
+        return entity.getStatus() == SalesOrderStatus.READY_FOR_PO;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -922,7 +922,7 @@ public class SalesOrderService {
                 .and(statusEqual(request.getStatus()))
                 .and(statusIn(request.getStatuses()))
                 .and(urgentRequestStatusEqual(request.getUrgentRequestStatus()))
-                .and(procurementStatusIn(request.getProcurementStatus()))
+                .and(statusIn(resolveSalesOrderStatusesForProcurementFilter(request.getProcurementStatus())))
                 .and(shippingTypeContains(request.getShippingType()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
@@ -936,6 +936,24 @@ public class SalesOrderService {
             return status;
         }
         throw new InvalidRequestException("status must be DRAFT or CREATED");
+    }
+
+    /** Transitional compatibility mapping while SalesOrderStatus becomes the source of truth. */
+    private List<SalesOrderStatus> resolveSalesOrderStatusesForProcurementFilter(
+            List<ProcurementStatus> procurementStatuses
+    ) {
+        if (procurementStatuses == null || procurementStatuses.isEmpty()) return null;
+        EnumSet<SalesOrderStatus> statuses = EnumSet.noneOf(SalesOrderStatus.class);
+        for (ProcurementStatus procurementStatus : procurementStatuses) {
+            if (procurementStatus == null) continue;
+            switch (procurementStatus) {
+                case NOT_READY -> statuses.addAll(EnumSet.of(
+                        SalesOrderStatus.DRAFT, SalesOrderStatus.CREATED, SalesOrderStatus.WAITING_PAYMENT));
+                case READY_FOR_PO, READY_FOR_PO_OVERRIDE -> statuses.add(SalesOrderStatus.READY_FOR_PO);
+                case PO_CREATED -> statuses.add(SalesOrderStatus.IN_PROGRESS);
+            }
+        }
+        return statuses.isEmpty() ? null : new ArrayList<>(statuses);
     }
 
     private SalesOrderDetailEntity buildDetail(
@@ -1479,7 +1497,7 @@ public class SalesOrderService {
             dto.setCommission(fallbackCommission);
         }
         dto.setCoSaleCommission(entity.getCoSaleCommission());
-        dto.setProcurementStatus(entity.getProcurementStatus());
+        dto.setProcurementStatus(deriveLegacyProcurementStatus(entity));
         dto.setShippingType(entity.getShippingType());
         dto.setRequestCoa(Boolean.TRUE.equals(entity.getRequestCoa()));
         dto.setRequestPo(Boolean.TRUE.equals(entity.getRequestPo()));
@@ -1583,6 +1601,19 @@ public class SalesOrderService {
         }
         dto.setItems(items);
         return dto;
+    }
+
+    /** Keeps the deprecated response field compatible while callers migrate to status. */
+    private ProcurementStatus deriveLegacyProcurementStatus(SalesOrderEntity entity) {
+        if (entity == null || entity.getStatus() == null) return null;
+        return switch (entity.getStatus()) {
+            case READY_FOR_PO -> Boolean.TRUE.equals(entity.getUrgentRequest())
+                    && entity.getUrgentRequestStatus() == UrgentRequestStatus.APPROVED
+                    ? ProcurementStatus.READY_FOR_PO_OVERRIDE
+                    : ProcurementStatus.READY_FOR_PO;
+            case IN_PROGRESS -> ProcurementStatus.PO_CREATED;
+            case DRAFT, CREATED, WAITING_PAYMENT, COMPLETED, REJECTED, CANCELLED -> ProcurementStatus.NOT_READY;
+        };
     }
 
     private SystemConfigEntity resolveCustomerPaymentTerm(String code) throws InvalidRequestException {

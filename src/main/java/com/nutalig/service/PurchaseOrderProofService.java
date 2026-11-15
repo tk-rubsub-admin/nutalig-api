@@ -360,8 +360,9 @@ public class PurchaseOrderProofService {
     }
 
     private void validateProductionRunning(PurchaseOrderEntity purchaseOrder) throws InvalidRequestException {
-        if (purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING) {
-            throw new InvalidRequestException("Proof can only be submitted while purchase order production is running.");
+        if (purchaseOrder.getStatus() != PurchaseOrderStatus.JOB_STARTED
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.PRODUCTION_RUNNING) {
+            throw new InvalidRequestException("Proof can only be submitted after the purchase order job has started.");
         }
     }
 

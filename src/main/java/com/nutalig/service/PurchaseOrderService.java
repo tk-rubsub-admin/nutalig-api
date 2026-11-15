@@ -122,9 +122,8 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
 
-        if (salesOrder.getProcurementStatus() != ProcurementStatus.READY_FOR_PO
-                && salesOrder.getProcurementStatus() != ProcurementStatus.READY_FOR_PO_OVERRIDE
-                && salesOrder.getProcurementStatus() != ProcurementStatus.PO_CREATED) {
+        if (salesOrder.getStatus() != SalesOrderStatus.READY_FOR_PO
+                && salesOrder.getStatus() != SalesOrderStatus.IN_PROGRESS) {
             throw new InvalidRequestException("Sales order is not ready for purchase order creation");
         }
 
@@ -328,18 +327,10 @@ public class PurchaseOrderService {
             );
         }
 
-        PurchaseOrderStatus createdStatus = entity.getStatus();
-        entity.setStatus(PurchaseOrderStatus.AWAITING_PAYMENT);
         entity.setUpdatedBy(user);
         entity.setUpdatedDate(now);
-        recordPurchaseOrderStatusChangeActivity(
-                entity,
-                userId,
-                createdStatus,
-                PurchaseOrderStatus.AWAITING_PAYMENT,
-                "เปลี่ยนสถานะใบสั่งซื้อเลขที่ " + entity.getPurchaseOrderNo() + " เป็นรอชำระเงิน"
-        );
 
+        salesOrder.setStatus(SalesOrderStatus.IN_PROGRESS);
         salesOrder.setProcurementStatus(ProcurementStatus.PO_CREATED);
         salesOrder.setUpdatedBy(user);
         salesOrder.setUpdatedDate(now);
@@ -737,8 +728,7 @@ public class PurchaseOrderService {
             throw new InvalidRequestException("lateStartReason is required when starting a late purchase order");
         }
 
-        boolean hasExpectedStatus = entity.getStatus() == PurchaseOrderStatus.AWAITING_PAYMENT
-                || entity.getStatus() == PurchaseOrderStatus.PAID;
+        boolean hasExpectedStatus = entity.getStatus() == PurchaseOrderStatus.AWAITING_START_RUN;
         boolean hasApprovedFirstPayment = entity.getPayments().stream()
                 .anyMatch(payment -> Objects.equals(payment.getInstallmentNo(), 1)
                         && payment.getStatus() == PurchaseOrderPaymentStatus.APPROVED);
@@ -760,7 +750,7 @@ public class PurchaseOrderService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
         PurchaseOrderStatus previousStatus = entity.getStatus();
-        entity.setStatus(PurchaseOrderStatus.PRODUCTION_RUNNING);
+        entity.setStatus(PurchaseOrderStatus.JOB_STARTED);
         entity.setStartRunOverrideReason(normalizedOverrideReason);
         if (lateStart) {
             entity.setLateStartReason(StringUtils.trimToNull(lateStartReason));
@@ -784,7 +774,7 @@ public class PurchaseOrderService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("purchaseOrderNo", purchaseOrderNo);
         detail.put("previousStatus", previousStatus != null ? previousStatus.name() : null);
-        detail.put("status", PurchaseOrderStatus.PRODUCTION_RUNNING.name());
+        detail.put("status", PurchaseOrderStatus.JOB_STARTED.name());
         detail.put("installmentNo", firstSchedule == null ? null : firstSchedule.getInstallmentNo());
         detail.put("scheduleId", firstSchedule == null ? null : firstSchedule.getId());
         detail.put("paidAmount", firstSchedule == null ? null : firstSchedule.getPaidAmount());
@@ -860,6 +850,7 @@ public class PurchaseOrderService {
         entity.setUpdatedDate(now);
 
         if (entity.getSalesOrder() != null && shouldRestoreSalesOrderProcurementStatus(entity)) {
+            entity.getSalesOrder().setStatus(SalesOrderStatus.READY_FOR_PO);
             entity.getSalesOrder().setProcurementStatus(ProcurementStatus.READY_FOR_PO);
             entity.getSalesOrder().setUpdatedBy(user);
             entity.getSalesOrder().setUpdatedDate(now);
@@ -1192,16 +1183,14 @@ public class PurchaseOrderService {
         if (request.getReceivedDate() != null && request.getReceivedDate().isBefore(request.getShippedDate())) {
             throw new InvalidRequestException("Received date cannot be before shipped date.");
         }
-        SupplierShippingEntity supplierShipping = purchaseOrder.getSupplierShipping();
-        String expectedShippingMethod = StringUtils.defaultIfBlank(
-                purchaseOrder.getShippingMethodSnapshot(),
-                supplierShipping == null || supplierShipping.getShippingMethod() == null
-                        ? null : supplierShipping.getShippingMethod().name()
-        );
-        if (StringUtils.isBlank(request.getShippingMethod())
-                || !StringUtils.equalsIgnoreCase(request.getShippingMethod().trim(), expectedShippingMethod)) {
-            throw new InvalidRequestException("Delivery shipping method must match the purchase order shipping method.");
+        String shippingMethod = StringUtils.upperCase(
+                StringUtils.trimToEmpty(request.getShippingMethod()), Locale.ROOT);
+        try {
+            ShippingMethod.valueOf(shippingMethod);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidRequestException("Delivery shipping method is invalid.");
         }
+        SupplierShippingEntity supplierShipping = purchaseOrder.getSupplierShipping();
         SupplierShippingDestinationEntity location = supplierShipping == null
                 ? null
                 : supplierShipping.getDestinations().stream()
@@ -1237,7 +1226,7 @@ public class PurchaseOrderService {
         delivery.setExpectedWarehouseDate(request.getExpectedWarehouseDate());
         delivery.setReceivedAt(request.getReceivedDate() == null ? null
                 : request.getReceivedDate().atStartOfDay(DateUtil.getTimeZone()));
-        delivery.setShippingMethod(request.getShippingMethod().trim());
+        delivery.setShippingMethod(shippingMethod);
         delivery.setContainerStatus(delivery.requiresContainer()
                 ? DeliveryContainerStatus.NOT_ASSIGNED
                 : null);
