@@ -234,6 +234,11 @@ public class PurchaseOrderService {
             detail.setQuantity(requestedItem == null || requestedItem.getQuantity() == null
                     ? defaultIfNull(sourceItem.getQuantity())
                     : requestedItem.getQuantity());
+            detail.setLineType(resolvePurchaseOrderLineType(
+                    requestedItem == null ? null : requestedItem.getLineType(),
+                    sourceItem.getLineType(),
+                    detail.getName()
+            ));
             applySupplierQuoteTierCost(detail, sourceItem.getSupplierQuoteTierId(),
                     sourceItem.getSupplierCurrency(), sourceItem.getSupplierUnitPrice(),
                     sourceItem.getSupplierShippingCost(), sourceItem.getSupplierTotalUnitCost());
@@ -253,11 +258,6 @@ public class PurchaseOrderService {
             detail.setShippingMethod(selection == null ? sourceItem.getShippingMethod()
                     : selection.shippingMethods().get(sourceItem.getId()));
             detail.setSupplierQuoteTierId(sourceItem.getSupplierQuoteTierId());
-            detail.setLineType(resolvePurchaseOrderLineType(
-                    requestedItem == null ? null : requestedItem.getLineType(),
-                    sourceItem.getLineType(),
-                    detail.getName()
-            ));
             purchaseOrderCbmService.snapshotFromSupplierQuote(detail);
             if (requestedItem != null && requestedItem.getComponents() != null) {
                 replaceComponents(detail, requestedItem.getComponents());
@@ -275,15 +275,13 @@ public class PurchaseOrderService {
             detail.setName(StringUtils.trimToEmpty(requestedItem.getName()));
             detail.setSpec(StringUtils.trimToEmpty(requestedItem.getSpec()));
             detail.setQuantity(defaultIfNull(requestedItem.getQuantity()));
+            detail.setLineType(resolvePurchaseOrderLineType(
+                    requestedItem.getLineType(), null, detail.getName()));
             detail.setSupplierCurrency(requestedItem.getSupplierCurrency() == null ? currency : requestedItem.getSupplierCurrency());
             detail.setSupplierUnitPrice(defaultIfNull(requestedItem.getSupplierUnitPrice()));
             detail.setSupplierShippingCost(defaultIfNull(requestedItem.getSupplierShippingCost()));
-            detail.setSupplierTotalUnitCost(detail.getSupplierUnitPrice().add(detail.getSupplierShippingCost()));
-            detail.setLineType(resolvePurchaseOrderLineType(
-                    requestedItem.getLineType(),
-                    null,
-                    detail.getName()
-            ));
+            detail.setSupplierTotalUnitCost(calculateSupplierTotalUnitCost(
+                    detail, detail.getSupplierUnitPrice(), detail.getSupplierShippingCost(), null));
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
@@ -1694,11 +1692,20 @@ public class PurchaseOrderService {
                 .and(salesOrderNoEqual(request.getSalesOrderNo()))
                 .and(salesIdEqual(request.getSalesId()))
                 .and(supplierIdEqual(request.getSupplierId()))
-                .and(statusEqual(request.getStatus()))
-                .and(statusIn(request.getStatuses()))
+                .and(statusFilter(request.getStatus(), request.getStatuses()))
                 .and(shippingMethodContains(request.getShippingMethod()))
                 .and(docDateBetween(request.getDocDateStart(), request.getDocDateEnd()))
                 .and(keywordContains(request.getKeyword()));
+    }
+
+    private Specification<PurchaseOrderEntity> statusFilter(
+            PurchaseOrderStatus status,
+            List<PurchaseOrderStatus> statuses
+    ) {
+        if (statuses != null && !statuses.isEmpty()) {
+            return statusIn(statuses);
+        }
+        return statusEqual(status);
     }
 
     private void validateCreateRequest(CreatePurchaseOrderRequest request, List<MultipartFile> attachments) throws InvalidRequestException {
@@ -1788,9 +1795,8 @@ public class PurchaseOrderService {
             detail.setSupplierCurrency(requestedCurrency);
             detail.setSupplierUnitPrice(requestedUnitPrice);
             detail.setSupplierShippingCost(requestedShippingCost);
-            detail.setSupplierTotalUnitCost(requestedTotalUnitCost != null
-                    ? requestedTotalUnitCost
-                    : defaultIfNull(requestedUnitPrice).add(defaultIfNull(requestedShippingCost)));
+            detail.setSupplierTotalUnitCost(calculateSupplierTotalUnitCost(
+                    detail, requestedUnitPrice, requestedShippingCost, requestedTotalUnitCost));
             return;
         }
 
@@ -1800,7 +1806,22 @@ public class PurchaseOrderService {
         detail.setSupplierCurrency(tier.getCurrency());
         detail.setSupplierUnitPrice(tier.getProductPrice());
         detail.setSupplierShippingCost(shippingCost);
-        detail.setSupplierTotalUnitCost(tier.getProductPrice().add(shippingCost));
+        detail.setSupplierTotalUnitCost(calculateSupplierTotalUnitCost(
+                detail, tier.getProductPrice(), shippingCost, null));
+    }
+
+    private BigDecimal calculateSupplierTotalUnitCost(
+            PurchaseOrderDetailEntity detail,
+            BigDecimal supplierUnitPrice,
+            BigDecimal supplierShippingCost,
+            BigDecimal requestedTotalUnitCost
+    ) {
+        if (detail.getLineType() == OrderLineType.PRODUCT) {
+            return defaultIfNull(supplierUnitPrice);
+        }
+        return requestedTotalUnitCost != null
+                ? requestedTotalUnitCost
+                : defaultIfNull(supplierUnitPrice).add(defaultIfNull(supplierShippingCost));
     }
 
     private OrderLineType resolvePurchaseOrderLineType(
@@ -1865,14 +1886,14 @@ public class PurchaseOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(StringUtils.trimToNull(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
-            applySupplierQuoteTierCost(detail, detail.getSupplierQuoteTierId(),
-                    itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
-                    itemRequest.getSupplierShippingCost(), null);
             detail.setLineType(resolvePurchaseOrderLineType(
                     itemRequest.getLineType(),
                     previousItem == null ? null : previousItem.getLineType(),
                     detail.getName()
             ));
+            applySupplierQuoteTierCost(detail, detail.getSupplierQuoteTierId(),
+                    itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
+                    itemRequest.getSupplierShippingCost(), null);
             if (itemRequest.getComponents() != null) {
                 replaceComponents(detail, itemRequest.getComponents());
             } else if (previousItem != null) {
@@ -2043,7 +2064,8 @@ public class PurchaseOrderService {
             BigDecimal quantity = defaultIfNull(detail.getQuantity());
             BigDecimal supplierUnitPrice = defaultIfNull(detail.getSupplierUnitPrice());
             BigDecimal supplierShippingCost = defaultIfNull(detail.getSupplierShippingCost());
-            BigDecimal supplierTotalUnitCost = supplierUnitPrice.add(supplierShippingCost);
+            BigDecimal supplierTotalUnitCost = calculateSupplierTotalUnitCost(
+                    detail, supplierUnitPrice, supplierShippingCost, null);
 
             detail.setQuantity(quantity);
             detail.setSupplierUnitPrice(supplierUnitPrice);
