@@ -37,6 +37,7 @@ public class ShippingContainerService {
     private final ObjectMapper json;
     private final ActivityHistoryService history;
     private final PurchaseOrderMilestoneService milestoneService;
+    private final PurchaseOrderStatusService purchaseOrderStatusService;
 
     @Transactional(readOnly=true)
     public Pageable<ShippingContainerDto> search(String keyword,ShippingContainerStatus status,String size,PageableRequest pagination)
@@ -186,6 +187,7 @@ public class ShippingContainerService {
         if(next==null||next==delivery.getStatus())return;
         delivery.setStatus(next);delivery.setUpdatedBy(user);delivery.setUpdatedDate(now());
         if(received)delivery.setReceivedAt(now());else delivery.setInTransitDate(now().toLocalDate());deliveries.save(delivery);
+        purchaseOrderStatusService.refresh(delivery.getPurchaseOrder());
         history.record(ActivityEntityType.PURCHASE_ORDER,delivery.getPurchaseOrder().getPurchaseOrderNo(),user,ActivityActorType.USER,ActivityAction.STATUS_CHANGE,ActivitySource.API,
                 "อัปเดตเที่ยวส่ง "+delivery.getDeliveryNo()+" จากตู้ "+current.getContainerJobNo()+" เป็น"+(received?"รับเข้าคลังแล้ว":"อยู่ระหว่างขนส่ง"),
                 Map.of("deliveryId",delivery.getId(),"containerId",current.getId(),"status",next.name()));

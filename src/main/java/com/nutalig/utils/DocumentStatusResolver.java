@@ -178,8 +178,9 @@ public final class DocumentStatusResolver {
         }
         return switch (status) {
             case CREATED, AWAITING_PAYMENT, PAID, AWAITING_START_RUN, JOB_STARTED, AWAITING_PROOF,
-                    PRODUCTION_RUNNING -> DocumentLifecycleStatus.OPEN;
-            case PRODUCTION_COMPLETED -> DocumentLifecycleStatus.FINALIZED;
+                    PRODUCTION_RUNNING, PRODUCTION_PARTIALLY_COMPLETED, PARTIALLY_IN_TRANSIT,
+                    IN_TRANSIT, PARTIALLY_RECEIVED -> DocumentLifecycleStatus.OPEN;
+            case PRODUCTION_COMPLETED, RECEIVED -> DocumentLifecycleStatus.FINALIZED;
             case CLOSED -> DocumentLifecycleStatus.FINALIZED;
             case CANCELLED -> DocumentLifecycleStatus.CANCELLED;
         };

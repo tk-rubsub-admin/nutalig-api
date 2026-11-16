@@ -10,6 +10,7 @@ import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryT
 import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDetailRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderDetailComponentRequest;
 import com.nutalig.controller.request.DocumentRequest;
 import com.nutalig.controller.request.PageableRequest;
@@ -55,6 +56,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.nutalig.constant.BusinessConstant.DocumentPrefix.PURCHASE_ORDER_PREFIX;
 import static com.nutalig.repository.specification.PurchaseOrderSpecification.*;
@@ -89,6 +91,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
     private final RfqSupplierQuoteTierRepository rfqSupplierQuoteTierRepository;
     private final PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    private final PurchaseOrderStatusService purchaseOrderStatusService;
     private final ProcurementNotificationService procurementNotificationService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
@@ -1115,6 +1118,7 @@ public class PurchaseOrderService {
                     userId
             );
         }
+        purchaseOrderStatusService.refresh(entity);
         return mapToDto(entity);
     }
 
@@ -1162,6 +1166,133 @@ public class PurchaseOrderService {
         delivery.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderDeliveryRepository.save(delivery);
         purchaseOrderMilestoneService.notifySalesDeliveryInTransitSafely(purchaseOrder, delivery);
+        purchaseOrderStatusService.refresh(purchaseOrder);
+        return mapToDto(purchaseOrder);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PurchaseOrderDto updateDelivery(
+            String purchaseOrderNo,
+            Long deliveryId,
+            UpdatePurchaseOrderDeliveryRequest request,
+            String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        if (request == null || request.getExpectedWarehouseDate() == null
+                || StringUtils.isBlank(request.getShippingMethod())
+                || request.getShippingLocationId() == null
+                || request.getDetails() == null || request.getDetails().isEmpty()) {
+            throw new InvalidRequestException("Delivery update details are required.");
+        }
+        PurchaseOrderEntity purchaseOrder = purchaseOrderRepository.findByIdForUpdate(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        validateProductionVisibility(purchaseOrder, userId);
+        PurchaseOrderDeliveryEntity delivery = purchaseOrderDeliveryRepository.findAllByIdForUpdate(List.of(deliveryId))
+                .stream().findFirst()
+                .orElseThrow(() -> new DataNotFoundException("Purchase order delivery " + deliveryId + " not found."));
+        if (!purchaseOrderNo.equals(delivery.getPurchaseOrder().getPurchaseOrderNo())) {
+            throw new InvalidRequestException("Delivery does not belong to this purchase order.");
+        }
+        if (delivery.getStatus() != PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER) {
+            throw new InvalidRequestException("Only deliveries handed over to the carrier can be edited.");
+        }
+        if (shippingContainerLoadRepository.existsByDelivery_IdAndActiveTrue(deliveryId)) {
+            throw new InvalidRequestException("เที่ยวส่งนี้มีรายการจัดตู้แล้ว ไม่สามารถแก้ไขได้");
+        }
+        if (delivery.getShippedAt() != null
+                && request.getExpectedWarehouseDate().isBefore(delivery.getShippedAt().toLocalDate())) {
+            throw new InvalidRequestException("Expected warehouse date cannot be before the shipped date.");
+        }
+
+        String shippingMethod = StringUtils.upperCase(
+                StringUtils.trimToEmpty(request.getShippingMethod()), Locale.ROOT);
+        try {
+            ShippingMethod.valueOf(shippingMethod);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidRequestException("Delivery shipping method is invalid.");
+        }
+        SupplierShippingDestinationEntity location = Optional.ofNullable(purchaseOrder.getSupplierShipping())
+                .map(SupplierShippingEntity::getDestinations)
+                .orElse(Set.of()).stream()
+                .filter(destination -> Objects.equals(destination.getId(), request.getShippingLocationId()))
+                .filter(destination -> Boolean.TRUE.equals(destination.getActive()))
+                .findFirst().orElse(null);
+        if (location == null) {
+            throw new InvalidRequestException("Delivery shipping location is not an active destination of this purchase order.");
+        }
+
+        Map<Long, PurchaseOrderDeliveryDetailEntity> existingDetails = delivery.getDetails().stream()
+                .filter(detail -> detail.getId() != null)
+                .collect(Collectors.toMap(PurchaseOrderDeliveryDetailEntity::getId, detail -> detail));
+        if (existingDetails.size() != request.getDetails().size()
+                || !existingDetails.keySet().containsAll(request.getDetails().stream()
+                .map(UpdatePurchaseOrderDeliveryRequest.Detail::getId).toList())) {
+            throw new InvalidRequestException("Delivery details cannot be added or removed while editing.");
+        }
+        for (UpdatePurchaseOrderDeliveryRequest.Detail detailRequest : request.getDetails()) {
+            if (detailRequest.getId() == null || detailRequest.getQuantity() == null
+                    || detailRequest.getQuantity().signum() <= 0) {
+                throw new InvalidRequestException("Delivery detail quantity must be greater than zero.");
+            }
+            validateNonNegative(detailRequest.getCartonCount(), "cartonCount");
+            validateNonNegative(detailRequest.getPiecesPerCarton(), "piecesPerCarton");
+            validateNonNegative(detailRequest.getNetWeightKg(), "netWeightKg");
+            validateNonNegative(detailRequest.getGrossWeightKg(), "grossWeightKg");
+            validateNonNegative(detailRequest.getLengthCm(), "lengthCm");
+            validateNonNegative(detailRequest.getWidthCm(), "widthCm");
+            validateNonNegative(detailRequest.getHeightCm(), "heightCm");
+            validateNonNegative(detailRequest.getCbmM3(), "cbmM3");
+            PurchaseOrderDeliveryDetailEntity detail = existingDetails.get(detailRequest.getId());
+            detail.setQuantity(detailRequest.getQuantity());
+            detail.setCartonCount(detailRequest.getCartonCount());
+            detail.setPiecesPerCarton(detailRequest.getPiecesPerCarton());
+            detail.setNetWeightKg(detailRequest.getNetWeightKg());
+            detail.setGrossWeightKg(detailRequest.getGrossWeightKg());
+            detail.setLengthCm(detailRequest.getLengthCm());
+            detail.setWidthCm(detailRequest.getWidthCm());
+            detail.setHeightCm(detailRequest.getHeightCm());
+            detail.setCbmM3(detailRequest.getCbmM3());
+            detail.setSortOrder(detailRequest.getSortOrder());
+        }
+
+        Map<Long, PurchaseOrderDeliveryScrapBoxEntity> existingBoxes = delivery.getScrapBoxes().stream()
+                .filter(box -> box.getId() != null)
+                .collect(Collectors.toMap(PurchaseOrderDeliveryScrapBoxEntity::getId, box -> box));
+        List<UpdatePurchaseOrderDeliveryRequest.ScrapBox> requestedBoxes =
+                Optional.ofNullable(request.getScrapBoxes()).orElse(List.of());
+        if (existingBoxes.size() != requestedBoxes.size()
+                || !existingBoxes.keySet().containsAll(requestedBoxes.stream()
+                .map(UpdatePurchaseOrderDeliveryRequest.ScrapBox::getId).toList())) {
+            throw new InvalidRequestException("Delivery boxes cannot be added or removed while editing.");
+        }
+        for (UpdatePurchaseOrderDeliveryRequest.ScrapBox boxRequest : requestedBoxes) {
+            if (boxRequest.getId() == null) {
+                throw new InvalidRequestException("Delivery box id is required.");
+            }
+            validateNonNegative(boxRequest.getNetWeightKg(), "scrapBox.netWeightKg");
+            validateNonNegative(boxRequest.getGrossWeightKg(), "scrapBox.grossWeightKg");
+            validateNonNegative(boxRequest.getLengthCm(), "scrapBox.lengthCm");
+            validateNonNegative(boxRequest.getWidthCm(), "scrapBox.widthCm");
+            validateNonNegative(boxRequest.getHeightCm(), "scrapBox.heightCm");
+            validateNonNegative(boxRequest.getCbmM3(), "scrapBox.cbmM3");
+            PurchaseOrderDeliveryScrapBoxEntity box = existingBoxes.get(boxRequest.getId());
+            box.setNetWeightKg(boxRequest.getNetWeightKg());
+            box.setGrossWeightKg(boxRequest.getGrossWeightKg());
+            box.setLengthCm(boxRequest.getLengthCm());
+            box.setWidthCm(boxRequest.getWidthCm());
+            box.setHeightCm(boxRequest.getHeightCm());
+            box.setCbmM3(boxRequest.getCbmM3());
+            box.setSortOrder(boxRequest.getSortOrder());
+        }
+
+        delivery.setExpectedWarehouseDate(request.getExpectedWarehouseDate());
+        delivery.setShippingMethod(shippingMethod);
+        delivery.setShippingLocation(location);
+        delivery.setShippingLocationNameSnapshot(StringUtils.defaultIfBlank(
+                location.getDestinationName(), location.getFullAddress()));
+        delivery.setUpdatedBy(userId);
+        delivery.setUpdatedDate(now(DateUtil.getTimeZone()));
+        purchaseOrderDeliveryRepository.save(delivery);
+        purchaseOrderStatusService.refresh(purchaseOrder);
         return mapToDto(purchaseOrder);
     }
 

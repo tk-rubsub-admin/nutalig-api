@@ -20,6 +20,7 @@ class PurchaseOrderContainerTransitGuardTest {
     @Mock ShippingContainerLoadRepository shippingContainerLoadRepository;
     @Mock UserRepository userRepository;
     @Mock PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    @Mock PurchaseOrderStatusService purchaseOrderStatusService;
     @InjectMocks PurchaseOrderService service;
     @Test void manualTransitLocksTheSourceAndRejectsContainerAllocatedDeliveries()throws Exception {
         var po=new PurchaseOrderEntity();po.setPurchaseOrderNo("PO");

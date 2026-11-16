@@ -30,6 +30,7 @@ class PurchaseOrderScrapBoxServiceTest {
     @Mock SystemConfigMapper systemConfigMapper;
     @Mock UserMapper userMapper;
     @Mock PurchaseOrderMilestoneService purchaseOrderMilestoneService;
+    @Mock PurchaseOrderStatusService purchaseOrderStatusService;
     @Mock PurchaseOrderCbmService purchaseOrderCbmService;
     @Mock ActivityHistoryService activityHistoryService;
     @Captor ArgumentCaptor<Map<String, Object>> historyDetail;

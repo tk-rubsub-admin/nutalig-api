@@ -12,6 +12,7 @@ import com.nutalig.controller.purchaseorder.request.SearchPurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.SearchPendingSupplierPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
+import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryRequest;
 import com.nutalig.controller.purchaseorder.request.StartPurchaseOrderRunRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderMilestoneRequest;
@@ -134,6 +135,18 @@ public class PurchaseOrderController {
             @RequestHeader("userId") String userId
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.markDeliveryInTransit(
+                id, deliveryId, request, userId));
+    }
+
+    @PatchMapping("/{id}/deliveries/{deliveryId}")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_START_RUN')")
+    public GeneralResponse<PurchaseOrderDto> updateDelivery(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId,
+            @RequestBody UpdatePurchaseOrderDeliveryRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateDelivery(
                 id, deliveryId, request, userId));
     }
 
