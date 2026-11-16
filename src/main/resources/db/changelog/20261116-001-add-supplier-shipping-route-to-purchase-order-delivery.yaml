@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261116-001-add-supplier-shipping-route-to-purchase-order-delivery
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: purchase_order_delivery
+        - tableExists:
+            tableName: supplier_shipping
+        - tableExists:
+            tableName: supplier_shipping_route
+      changes:
+        - addColumn:
+            tableName: purchase_order_delivery
+            columns:
+              - column:
+                  name: supplier_shipping_id
+                  type: BIGINT
+              - column:
+                  name: supplier_shipping_route_id
+                  type: BIGINT
+        - sql:
+            sql: |
+              UPDATE purchase_order_delivery d
+              INNER JOIN purchase_order po ON po.purchase_order_no = d.purchase_order_no
+              SET d.supplier_shipping_id = po.supplier_shipping_id
+              WHERE d.supplier_shipping_id IS NULL
+                AND po.supplier_shipping_id IS NOT NULL
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_delivery
+            baseColumnNames: supplier_shipping_id
+            constraintName: fk_po_delivery_supplier_shipping
+            referencedTableName: supplier_shipping
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - addForeignKeyConstraint:
+            baseTableName: purchase_order_delivery
+            baseColumnNames: supplier_shipping_route_id
+            constraintName: fk_po_delivery_supplier_shipping_route
+            referencedTableName: supplier_shipping_route
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: purchase_order_delivery
+            indexName: idx_po_delivery_supplier_shipping
+            columns:
+              - column:
+                  name: supplier_shipping_id
+        - createIndex:
+            tableName: purchase_order_delivery
+            indexName: idx_po_delivery_supplier_shipping_route
+            columns:
+              - column:
+                  name: supplier_shipping_route_id

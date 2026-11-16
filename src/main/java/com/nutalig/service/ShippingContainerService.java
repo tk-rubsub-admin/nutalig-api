@@ -94,9 +94,9 @@ public class ShippingContainerService {
         applyMetadata(entity,request);return finish(entity,user,before,"แก้ไขข้อมูลตู้คอนเทนเนอร์",ActivityAction.UPDATE,null);
     }
     @Transactional(readOnly=true)
-    public List<ShippingContainerDto.Source> previewSources(String size,Long shippingId,Long destinationId,Long deliveryId)
+    public List<ShippingContainerDto.Source> previewSources(String size,Long shippingId,Long routeId,Long destinationId,Long deliveryId)
             throws DataNotFoundException,InvalidRequestException {
-        var request=new ShippingContainerRequest();request.setContainerSize(size);request.setSupplierShippingId(shippingId);request.setDestinationId(destinationId);
+        var request=new ShippingContainerRequest();request.setContainerSize(size);request.setSupplierShippingId(shippingId);request.setSupplierShippingRouteId(routeId);request.setDestinationId(destinationId);
         var target=new ShippingContainerEntity();applyMetadata(target,request);
         var source=deliveries.findById(deliveryId).orElseThrow(()->new DataNotFoundException("ไม่พบเที่ยวส่ง"));
         validateRoute(target,source);
@@ -209,13 +209,19 @@ public class ShippingContainerService {
             throw new InvalidRequestException("ต้องนำกล่องออกก่อนเปลี่ยนขนาดตู้ ผู้ให้บริการขนส่ง หรือปลายทาง");
         if(request.getPlannedDepartureDate()!=null&&request.getPlannedArrivalDate()!=null&&request.getPlannedArrivalDate().isBefore(request.getPlannedDepartureDate()))throw new InvalidRequestException("วันที่ถึงต้องไม่ก่อนวันที่ออกเดินทาง");
         if(request.getCapacityCbm()!=null&&request.getCapacityCbm().signum()<0||request.getMaxCargoWeightKg()!=null&&request.getMaxCargoWeightKg().signum()<0)throw new InvalidRequestException("ความจุและน้ำหนักต้องไม่ติดลบ");
-        SupplierShippingEntity shipping=null;SupplierShippingDestinationEntity destination=null;
+        SupplierShippingEntity shipping=null;SupplierShippingDestinationEntity destination=null;SupplierShippingRouteEntity route=null;
         if(request.getSupplierShippingId()!=null) {
             shipping=shippings.findByIdAndActiveTrue(request.getSupplierShippingId()).orElseThrow(()->new InvalidRequestException("ไม่พบผู้ให้บริการขนส่งที่ใช้งานอยู่"));
             if(shipping.getShippingMethod()!=ShippingMethod.SEA||shipping.getShippingMode()!=ShippingMode.FCL)throw new InvalidRequestException("ต้องเลือกขนส่งทางเรือแบบปิดตู้");
+            route=shipping.getRoutes().stream().filter(r->Boolean.TRUE.equals(r.getActive())
+                    &&(request.getSupplierShippingRouteId()==null||Objects.equals(r.getId(),request.getSupplierShippingRouteId())))
+                    .findFirst().orElse(null);
+            if(request.getSupplierShippingRouteId()!=null&&route==null)throw new InvalidRequestException("เส้นทางขนส่งไม่ได้อยู่ในผู้ให้บริการที่เลือก");
+            if(route==null&&shipping.getRoutes().stream().filter(r->Boolean.TRUE.equals(r.getActive())).count()==1)
+                route=shipping.getRoutes().stream().filter(r->Boolean.TRUE.equals(r.getActive())).findFirst().orElse(null);
             if(request.getDestinationId()!=null) destination=shipping.getDestinations().stream().filter(d->Objects.equals(d.getId(),request.getDestinationId())&&Boolean.TRUE.equals(d.getActive())).findFirst().orElseThrow(()->new InvalidRequestException("ปลายทางไม่ได้อยู่ในขนส่งที่เลือก"));
         } else if(request.getDestinationId()!=null)throw new InvalidRequestException("กรุณาเลือกผู้ให้บริการขนส่งก่อนเลือกปลายทาง");
-        entity.setContainerSize(request.getContainerSize());entity.setShippingMethod("SEA_FCL_"+request.getContainerSize());entity.setSupplierShipping(shipping);entity.setDestination(destination);
+        entity.setContainerSize(request.getContainerSize());entity.setShippingMethod("SEA_FCL_"+request.getContainerSize());entity.setSupplierShipping(shipping);entity.setSupplierShippingRoute(route);entity.setDestination(destination);
         entity.setCarrierName(shipping==null?null:shipping.getShippingName());entity.setDestinationName(destination==null?null:destination.getDestinationName());
         entity.setContainerNo(StringUtils.upperCase(StringUtils.trimToNull(request.getContainerNo()),Locale.ROOT));entity.setSealNo(StringUtils.trimToNull(request.getSealNo()));
         entity.setTrackingNo(StringUtils.trimToNull(request.getTrackingNo()));
@@ -225,13 +231,19 @@ public class ShippingContainerService {
     private void validateRoute(ShippingContainerEntity container,PurchaseOrderDeliveryEntity source) throws InvalidRequestException {
         if(source.getStatus()!=PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER||source.getPurchaseOrder().getStatus()==PurchaseOrderStatus.CANCELLED)throw new InvalidRequestException("เที่ยวส่งต้องอยู่ในสถานะส่งมอบให้ขนส่งแล้ว และ PO ไม่ถูกยกเลิก");
         var shipping=source.getPurchaseOrder().getSupplierShipping();
-        if(container.getSupplierShipping()==null||container.getDestination()==null||shipping==null||source.getShippingLocation()==null
-                ||!Boolean.TRUE.equals(container.getSupplierShipping().getActive())||!Boolean.TRUE.equals(container.getDestination().getActive())
-                ||!Objects.equals(container.getSupplierShipping().getId(),shipping.getId())||!Objects.equals(container.getDestination().getId(),source.getShippingLocation().getId())
+        boolean routeMatches=source.getSupplierShippingRoute()!=null&&container.getSupplierShippingRoute()!=null
+                &&Objects.equals(container.getSupplierShippingRoute().getId(),source.getSupplierShippingRoute().getId());
+        boolean legacyDestinationMatches=source.getSupplierShippingRoute()==null&&container.getDestination()!=null&&source.getShippingLocation()!=null
+                &&Objects.equals(container.getDestination().getId(),source.getShippingLocation().getId());
+        if(container.getSupplierShipping()==null||shipping==null
+                ||!Boolean.TRUE.equals(container.getSupplierShipping().getActive())
+                ||!Objects.equals(container.getSupplierShipping().getId(),shipping.getId())
+                ||(!routeMatches&&!legacyDestinationMatches)
                 ||!StringUtils.equalsIgnoreCase(container.getShippingMethod(),source.getShippingMethod()))throw new InvalidRequestException("เที่ยวส่งต้องมีขนาดตู้ ผู้ให้บริการ และปลายทางตรงกับตู้ที่เลือก");
     }
     private void validateSeal(ShippingContainerEntity entity) throws InvalidRequestException {
-        if(StringUtils.isBlank(entity.getContainerNo())||StringUtils.isBlank(entity.getSealNo())||entity.getSupplierShipping()==null||entity.getDestination()==null
+        if(StringUtils.isBlank(entity.getContainerNo())||StringUtils.isBlank(entity.getSealNo())||entity.getSupplierShipping()==null
+                ||(entity.getDestination()==null&&entity.getSupplierShippingRoute()==null)
                 ||entity.getPlannedDepartureDate()==null||entity.getPlannedArrivalDate()==null||entity.getLoads().isEmpty())throw new InvalidRequestException("กรุณาระบุหมายเลขตู้ ซีล ขนส่ง ปลายทาง กำหนดวัน และรายการกล่องให้ครบก่อนปิดตู้");
         for(var load:entity.getLoads())ShippingContainerPacking.requireCompleteMetrics(load);
         var dto=mapper.toDto(entity);

@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261116-002-add-supplier-shipping-route-to-shipping-container
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: shipping_container
+        - tableExists:
+            tableName: supplier_shipping_route
+      changes:
+        - addColumn:
+            tableName: shipping_container
+            columns:
+              - column:
+                  name: supplier_shipping_route_id
+                  type: BIGINT
+        - addForeignKeyConstraint:
+            baseTableName: shipping_container
+            baseColumnNames: supplier_shipping_route_id
+            constraintName: fk_container_supplier_shipping_route
+            referencedTableName: supplier_shipping_route
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: shipping_container
+            indexName: idx_container_supplier_shipping_route
+            columns:
+              - column:
+                  name: supplier_shipping_route_id

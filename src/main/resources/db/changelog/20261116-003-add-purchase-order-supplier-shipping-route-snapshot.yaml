@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261116-003-add-purchase-order-supplier-shipping-route-snapshot
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: purchase_order
+      changes:
+        - addColumn:
+            tableName: purchase_order
+            columns:
+              - column:
+                  name: supplier_shipping_route_id_snapshot
+                  type: BIGINT
+              - column:
+                  name: supplier_shipping_route_code_snapshot
+                  type: VARCHAR(100)
+              - column:
+                  name: supplier_shipping_route_origin_snapshot
+                  type: VARCHAR(255)
+              - column:
+                  name: supplier_shipping_route_destination_snapshot
+                  type: VARCHAR(255)

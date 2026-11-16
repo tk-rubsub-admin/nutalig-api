@@ -51,6 +51,14 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
     @JoinColumn(name = "shipping_location_id", referencedColumnName = "id")
     private SupplierShippingDestinationEntity shippingLocation;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_shipping_id", referencedColumnName = "id")
+    private SupplierShippingEntity supplierShipping;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_shipping_route_id", referencedColumnName = "id")
+    private SupplierShippingRouteEntity supplierShippingRoute;
+
     @Column(name = "shipping_location_name_snapshot", length = 255)
     private String shippingLocationNameSnapshot;
 

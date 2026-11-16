@@ -832,6 +832,14 @@ public class SupplierService {
                     return destinationDto;
                 })
                 .toList());
+        dto.setRoutes(entity.getRoutes() == null
+                ? List.of()
+                : entity.getRoutes().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getActive()))
+                .sorted(Comparator.comparing(SupplierShippingRouteEntity::getId,
+                        Comparator.nullsLast(Long::compareTo)))
+                .map(this::toSupplierShippingRouteDto)
+                .toList());
         return dto;
     }
 

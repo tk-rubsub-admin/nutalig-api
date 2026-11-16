@@ -48,6 +48,10 @@ public class PurchaseOrderDto {
     private String shippingMethodSnapshot;
     private String carCodeSnapshot;
     private String containerSizeSnapshot;
+    private Long supplierShippingRouteIdSnapshot;
+    private String supplierShippingRouteCodeSnapshot;
+    private String supplierShippingRouteOriginSnapshot;
+    private String supplierShippingRouteDestinationSnapshot;
     private UserDto createdBy;
     private UserDto updatedBy;
     private List<PurchaseOrderAttachmentDto> attachments;

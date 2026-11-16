@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class ShippingContainerDto {
     private Long id; private Long version; private String containerJobNo; private String containerNo; private String sealNo; private String trackingNo;
-    private String containerSize; private String shippingMethod; private Long supplierShippingId; private String carrierName;
+    private String containerSize; private String shippingMethod; private Long supplierShippingId; private Long supplierShippingRouteId; private String shippingRouteCode; private String carrierName;
     private Long destinationId; private String destinationName; private String origin;
     private LocalDate plannedDepartureDate; private LocalDate plannedArrivalDate;
     private ZonedDateTime sealedAt; private ZonedDateTime departedAt; private ZonedDateTime receivedAt;

@@ -148,6 +148,18 @@ public class PurchaseOrderEntity extends AuditDateEntity {
     @Column(name = "container_size_snapshot", length = 255)
     private String containerSizeSnapshot;
 
+    @Column(name = "supplier_shipping_route_id_snapshot")
+    private Long supplierShippingRouteIdSnapshot;
+
+    @Column(name = "supplier_shipping_route_code_snapshot", length = 100)
+    private String supplierShippingRouteCodeSnapshot;
+
+    @Column(name = "supplier_shipping_route_origin_snapshot", length = 255)
+    private String supplierShippingRouteOriginSnapshot;
+
+    @Column(name = "supplier_shipping_route_destination_snapshot", length = 255)
+    private String supplierShippingRouteDestinationSnapshot;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")
     @ToString.Exclude

@@ -3176,3 +3176,9 @@ databaseChangeLog:
       file: db/changelog/20261115-001-sync-sales-order-status-from-procurement.yaml
   - include:
       file: db/changelog/20261115-002-backfill-po-start-run-status.yaml
+  - include:
+      file: db/changelog/20261116-001-add-supplier-shipping-route-to-purchase-order-delivery.yaml
+  - include:
+      file: db/changelog/20261116-002-add-supplier-shipping-route-to-shipping-container.yaml
+  - include:
+      file: db/changelog/20261116-003-add-purchase-order-supplier-shipping-route-snapshot.yaml

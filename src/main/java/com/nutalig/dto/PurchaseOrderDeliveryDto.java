@@ -21,6 +21,13 @@ public class PurchaseOrderDeliveryDto {
     private LocalDate inTransitDate;
     private Long shippingLocationId;
     private String shippingLocationName;
+    private Long supplierShippingId;
+    private String supplierShippingName;
+    private SupplierShippingDto supplierShipping;
+    private Long supplierShippingRouteId;
+    private String shippingRouteCode;
+    private String originLocationName;
+    private String destinationLocationName;
     private PurchaseOrderDeliveryStatus status;
     private DeliveryContainerStatus containerStatus;
     private List<ContainerReference> containers;

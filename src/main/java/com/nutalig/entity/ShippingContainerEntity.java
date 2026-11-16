@@ -42,6 +42,8 @@ public class ShippingContainerEntity extends AuditDateEntity {
     private String updatedBy;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "supplier_shipping_id")
     private SupplierShippingEntity supplierShipping;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "supplier_shipping_route_id")
+    private SupplierShippingRouteEntity supplierShippingRoute;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "destination_id")
     private SupplierShippingDestinationEntity destination;
     @Column(name = "capacity_cbm", precision = 18, scale = 6)

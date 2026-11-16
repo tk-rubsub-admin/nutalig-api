@@ -16,6 +16,7 @@ public class ShippingContainerRequest {
     @Size(max=50) private String trackingNo;
     private String containerSize;
     private Long supplierShippingId;
+    private Long supplierShippingRouteId;
     private Long destinationId;
     @Size(max=255) private String origin;
     private LocalDate plannedDepartureDate;

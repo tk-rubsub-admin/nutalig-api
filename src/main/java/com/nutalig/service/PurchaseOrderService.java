@@ -116,6 +116,15 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new DataNotFoundException(
                         "Supplier shipping " + request.getSupplierShippingId() + " not found."
                 ));
+        if (request.getSupplierShippingRouteId() == null) {
+            throw new InvalidRequestException("supplierShippingRouteId is required");
+        }
+        SupplierShippingRouteEntity supplierShippingRoute = supplierShipping.getRoutes().stream()
+                .filter(route -> Objects.equals(route.getId(), request.getSupplierShippingRouteId()))
+                .filter(route -> Boolean.TRUE.equals(route.getActive()))
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException(
+                        "Supplier shipping route does not belong to the selected supplier shipping"));
         String shippingMethod = StringUtils.upperCase(StringUtils.defaultIfBlank(
                 StringUtils.trimToNull(request.getShippingMethodSnapshot()), supplierShipping.getShippingMethod().name()
         ), Locale.ROOT);
@@ -213,6 +222,15 @@ public class PurchaseOrderService {
         entity.setShippingMethodSnapshot(shippingMethod);
         entity.setCarCodeSnapshot(StringUtils.trimToNull(supplierShipping.getCarCode()));
         entity.setContainerSizeSnapshot(StringUtils.trimToNull(request.getContainerSizeSnapshot()));
+        entity.setSupplierShippingRouteIdSnapshot(supplierShippingRoute.getId());
+        entity.setSupplierShippingRouteCodeSnapshot(supplierShippingRoute.getShippingRoute() == null
+                ? null : StringUtils.trimToNull(supplierShippingRoute.getShippingRoute().getRouteCode()));
+        entity.setSupplierShippingRouteOriginSnapshot(supplierShippingRoute.getShippingRoute() == null
+                || supplierShippingRoute.getShippingRoute().getOriginLocation() == null
+                ? null : StringUtils.trimToNull(supplierShippingRoute.getShippingRoute().getOriginLocation().getName()));
+        entity.setSupplierShippingRouteDestinationSnapshot(supplierShippingRoute.getShippingRoute() == null
+                || supplierShippingRoute.getShippingRoute().getDestinationLocation() == null
+                ? null : StringUtils.trimToNull(supplierShippingRoute.getShippingRoute().getDestinationLocation().getName()));
         entity.setCreatedBy(user);
         entity.setUpdatedBy(user);
         entity.setCreatedDate(now);
@@ -1176,8 +1194,6 @@ public class PurchaseOrderService {
             String userId
     ) throws DataNotFoundException, InvalidRequestException {
         if (request == null || request.getExpectedWarehouseDate() == null
-                || StringUtils.isBlank(request.getShippingMethod())
-                || request.getShippingLocationId() == null
                 || request.getDetails() == null || request.getDetails().isEmpty()) {
             throw new InvalidRequestException("Delivery update details are required.");
         }
@@ -1201,20 +1217,22 @@ public class PurchaseOrderService {
             throw new InvalidRequestException("Expected warehouse date cannot be before the shipped date.");
         }
 
-        String shippingMethod = StringUtils.upperCase(
-                StringUtils.trimToEmpty(request.getShippingMethod()), Locale.ROOT);
+        SupplierShippingEntity supplierShipping = purchaseOrder.getSupplierShipping();
+        if (supplierShipping == null) {
+            throw new InvalidRequestException("ไม่พบขนส่งของใบสั่งซื้อ");
+        }
+        SupplierShippingRouteEntity supplierShippingRoute = resolveDeliveryRoute(
+                supplierShipping, request.getSupplierShippingRouteId());
+        String shippingMethod = resolveDeliveryShippingMethod(
+                purchaseOrder, supplierShippingRoute, request.getShippingMethod());
         try {
             ShippingMethod.valueOf(shippingMethod);
         } catch (IllegalArgumentException exception) {
             throw new InvalidRequestException("Delivery shipping method is invalid.");
         }
-        SupplierShippingDestinationEntity location = Optional.ofNullable(purchaseOrder.getSupplierShipping())
-                .map(SupplierShippingEntity::getDestinations)
-                .orElse(Set.of()).stream()
-                .filter(destination -> Objects.equals(destination.getId(), request.getShippingLocationId()))
-                .filter(destination -> Boolean.TRUE.equals(destination.getActive()))
-                .findFirst().orElse(null);
-        if (location == null) {
+        SupplierShippingDestinationEntity location = resolveLegacyDeliveryLocation(
+                supplierShipping, supplierShippingRoute, request.getShippingLocationId());
+        if (supplierShippingRoute == null && location == null) {
             throw new InvalidRequestException("Delivery shipping location is not an active destination of this purchase order.");
         }
 
@@ -1285,13 +1303,82 @@ public class PurchaseOrderService {
         delivery.setExpectedWarehouseDate(request.getExpectedWarehouseDate());
         delivery.setShippingMethod(shippingMethod);
         delivery.setShippingLocation(location);
-        delivery.setShippingLocationNameSnapshot(StringUtils.defaultIfBlank(
-                location.getDestinationName(), location.getFullAddress()));
+        delivery.setSupplierShipping(supplierShipping);
+        delivery.setSupplierShippingRoute(supplierShippingRoute);
+        delivery.setShippingLocationNameSnapshot(deliveryLocationSnapshot(location, supplierShippingRoute));
         delivery.setUpdatedBy(userId);
         delivery.setUpdatedDate(now(DateUtil.getTimeZone()));
         purchaseOrderDeliveryRepository.save(delivery);
         purchaseOrderStatusService.refresh(purchaseOrder);
         return mapToDto(purchaseOrder);
+    }
+
+    private SupplierShippingRouteEntity resolveDeliveryRoute(
+            SupplierShippingEntity shipping, Long routeId) throws InvalidRequestException {
+        List<SupplierShippingRouteEntity> activeRoutes = shipping == null || shipping.getRoutes() == null
+                ? List.of()
+                : shipping.getRoutes().stream()
+                .filter(route -> Boolean.TRUE.equals(route.getActive()))
+                .sorted(Comparator.comparing(SupplierShippingRouteEntity::getId,
+                        Comparator.nullsLast(Long::compareTo)))
+                .toList();
+        if (routeId == null) {
+            if (activeRoutes.size() == 1) {
+                return activeRoutes.getFirst();
+            }
+            if (!activeRoutes.isEmpty()) {
+                throw new InvalidRequestException("กรุณาเลือกเส้นทางขนส่ง");
+            }
+            return null;
+        }
+        return activeRoutes.stream()
+                .filter(route -> Objects.equals(route.getId(), routeId))
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException(
+                        "เส้นทางขนส่งไม่ได้อยู่ในผู้ให้บริการขนส่งของใบสั่งซื้อนี้"));
+    }
+
+    private String resolveDeliveryShippingMethod(
+            PurchaseOrderEntity purchaseOrder,
+            SupplierShippingRouteEntity route,
+            String requestedMethod) {
+        String method = requestedMethod;
+        if (StringUtils.isBlank(method)) {
+            method = purchaseOrder.getShippingMethodSnapshot();
+        }
+        if (StringUtils.isBlank(method) && route != null && route.getSupplierShipping() != null) {
+            method = route.getSupplierShipping().getShippingMethod() == null
+                    ? null : route.getSupplierShipping().getShippingMethod().name();
+        }
+        return StringUtils.upperCase(StringUtils.trimToEmpty(method), Locale.ROOT);
+    }
+
+    private SupplierShippingDestinationEntity resolveLegacyDeliveryLocation(
+            SupplierShippingEntity shipping,
+            SupplierShippingRouteEntity route,
+            Long locationId) {
+        if (route != null) {
+            return null;
+        }
+        return Optional.ofNullable(shipping)
+                .map(SupplierShippingEntity::getDestinations)
+                .orElse(Set.of()).stream()
+                .filter(destination -> Objects.equals(destination.getId(), locationId))
+                .filter(destination -> Boolean.TRUE.equals(destination.getActive()))
+                .findFirst().orElse(null);
+    }
+
+    private String deliveryLocationSnapshot(
+            SupplierShippingDestinationEntity legacyLocation,
+            SupplierShippingRouteEntity route) {
+        if (legacyLocation != null) {
+            return StringUtils.defaultIfBlank(legacyLocation.getDestinationName(), legacyLocation.getFullAddress());
+        }
+        if (route != null && route.getShippingRoute() != null
+                && route.getShippingRoute().getDestinationLocation() != null) {
+            return route.getShippingRoute().getDestinationLocation().getName();
+        }
+        return null;
     }
 
     private boolean saveProductionCompletionDelivery(
@@ -1312,22 +1399,27 @@ public class PurchaseOrderService {
         if (request.getReceivedDate() != null && request.getReceivedDate().isBefore(request.getShippedDate())) {
             throw new InvalidRequestException("Received date cannot be before shipped date.");
         }
-        String shippingMethod = StringUtils.upperCase(
-                StringUtils.trimToEmpty(request.getShippingMethod()), Locale.ROOT);
+        Long selectedSupplierShippingId = request.getSupplierShippingId() != null
+                ? request.getSupplierShippingId()
+                : purchaseOrder.getSupplierShipping() == null ? null : purchaseOrder.getSupplierShipping().getId();
+        if (selectedSupplierShippingId == null) {
+            throw new InvalidRequestException("supplierShippingId is required");
+        }
+        SupplierShippingEntity supplierShipping = supplierShippingRepository
+                .findByIdAndActiveTrue(selectedSupplierShippingId)
+                .orElseThrow(() -> new InvalidRequestException("ไม่พบขนส่งที่ใช้งานอยู่"));
+        SupplierShippingRouteEntity supplierShippingRoute = resolveDeliveryRoute(
+                supplierShipping, request.getSupplierShippingRouteId());
+        String shippingMethod = resolveDeliveryShippingMethod(
+                purchaseOrder, supplierShippingRoute, request.getShippingMethod());
         try {
             ShippingMethod.valueOf(shippingMethod);
         } catch (IllegalArgumentException exception) {
             throw new InvalidRequestException("Delivery shipping method is invalid.");
         }
-        SupplierShippingEntity supplierShipping = purchaseOrder.getSupplierShipping();
-        SupplierShippingDestinationEntity location = supplierShipping == null
-                ? null
-                : supplierShipping.getDestinations().stream()
-                .filter(destination -> Objects.equals(destination.getId(), request.getShippingLocationId()))
-                .filter(destination -> Boolean.TRUE.equals(destination.getActive()))
-                .findFirst()
-                .orElse(null);
-        if (location == null) {
+        SupplierShippingDestinationEntity location = resolveLegacyDeliveryLocation(
+                supplierShipping, supplierShippingRoute, request.getShippingLocationId());
+        if (supplierShippingRoute == null && location == null) {
             throw new InvalidRequestException("Delivery shipping location is not an active destination of this purchase order.");
         }
         if (request.getDetails() == null || request.getDetails().isEmpty()) {
@@ -1360,8 +1452,9 @@ public class PurchaseOrderService {
                 ? DeliveryContainerStatus.NOT_ASSIGNED
                 : null);
         delivery.setShippingLocation(location);
-        delivery.setShippingLocationNameSnapshot(StringUtils.defaultIfBlank(
-                location.getDestinationName(), location.getFullAddress()));
+        delivery.setSupplierShipping(supplierShipping);
+        delivery.setSupplierShippingRoute(supplierShippingRoute);
+        delivery.setShippingLocationNameSnapshot(deliveryLocationSnapshot(location, supplierShippingRoute));
         delivery.setStatus(request.getReceivedDate() == null
                 ? PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER
                 : PurchaseOrderDeliveryStatus.RECEIVED_AT_WAREHOUSE);
@@ -2375,6 +2468,10 @@ public class PurchaseOrderService {
         dto.setShippingMethodSnapshot(entity.getShippingMethodSnapshot());
         dto.setCarCodeSnapshot(entity.getCarCodeSnapshot());
         dto.setContainerSizeSnapshot(entity.getContainerSizeSnapshot());
+        dto.setSupplierShippingRouteIdSnapshot(entity.getSupplierShippingRouteIdSnapshot());
+        dto.setSupplierShippingRouteCodeSnapshot(entity.getSupplierShippingRouteCodeSnapshot());
+        dto.setSupplierShippingRouteOriginSnapshot(entity.getSupplierShippingRouteOriginSnapshot());
+        dto.setSupplierShippingRouteDestinationSnapshot(entity.getSupplierShippingRouteDestinationSnapshot());
         dto.setCreatedBy(userMapper.toDto(entity.getCreatedBy()));
         dto.setUpdatedBy(userMapper.toDto(entity.getUpdatedBy()));
 
@@ -2461,7 +2558,11 @@ public class PurchaseOrderService {
         dto.setItems(items);
         dto.setDeliveries(purchaseOrderDeliveryRepository.findAllByPurchaseOrder_PurchaseOrderNo(entity.getPurchaseOrderNo())
                 .stream()
-                .map(PurchaseOrderDeliveryMapper::toDto)
+                .map(delivery -> {
+                    PurchaseOrderDeliveryDto deliveryDto = PurchaseOrderDeliveryMapper.toDto(delivery);
+                    deliveryDto.setSupplierShipping(buildSupplierShippingDto(delivery.getSupplierShipping()));
+                    return deliveryDto;
+                })
                 .toList());
         return dto;
     }
@@ -2519,6 +2620,42 @@ public class PurchaseOrderService {
                     });
         }
         dto.setDestinations(destinations);
+        List<SupplierShippingRouteDto> routes = entity.getRoutes() == null
+                ? List.of()
+                : entity.getRoutes().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getActive()))
+                .sorted(Comparator.comparing(SupplierShippingRouteEntity::getId,
+                        Comparator.nullsLast(Long::compareTo)))
+                .map(route -> {
+                    SupplierShippingRouteDto routeDto = new SupplierShippingRouteDto();
+                    routeDto.setId(route.getId());
+                    routeDto.setSupplierShippingId(entity.getId());
+                    routeDto.setSupplierShippingName(entity.getShippingName());
+                    routeDto.setShippingMethod(entity.getShippingMethod());
+                    routeDto.setShippingMode(entity.getShippingMode());
+                    routeDto.setCarCode(entity.getCarCode());
+                    routeDto.setShippingRouteId(route.getShippingRoute() == null ? null : route.getShippingRoute().getId());
+                    routeDto.setRouteCode(route.getShippingRoute() == null ? null : route.getShippingRoute().getRouteCode());
+                    routeDto.setOriginLocationId(route.getShippingRoute() == null || route.getShippingRoute().getOriginLocation() == null
+                            ? null : route.getShippingRoute().getOriginLocation().getId());
+                    routeDto.setOriginLocationName(route.getShippingRoute() == null || route.getShippingRoute().getOriginLocation() == null
+                            ? null : route.getShippingRoute().getOriginLocation().getName());
+                    routeDto.setDestinationLocationId(route.getShippingRoute() == null || route.getShippingRoute().getDestinationLocation() == null
+                            ? null : route.getShippingRoute().getDestinationLocation().getId());
+                    routeDto.setDestinationLocationName(route.getShippingRoute() == null || route.getShippingRoute().getDestinationLocation() == null
+                            ? null : route.getShippingRoute().getDestinationLocation().getName());
+                    routeDto.setCurrency(route.getCurrency());
+                    routeDto.setBaseCost(route.getBaseCost());
+                    routeDto.setLeadTimeDayMin(route.getLeadTimeDayMin());
+                    routeDto.setLeadTimeDayMax(route.getLeadTimeDayMax());
+                    routeDto.setEffectiveFrom(route.getEffectiveFrom());
+                    routeDto.setEffectiveTo(route.getEffectiveTo());
+                    routeDto.setRemark(route.getRemark());
+                    routeDto.setActive(route.getActive());
+                    return routeDto;
+                })
+                .toList();
+        dto.setRoutes(routes);
         return dto;
     }
 

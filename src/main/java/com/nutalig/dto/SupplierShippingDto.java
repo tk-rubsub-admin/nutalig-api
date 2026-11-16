@@ -23,4 +23,5 @@ public class SupplierShippingDto {
     private String remark;
     private String carCode;
     private List<SupplierShippingDestinationDto> destinations;
+    private List<SupplierShippingRouteDto> routes;
 }

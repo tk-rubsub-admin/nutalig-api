@@ -16,6 +16,8 @@ public class ShippingContainerMapper {
     public ShippingContainerDto toDto(ShippingContainerEntity entity) {
         var dto=new ShippingContainerDto();BeanUtils.copyProperties(entity,dto,"loads");
         dto.setSupplierShippingId(entity.getSupplierShipping()==null?null:entity.getSupplierShipping().getId());
+        dto.setSupplierShippingRouteId(entity.getSupplierShippingRoute()==null?null:entity.getSupplierShippingRoute().getId());
+        dto.setShippingRouteCode(entity.getSupplierShippingRoute()==null||entity.getSupplierShippingRoute().getShippingRoute()==null?null:entity.getSupplierShippingRoute().getShippingRoute().getRouteCode());
         dto.setDestinationId(entity.getDestination()==null?null:entity.getDestination().getId());
         dto.setLoads(entity.getLoads().stream().map(load -> {
             var row=new ShippingContainerDto.Load();BeanUtils.copyProperties(load,row);
@@ -38,7 +40,7 @@ public class ShippingContainerMapper {
         var dto=toDto(entity);Map<String,Object> data=new LinkedHashMap<>();
         data.put("containerJobNo",dto.getContainerJobNo());data.put("containerNo",dto.getContainerNo());data.put("sealNo",dto.getSealNo());data.put("trackingNo",dto.getTrackingNo());
         data.put("status",dto.getStatus().name());data.put("containerSize",dto.getContainerSize());data.put("shippingMethod",dto.getShippingMethod());
-        data.put("supplierShippingId",dto.getSupplierShippingId());data.put("destinationId",dto.getDestinationId());data.put("destinationName",dto.getDestinationName());
+        data.put("supplierShippingId",dto.getSupplierShippingId());data.put("supplierShippingRouteId",dto.getSupplierShippingRouteId());data.put("shippingRouteCode",dto.getShippingRouteCode());data.put("destinationId",dto.getDestinationId());data.put("destinationName",dto.getDestinationName());
         data.put("sealedAt",Objects.toString(dto.getSealedAt(),null));data.put("departedAt",Objects.toString(dto.getDepartedAt(),null));data.put("receivedAt",Objects.toString(dto.getReceivedAt(),null));
         data.put("origin",dto.getOrigin());data.put("plannedDepartureDate",Objects.toString(dto.getPlannedDepartureDate(),null));data.put("plannedArrivalDate",Objects.toString(dto.getPlannedArrivalDate(),null));
         data.put("capacityCbm",dto.getCapacityCbm());data.put("maxCargoWeightKg",dto.getMaxCargoWeightKg());data.put("totalCbm",dto.getTotalCbm());data.put("totalCartons",dto.getTotalCartons());

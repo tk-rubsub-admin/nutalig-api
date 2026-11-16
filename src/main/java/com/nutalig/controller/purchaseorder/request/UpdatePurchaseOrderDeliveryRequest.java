@@ -11,6 +11,7 @@ public class UpdatePurchaseOrderDeliveryRequest {
     private LocalDate expectedWarehouseDate;
     private String shippingMethod;
     private Long shippingLocationId;
+    private Long supplierShippingRouteId;
     private List<Detail> details;
     private List<ScrapBox> scrapBoxes;
 

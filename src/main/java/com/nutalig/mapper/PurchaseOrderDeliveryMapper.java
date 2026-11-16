@@ -27,6 +27,21 @@ public final class PurchaseOrderDeliveryMapper {
         deliveryDto.setShippingLocationId(delivery.getShippingLocation() == null
                 ? null : delivery.getShippingLocation().getId());
         deliveryDto.setShippingLocationName(delivery.getShippingLocationNameSnapshot());
+        deliveryDto.setSupplierShippingId(delivery.getSupplierShipping() == null ? null
+                : delivery.getSupplierShipping().getId());
+        deliveryDto.setSupplierShippingName(delivery.getSupplierShipping() == null ? null
+                : delivery.getSupplierShipping().getShippingName());
+        deliveryDto.setSupplierShippingRouteId(delivery.getSupplierShippingRoute() == null ? null
+                : delivery.getSupplierShippingRoute().getId());
+        if (delivery.getSupplierShippingRoute() != null
+                && delivery.getSupplierShippingRoute().getShippingRoute() != null) {
+            var route = delivery.getSupplierShippingRoute().getShippingRoute();
+            deliveryDto.setShippingRouteCode(route.getRouteCode());
+            deliveryDto.setOriginLocationName(route.getOriginLocation() == null ? null
+                    : route.getOriginLocation().getName());
+            deliveryDto.setDestinationLocationName(route.getDestinationLocation() == null ? null
+                    : route.getDestinationLocation().getName());
+        }
         deliveryDto.setStatus(delivery.getStatus());
         deliveryDto.setContainerStatus(delivery.getContainerStatus());
         deliveryDto.setContainers(delivery.getContainers().stream()
