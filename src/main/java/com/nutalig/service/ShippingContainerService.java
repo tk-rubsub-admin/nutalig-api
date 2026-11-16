@@ -94,6 +94,12 @@ public class ShippingContainerService {
         applyMetadata(entity,request);return finish(entity,user,before,"แก้ไขข้อมูลตู้คอนเทนเนอร์",ActivityAction.UPDATE,null);
     }
     @Transactional(readOnly=true)
+    public List<ShippingContainerDto.Source> previewSources(String size,Long shippingId,Long destinationId,Long deliveryId)
+            throws DataNotFoundException,InvalidRequestException {
+        return previewSources(size, shippingId, null, destinationId, deliveryId);
+    }
+
+    @Transactional(readOnly=true)
     public List<ShippingContainerDto.Source> previewSources(String size,Long shippingId,Long routeId,Long destinationId,Long deliveryId)
             throws DataNotFoundException,InvalidRequestException {
         var request=new ShippingContainerRequest();request.setContainerSize(size);request.setSupplierShippingId(shippingId);request.setSupplierShippingRouteId(routeId);request.setDestinationId(destinationId);

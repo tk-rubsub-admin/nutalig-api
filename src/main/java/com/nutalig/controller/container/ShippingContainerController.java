@@ -30,6 +30,12 @@ public class ShippingContainerController {
     public GeneralResponse<ShippingContainerDto> update(@PathVariable Long id,@Valid @RequestBody ShippingContainerRequest request,@RequestHeader("userId")String user) throws DataNotFoundException,InvalidRequestException {
         return new GeneralResponse<>(SUCCESS,service.update(id,request,user));
     }
+    public GeneralResponse<List<ShippingContainerDto.Source>> previewSources(String containerSize,
+            Long supplierShippingId,Long destinationId,Long deliveryId)
+            throws DataNotFoundException,InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS,service.previewSources(containerSize,supplierShippingId,destinationId,deliveryId));
+    }
+
     @GetMapping("/sources") @PreAuthorize("hasAnyAuthority('PERM_CONTAINER_CREATE','PERM_CONTAINER_VIEW','PERM_CONTAINER_EDIT')")
     public GeneralResponse<List<ShippingContainerDto.Source>> previewSources(@RequestParam String containerSize,
             @RequestParam Long supplierShippingId,@RequestParam(required=false) Long supplierShippingRouteId,
