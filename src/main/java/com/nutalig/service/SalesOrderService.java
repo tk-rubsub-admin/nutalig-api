@@ -187,20 +187,20 @@ public class SalesOrderService {
         entity.setVat(summary.vat());
         entity.setGrandTotal(summary.grandTotal());
 
-//        salesOrderPaymentScheduleService.initializeSchedules(entity, now);
-//
-//        salesOrderRepository.save(entity);
-//        refreshCustomerOrderTotal(customer);
-//        recalculatePaymentSummary(entity.getSalesOrderNo());
-//
-//        if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
-//            linkRfq(request.getRfqId(), salesOrderNo, userId, now);
-//        }
-//
-//        recordCreateSalesOrderActivity(entity, request, userId);
-//        if (SalesOrderStatus.DRAFT.equals(status)) {
-//            sendDraftSalesOrderNotification(entity, userId);
-//        }
+        salesOrderPaymentScheduleService.initializeSchedules(entity, now);
+
+        salesOrderRepository.save(entity);
+        refreshCustomerOrderTotal(customer);
+        recalculatePaymentSummary(entity.getSalesOrderNo());
+
+        if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
+            linkRfq(request.getRfqId(), salesOrderNo, userId, now);
+        }
+
+        recordCreateSalesOrderActivity(entity, request, userId);
+        if (SalesOrderStatus.DRAFT.equals(status)) {
+            sendDraftSalesOrderNotification(entity, userId);
+        }
 
         return entity;
     }
