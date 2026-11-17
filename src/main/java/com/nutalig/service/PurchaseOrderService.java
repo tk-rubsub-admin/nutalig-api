@@ -163,10 +163,6 @@ public class PurchaseOrderService {
             Currency itemCurrency = requestedItem == null || requestedItem.getSupplierCurrency() == null
                     ? item.getSupplierCurrency()
                     : requestedItem.getSupplierCurrency();
-            if (itemCurrency == null || item.getSupplierUnitPrice() == null
-                    || item.getSupplierTotalUnitCost() == null) {
-                throw new InvalidRequestException("Sales order detail " + item.getId() + " is missing supplier cost snapshot");
-            }
 
             if (currency == null) {
                 currency = itemCurrency;
@@ -259,7 +255,8 @@ public class PurchaseOrderService {
             ));
             applySupplierQuoteTierCost(detail, sourceItem.getSupplierQuoteTierId(),
                     sourceItem.getSupplierCurrency(), sourceItem.getSupplierUnitPrice(),
-                    sourceItem.getSupplierShippingCost(), sourceItem.getSupplierTotalUnitCost());
+                    sourceItem.getSupplierShippingCost(), sourceItem.getSupplierTotalUnitCost(),
+                    requestedItem == null ? null : requestedItem.getSupplierUnitPrice());
 
             BigDecimal amountSupplierCurrency = detail.getSupplierTotalUnitCost()
                     .multiply(detail.getQuantity())
@@ -1882,7 +1879,8 @@ public class PurchaseOrderService {
             Currency requestedCurrency,
             BigDecimal requestedUnitPrice,
             BigDecimal requestedShippingCost,
-            BigDecimal requestedTotalUnitCost
+            BigDecimal requestedTotalUnitCost,
+            BigDecimal requestedUnitPriceOverride
     ) throws DataNotFoundException {
         if (supplierQuoteTierId == null) {
             detail.setSupplierCurrency(requestedCurrency);
@@ -1896,11 +1894,16 @@ public class PurchaseOrderService {
         RfqSupplierQuoteTierEntity tier = rfqSupplierQuoteTierRepository.findById(supplierQuoteTierId)
                 .orElseThrow(() -> new DataNotFoundException("Supplier quote tier " + supplierQuoteTierId + " not found."));
         BigDecimal shippingCost = defaultIfNull(tier.getShippingCost());
+        BigDecimal unitPrice = tier.getProductPrice();
+        if (requestedUnitPriceOverride != null
+                && requestedUnitPriceOverride.compareTo(tier.getProductPrice()) != 0) {
+            unitPrice = requestedUnitPriceOverride;
+        }
         detail.setSupplierCurrency(tier.getCurrency());
-        detail.setSupplierUnitPrice(tier.getProductPrice());
+        detail.setSupplierUnitPrice(unitPrice);
         detail.setSupplierShippingCost(shippingCost);
         detail.setSupplierTotalUnitCost(calculateSupplierTotalUnitCost(
-                detail, tier.getProductPrice(), shippingCost, null));
+                detail, unitPrice, shippingCost, null));
     }
 
     private BigDecimal calculateSupplierTotalUnitCost(
@@ -1986,7 +1989,7 @@ public class PurchaseOrderService {
             ));
             applySupplierQuoteTierCost(detail, detail.getSupplierQuoteTierId(),
                     itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
-                    itemRequest.getSupplierShippingCost(), null);
+                    itemRequest.getSupplierShippingCost(), null, itemRequest.getSupplierUnitPrice());
             if (itemRequest.getComponents() != null) {
                 replaceComponents(detail, itemRequest.getComponents());
             } else if (previousItem != null) {
