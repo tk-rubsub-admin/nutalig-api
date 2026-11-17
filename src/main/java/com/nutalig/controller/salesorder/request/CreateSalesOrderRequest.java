@@ -14,6 +14,7 @@ public class CreateSalesOrderRequest {
     private SalesOrderStatus status;
     private LocalDate docDate;
     private LocalDate expireDate;
+    private LocalDate deliveryDate;
     private String customerId;
     private String customerAddressId;
     private String customerContactId;

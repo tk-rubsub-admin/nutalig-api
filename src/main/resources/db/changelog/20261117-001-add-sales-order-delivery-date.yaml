@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261117-001-add-sales-order-delivery-date
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: sales_order
+        - not:
+            - columnExists:
+                tableName: sales_order
+                columnName: delivery_date
+      changes:
+        - addColumn:
+            tableName: sales_order
+            columns:
+              - column:
+                  name: delivery_date
+                  type: DATE

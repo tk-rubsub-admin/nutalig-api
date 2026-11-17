@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261117-003-add-invoice-reverse-permission
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at)
+              VALUES ('PERM_INVOICE_REVERSE', 'ยกเลิก/ย้อนใบแจ้งหนี้', 'Cancel or reverse invoices', 'document', NOW(6))
+              ON DUPLICATE KEY UPDATE name_th = VALUES(name_th), name_en = VALUES(name_en), `group` = VALUES(`group`);
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              VALUES ('SUPER_ADMIN', 'PERM_INVOICE_REVERSE');

@@ -1,6 +1,5 @@
 package com.nutalig.controller.salesorder.request;
 
-import com.nutalig.constant.Currency;
 import com.nutalig.constant.OrderLineType;
 import lombok.Data;
 
@@ -23,10 +22,6 @@ public class UpdateSalesOrderDetailRequest {
     private Long rfqTierSplitId;
     private Long quotationDetailId;
     private String shippingMethod;
-    private Currency supplierCurrency;
-    private BigDecimal supplierUnitPrice;
-    private BigDecimal supplierShippingCost;
-    private BigDecimal supplierTotalUnitCost;
     private Long supplierQuoteTierId;
     private OrderLineType lineType;
 }

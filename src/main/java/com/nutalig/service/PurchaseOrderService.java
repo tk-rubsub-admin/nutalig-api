@@ -2433,6 +2433,9 @@ public class PurchaseOrderService {
         PurchaseOrderDto dto = new PurchaseOrderDto();
         dto.setPurchaseOrderNo(entity.getPurchaseOrderNo());
         dto.setSalesOrderNo(entity.getSalesOrder() != null ? entity.getSalesOrder().getSalesOrderNo() : null);
+        dto.setDeliveryDate(entity.getSalesOrder() != null && entity.getSalesOrder().getDeliveryDate() != null
+                ? entity.getSalesOrder().getDeliveryDate().format(DateUtil.DD_MM_YY)
+                : null);
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setPoMonth(entity.getPoMonth());
         dto.setProductionLeadTimeDay(entity.getProductionLeadTimeDay());

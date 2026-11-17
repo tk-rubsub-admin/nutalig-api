@@ -7,6 +7,7 @@ import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.InvoiceAwaitingValidationActionRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
 import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
+import com.nutalig.controller.invoice.request.InvoiceStatusChangeRequest;
 import com.nutalig.controller.invoice.request.RejectInvoiceRequiredApproveRequest;
 import com.nutalig.controller.invoice.request.RejectInvoicePaymentRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
@@ -28,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -96,6 +98,26 @@ public class InvoiceController {
 
         log.info("=== End update invoice {} ===", id);
         return new GeneralResponse<>(SUCCESS, response);
+    }
+
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('PERM_INVOICE_CREATE','PERM_INVOICE_REVERSE')")
+    public GeneralResponse<InvoiceDto> cancelInvoice(
+            @PathVariable(name = "id") String id,
+            @RequestBody InvoiceStatusChangeRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.cancelInvoice(id, request, userId));
+    }
+
+    @PatchMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('PERM_INVOICE_REVERSE')")
+    public GeneralResponse<InvoiceDto> voidInvoice(
+            @PathVariable(name = "id") String id,
+            @RequestBody InvoiceStatusChangeRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, invoiceService.voidInvoice(id, request, userId));
     }
 
     @PatchMapping("/{id}/required-approve/approve")

@@ -62,6 +62,15 @@ public class InvoiceEntity extends AuditDateEntity {
     @Column(name = "status", length = 30)
     private InvoiceStatus status;
 
+    @Column(name = "status_reason", columnDefinition = "TEXT")
+    private String statusReason;
+
+    @Column(name = "status_changed_by")
+    private String statusChangedBy;
+
+    @Column(name = "status_changed_date")
+    private ZonedDateTime statusChangedDate;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "currency", length = 10)
     private Currency currency;

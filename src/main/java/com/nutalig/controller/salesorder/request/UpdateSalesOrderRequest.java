@@ -11,6 +11,7 @@ import java.util.List;
 public class UpdateSalesOrderRequest {
     private LocalDate docDate;
     private LocalDate expireDate;
+    private LocalDate deliveryDate;
     private String coSaleId;
     private BigDecimal subTotal;
     private BigDecimal amount;

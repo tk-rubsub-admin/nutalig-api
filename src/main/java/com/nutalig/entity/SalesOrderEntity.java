@@ -34,6 +34,9 @@ public class SalesOrderEntity extends AuditDateEntity {
     @Column(name = "expire_date")
     private LocalDate expireDate;
 
+    @Column(name = "delivery_date")
+    private LocalDate deliveryDate;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30)
     private SalesOrderStatus status;

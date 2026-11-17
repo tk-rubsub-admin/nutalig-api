@@ -12,6 +12,7 @@ public class SalesOrderDto {
     private String salesOrderNo;
     private String docDate;
     private String expireDate;
+    private String deliveryDate;
     private SalesOrderStatus status;
     private DocumentStatusProfileDto statusProfile;
     private Currency currency;

@@ -11,6 +11,7 @@ import java.util.List;
 
 @Repository
 public interface ReceiptRepository extends JpaRepository<ReceiptEntity, String>, JpaSpecificationExecutor<ReceiptEntity> {
+    List<ReceiptEntity> findByInvoiceInvoiceNoOrderByCreatedDateDesc(String invoiceNo);
     List<ReceiptEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
 
     @Query(value = """

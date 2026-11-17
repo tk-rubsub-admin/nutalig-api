@@ -8,6 +8,7 @@ import com.nutalig.controller.file.response.UploadFileResponse;
 import com.nutalig.controller.invoice.request.CreateInvoiceRequest;
 import com.nutalig.controller.invoice.request.SearchInvoiceRequest;
 import com.nutalig.controller.invoice.request.UpdateInvoiceRequest;
+import com.nutalig.controller.invoice.request.InvoiceStatusChangeRequest;
 import com.nutalig.controller.invoice.request.RejectInvoiceRequiredApproveRequest;
 import com.nutalig.controller.invoice.response.InvoiceAwaitingValidationResponse;
 import com.nutalig.controller.request.DocumentRequest;
@@ -35,6 +36,7 @@ import com.nutalig.repository.InvoiceRepository;
 import com.nutalig.repository.InvoicePaymentAttachmentRepository;
 import com.nutalig.repository.InvoicePaymentRepository;
 import com.nutalig.repository.RequestPriceHeaderRepository;
+import com.nutalig.repository.ReceiptRepository;
 import com.nutalig.repository.SalesOrderRepository;
 import com.nutalig.repository.UserRepository;
 import com.nutalig.repository.SystemConfigRepository;
@@ -88,6 +90,7 @@ public class InvoiceService {
     private final InvoicePaymentAttachmentRepository invoicePaymentAttachmentRepository;
     private final InvoicePaymentRepository invoicePaymentRepository;
     private final InvoiceRepository invoiceRepository;
+    private final ReceiptRepository receiptRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final SalesOrderService salesOrderService;
     private final CustomerAnnualSalesService customerAnnualSalesService;
@@ -382,6 +385,87 @@ public class InvoiceService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto cancelInvoice(String invoiceNo, InvoiceStatusChangeRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        return changeInvoiceStatus(invoiceNo, request, userId, InvoiceStatus.CANCELLED);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public InvoiceDto voidInvoice(String invoiceNo, InvoiceStatusChangeRequest request, String userId)
+            throws DataNotFoundException, InvalidRequestException {
+        return changeInvoiceStatus(invoiceNo, request, userId, InvoiceStatus.VOID);
+    }
+
+    private InvoiceDto changeInvoiceStatus(String invoiceNo, InvoiceStatusChangeRequest request, String userId,
+                                           InvoiceStatus nextStatus)
+            throws DataNotFoundException, InvalidRequestException {
+        if (request == null || StringUtils.isBlank(request.getReason())) {
+            throw new InvalidRequestException("reason is required");
+        }
+        InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
+                .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED || invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new InvalidRequestException("Invoice is already cancelled or void");
+        }
+        boolean hasActiveReceipt = receiptRepository.findByInvoiceInvoiceNoOrderByCreatedDateDesc(invoiceNo).stream()
+                .anyMatch(receipt -> receipt.getStatus() != ReceiptStatus.CANCELLED
+                        && receipt.getStatus() != ReceiptStatus.VOID);
+        if (hasActiveReceipt) {
+            throw new InvalidRequestException("Invoice with an active receipt cannot be changed");
+        }
+        boolean hasApprovedPayment = invoice.getPayments().stream()
+                .anyMatch(payment -> payment.getStatus() == InvoicePaymentStatus.APPROVE);
+        if (nextStatus == InvoiceStatus.CANCELLED && hasApprovedPayment) {
+            throw new InvalidRequestException("Invoice with approved payment must be voided instead");
+        }
+        if (nextStatus == InvoiceStatus.CANCELLED
+                && !EnumSet.of(InvoiceStatus.DRAFT, InvoiceStatus.ISSUED, InvoiceStatus.AWAITING_VALIDATION)
+                .contains(invoice.getStatus())) {
+            throw new InvalidRequestException("Invoice status cannot be cancelled");
+        }
+        if (nextStatus == InvoiceStatus.VOID
+                && !EnumSet.of(InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.PAID)
+                .contains(invoice.getStatus())) {
+            throw new InvalidRequestException("Invoice status cannot be voided");
+        }
+        InvoiceStatus previousStatus = invoice.getStatus();
+        ZonedDateTime now = ZonedDateTime.now(DateUtil.getTimeZone());
+        if (nextStatus == InvoiceStatus.CANCELLED) {
+            invoice.getPayments().stream()
+                    .filter(payment -> payment.getStatus() == InvoicePaymentStatus.PENDING)
+                    .forEach(payment -> {
+                        payment.setStatus(InvoicePaymentStatus.REJECT);
+                        updateAllocationStatuses(payment, "REJECTED");
+                        payment.setUpdatedBy(user);
+                        payment.setUpdatedDate(now);
+                    });
+            invoice.setPaidTotal(BigDecimal.ZERO);
+            invoice.setOutstandingTotal(defaultIfNull(invoice.getGrandTotal()));
+        }
+        invoice.setStatus(nextStatus);
+        invoice.setStatusReason(request.getReason().trim());
+        invoice.setStatusChangedBy(userId);
+        invoice.setStatusChangedDate(now);
+        invoice.setUpdatedBy(user);
+        invoice.setUpdatedDate(now);
+        InvoiceEntity saved = invoiceRepository.saveAndFlush(invoice);
+        salesOrderPaymentScheduleService.recalculateStatuses(saved.getSalesOrder().getSalesOrderNo());
+        salesOrderService.recalculatePaymentSummary(saved.getSalesOrder().getSalesOrderNo());
+        salesPerformanceService.refreshForSalesOrder(saved.getSalesOrder());
+        customerAnnualSalesService.refreshForSalesOrder(saved.getSalesOrder());
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("previousStatus", previousStatus);
+        detail.put("status", nextStatus);
+        detail.put("reason", request.getReason().trim());
+        activityHistoryService.record(ActivityEntityType.INVOICE, invoiceNo, userId,
+                ActivityActorType.USER, ActivityAction.STATUS_CHANGE, ActivitySource.API,
+                (nextStatus == InvoiceStatus.VOID ? "Void" : "ยกเลิก") + " Invoice เลขที่ " + invoiceNo, detail);
+        return mapToDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public InvoiceDto approveRequiredApprove(String invoiceNo, String userId)
             throws DataNotFoundException, InvalidRequestException {
         validateRequiredApproveSuperAdmin(userId);
@@ -512,6 +596,9 @@ public class InvoiceService {
         InvoiceEntity invoice = invoiceRepository.findById(invoiceNo)
                 .orElseThrow(() -> new DataNotFoundException("Invoice " + invoiceNo + " not found."));
         InvoicePaymentEntity payment = resolvePayment(invoice, paymentId);
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED || invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new InvalidRequestException("Invoice is no longer active.");
+        }
         if (payment.getStatus() != InvoicePaymentStatus.PENDING) {
             throw new InvalidRequestException("Invoice payment is already processed.");
         }
@@ -1398,6 +1485,9 @@ public class InvoiceService {
         dto.setInstallmentCount(entity.getInstallmentCount());
         dto.setPaymentScheduleId(entity.getPaymentSchedule() == null ? null : entity.getPaymentSchedule().getId());
         dto.setStatus(entity.getStatus());
+        dto.setStatusReason(entity.getStatusReason());
+        dto.setStatusChangedBy(entity.getStatusChangedBy());
+        dto.setStatusChangedDate(entity.getStatusChangedDate());
         dto.setStatusProfile(DocumentStatusResolver.resolveInvoice(entity.getStatus(), entity.getPayments()));
         dto.setCurrency(entity.getCurrency());
         dto.setCustomer(customerMapper.toDto(entity.getCustomer()));

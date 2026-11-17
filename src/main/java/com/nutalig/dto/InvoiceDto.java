@@ -25,6 +25,9 @@ public class InvoiceDto {
     private Integer installmentCount;
     private Long paymentScheduleId;
     private InvoiceStatus status;
+    private String statusReason;
+    private String statusChangedBy;
+    private ZonedDateTime statusChangedDate;
     private DocumentStatusProfileDto statusProfile;
     private Currency currency;
     private CustomerDto customer;

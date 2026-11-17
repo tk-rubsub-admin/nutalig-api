@@ -1,5 +1,11 @@
 databaseChangeLog:
   - include:
+      file: db/changelog/20261117-003-add-invoice-reverse-permission.yaml
+  - include:
+      file: db/changelog/20261117-002-add-invoice-status-change-fields.yaml
+  - include:
+      file: db/changelog/20261117-001-add-sales-order-delivery-date.yaml
+  - include:
       file: db/changelog/20261019-001-add-purchase-order-payment-confirm-permission.yaml
   - include:
       file: db/changelog/20260928-001-add-request-sample-production-to-rfq.yaml

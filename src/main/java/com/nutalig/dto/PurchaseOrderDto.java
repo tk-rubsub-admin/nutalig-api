@@ -13,6 +13,7 @@ import java.time.LocalDate;
 public class PurchaseOrderDto {
     private String purchaseOrderNo;
     private String salesOrderNo;
+    private String deliveryDate;
     private String docDate;
     private String poMonth;
     private Integer productionLeadTimeDay;

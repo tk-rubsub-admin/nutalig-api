@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261117-002-add-invoice-status-change-fields
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: invoice
+        - not:
+            - columnExists:
+                tableName: invoice
+                columnName: status_reason
+      changes:
+        - addColumn:
+            tableName: invoice
+            columns:
+              - column: { name: status_reason, type: TEXT }
+              - column: { name: status_changed_by, type: VARCHAR(255) }
+              - column: { name: status_changed_date, type: DATETIME(6) }

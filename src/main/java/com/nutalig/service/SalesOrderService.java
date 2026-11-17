@@ -112,6 +112,7 @@ public class SalesOrderService {
     record SalesOrderSummary(
             BigDecimal subTotal,
             BigDecimal productSubTotal,
+            BigDecimal totalFreight,
             BigDecimal vat,
             BigDecimal grandTotal
     ) {}
@@ -139,6 +140,7 @@ public class SalesOrderService {
         entity.setQuotationNo(request.getQuotationNo());
         entity.setDocDate(request.getDocDate() == null ? today : request.getDocDate());
         entity.setExpireDate(request.getExpireDate() == null ? today.plusDays(7) : request.getExpireDate());
+        entity.setDeliveryDate(request.getDeliveryDate());
         entity.setStatus(status);
         entity.setCurrency(Currency.THB);
         entity.setCustomer(customer);
@@ -150,7 +152,7 @@ public class SalesOrderService {
         entity.setCoSalesId(request.getCoSaleId());
         entity.setCoSaleCommission(request.getCoSaleCommission());
         entity.setDiscount(defaultIfNull(request.getDiscount()));
-        entity.setFreight(defaultIfNull(request.getFreight()));
+        entity.setFreight(BigDecimal.ZERO);
         entity.setShippingType(normalizeShippingType(request.getShippingType()));
         entity.setShipping(request.getShipping());
         entity.setRequestCoa(Boolean.TRUE.equals(request.getRequestCoa()));
@@ -178,27 +180,27 @@ public class SalesOrderService {
             entity.getItems().add(detail);
         }
 
-        SalesOrderSummary summary = calculate(request.getItems(), entity.getDiscount(), entity.getFreight(), request.getIsVat());
+        SalesOrderSummary summary = calculate(request.getItems(), entity.getDiscount(), request.getIsVat());
+        entity.setFreight(summary.totalFreight());
         entity.setSubTotal(summary.subTotal());
-        entity.setAmount(summary.productSubTotal().subtract(entity.getFreight())
-                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        entity.setAmount(summary.productSubTotal());
         entity.setVat(summary.vat());
         entity.setGrandTotal(summary.grandTotal());
 
-        salesOrderPaymentScheduleService.initializeSchedules(entity, now);
-
-        salesOrderRepository.save(entity);
-        refreshCustomerOrderTotal(customer);
-        recalculatePaymentSummary(entity.getSalesOrderNo());
-
-        if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
-            linkRfq(request.getRfqId(), salesOrderNo, userId, now);
-        }
-
-        recordCreateSalesOrderActivity(entity, request, userId);
-        if (SalesOrderStatus.DRAFT.equals(status)) {
-            sendDraftSalesOrderNotification(entity, userId);
-        }
+//        salesOrderPaymentScheduleService.initializeSchedules(entity, now);
+//
+//        salesOrderRepository.save(entity);
+//        refreshCustomerOrderTotal(customer);
+//        recalculatePaymentSummary(entity.getSalesOrderNo());
+//
+//        if (SalesOrderStatus.CREATED.equals(request.getStatus())) {
+//            linkRfq(request.getRfqId(), salesOrderNo, userId, now);
+//        }
+//
+//        recordCreateSalesOrderActivity(entity, request, userId);
+//        if (SalesOrderStatus.DRAFT.equals(status)) {
+//            sendDraftSalesOrderNotification(entity, userId);
+//        }
 
         return entity;
     }
@@ -237,6 +239,9 @@ public class SalesOrderService {
         }
         if (request.getExpireDate() != null) {
             entity.setExpireDate(request.getExpireDate());
+        }
+        if (request.getDeliveryDate() != null) {
+            entity.setDeliveryDate(request.getDeliveryDate());
         }
         if (request.getCoSaleId() != null) {
             entity.setCoSalesId(request.getCoSaleId());
@@ -986,8 +991,7 @@ public class SalesOrderService {
         detail.setQuotationDetailId(request.getQuotationDetailId());
         detail.setShippingMethod(normalizeShippingType(request.getShippingMethod()));
         detail.setSupplierQuoteTierId(request.getSupplierQuoteTierId());
-        applySupplierQuoteTierCost(detail, request.getSupplierCurrency(), request.getSupplierUnitPrice(),
-                request.getSupplierShippingCost(), request.getSupplierTotalUnitCost());
+        applySupplierQuoteTierCost(detail);
         detail.setLineType(request.getLineType() == null
                 ? com.nutalig.constant.OrderLineType.PRODUCT
                 : request.getLineType());
@@ -1040,8 +1044,7 @@ public class SalesOrderService {
             detail.setQuotationDetailId(itemRequest.getQuotationDetailId());
             detail.setShippingMethod(normalizeShippingType(itemRequest.getShippingMethod()));
             detail.setSupplierQuoteTierId(itemRequest.getSupplierQuoteTierId());
-            applySupplierQuoteTierCost(detail, itemRequest.getSupplierCurrency(), itemRequest.getSupplierUnitPrice(),
-                    itemRequest.getSupplierShippingCost(), itemRequest.getSupplierTotalUnitCost());
+            applySupplierQuoteTierCost(detail);
             detail.setLineType(itemRequest.getLineType() == null
                     ? com.nutalig.constant.OrderLineType.PRODUCT
                     : itemRequest.getLineType());
@@ -1052,23 +1055,25 @@ public class SalesOrderService {
     }
 
     private void applySupplierQuoteTierCost(
-            SalesOrderDetailEntity detail,
-            Currency requestedCurrency,
-            BigDecimal requestedUnitPrice,
-            BigDecimal requestedShippingCost,
-            BigDecimal requestedTotalUnitCost
+            SalesOrderDetailEntity detail
     ) throws DataNotFoundException {
         if (detail.getSupplierQuoteTierId() == null) {
-            detail.setSupplierCurrency(requestedCurrency);
-            detail.setSupplierUnitPrice(requestedUnitPrice);
-            detail.setSupplierShippingCost(requestedShippingCost);
-            detail.setSupplierTotalUnitCost(requestedTotalUnitCost);
+            detail.setSupplierCurrency(null);
+            detail.setSupplierUnitPrice(null);
+            detail.setSupplierShippingCost(null);
+            detail.setSupplierTotalUnitCost(null);
             return;
         }
 
-        RfqSupplierQuoteTierEntity tier = supplierQuoteTierRepository.findById(detail.getSupplierQuoteTierId())
-                .orElseThrow(() -> new DataNotFoundException(
-                        "Supplier quote tier " + detail.getSupplierQuoteTierId() + " not found."));
+        RfqSupplierQuoteTierEntity tier = supplierQuoteTierRepository.findById(detail.getSupplierQuoteTierId()).orElse(null);
+        if (tier == null) {
+            detail.setSupplierQuoteTierId(null);
+            detail.setSupplierCurrency(null);
+            detail.setSupplierUnitPrice(null);
+            detail.setSupplierShippingCost(null);
+            detail.setSupplierTotalUnitCost(null);
+            return;
+        }
         BigDecimal shippingCost = defaultIfNull(tier.getShippingCost());
         detail.setSupplierCurrency(tier.getCurrency());
         detail.setSupplierUnitPrice(tier.getProductPrice());
@@ -1095,10 +1100,6 @@ public class SalesOrderService {
             request.setRfqTierSplitId(item.getRfqTierSplitId());
             request.setQuotationDetailId(item.getQuotationDetailId());
             request.setShippingMethod(item.getShippingMethod());
-            request.setSupplierCurrency(item.getSupplierCurrency());
-            request.setSupplierUnitPrice(item.getSupplierUnitPrice());
-            request.setSupplierShippingCost(item.getSupplierShippingCost());
-            request.setSupplierTotalUnitCost(item.getSupplierTotalUnitCost());
             request.setSupplierQuoteTierId(item.getSupplierQuoteTierId());
             request.setLineType(item.getLineType());
             requests.add(request);
@@ -1109,17 +1110,28 @@ public class SalesOrderService {
     private SalesOrderSummary calculate(
             List<CreateSalesOrderDetailRequest> items,
             BigDecimal requestDiscount,
-            BigDecimal requestFreight,
-            Boolean isVat
-    ) {
+            Boolean isVat) {
         BigDecimal subTotal = BigDecimal.ZERO;
         BigDecimal productSubTotal = BigDecimal.ZERO;
+        BigDecimal totalFreight = BigDecimal.ZERO;
         for (CreateSalesOrderDetailRequest item : Optional.ofNullable(items).orElseGet(List::of)) {
             BigDecimal lineTotal = defaultIfNull(item.getUnitPrice())
                     .multiply(defaultIfNull(item.getQuantity()));
             subTotal = subTotal.add(lineTotal);
             if (item.getLineType() == null || OrderLineType.PRODUCT.equals(item.getLineType())) {
-                productSubTotal = productSubTotal.add(lineTotal);
+                BigDecimal productPrice = lineTotal;
+                BigDecimal shippingCost = BigDecimal.ZERO;
+                if (item.getRfqTierId() != null) {
+                    RfqTierEntity tier = requestPriceTierRepository.findById(item.getRfqTierId())
+                            .orElse(null);
+                    if (tier != null) {
+//                        productPrice = defaultIfNull(tier.getProductPrice());
+                        productPrice = defaultIfNull(item.getUnitPrice()).subtract(defaultIfNull(tier.getShippingCost()));
+                        shippingCost = defaultIfNull(tier.getShippingCost());
+                    }
+                }
+                productSubTotal = productSubTotal.add(productPrice.multiply(defaultIfNull(item.getQuantity())));
+                totalFreight = totalFreight.add(shippingCost.multiply(defaultIfNull(item.getQuantity())));
             }
         }
 
@@ -1138,6 +1150,7 @@ public class SalesOrderService {
         return new SalesOrderSummary(
                 subTotal.setScale(2, RoundingMode.HALF_UP),
                 productSubTotal.setScale(2, RoundingMode.HALF_UP),
+                totalFreight.setScale(2, RoundingMode.HALF_UP),
                 vat,
                 grandTotal
         );
@@ -1176,6 +1189,7 @@ public class SalesOrderService {
         return new SalesOrderSummary(
                 subTotal.setScale(2, RoundingMode.HALF_UP),
                 productSubTotal.setScale(2, RoundingMode.HALF_UP),
+                freight.setScale(2, RoundingMode.HALF_UP),
                 vat,
                 grandTotal
         );
@@ -1466,6 +1480,7 @@ public class SalesOrderService {
         dto.setSalesOrderNo(entity.getSalesOrderNo());
         dto.setDocDate(entity.getDocDate() != null ? entity.getDocDate().format(DateUtil.DD_MM_YY) : null);
         dto.setExpireDate(entity.getExpireDate() != null ? entity.getExpireDate().format(DateUtil.DD_MM_YY) : null);
+        dto.setDeliveryDate(entity.getDeliveryDate() != null ? entity.getDeliveryDate().format(DateUtil.DD_MM_YY) : null);
         dto.setStatus(entity.getStatus());
         dto.setStatusProfile(DocumentStatusResolver.resolveSalesOrder(entity.getStatus()));
         dto.setCurrency(entity.getCurrency());
