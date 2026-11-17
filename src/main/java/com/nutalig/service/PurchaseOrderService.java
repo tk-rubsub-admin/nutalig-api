@@ -2646,6 +2646,8 @@ public class PurchaseOrderService {
                             ? null : route.getShippingRoute().getOriginLocation().getId());
                     routeDto.setOriginLocationName(route.getShippingRoute() == null || route.getShippingRoute().getOriginLocation() == null
                             ? null : route.getShippingRoute().getOriginLocation().getName());
+                    routeDto.setOriginLocationAddress(route.getShippingRoute() == null || route.getShippingRoute().getOriginLocation() == null
+                            ? null : route.getShippingRoute().getOriginLocation().getAddress());
                     routeDto.setDestinationLocationId(route.getShippingRoute() == null || route.getShippingRoute().getDestinationLocation() == null
                             ? null : route.getShippingRoute().getDestinationLocation().getId());
                     routeDto.setDestinationLocationName(route.getShippingRoute() == null || route.getShippingRoute().getDestinationLocation() == null

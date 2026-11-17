@@ -19,8 +19,10 @@ public class SupplierShippingRouteDto {
     private String routeCode;
     private Long originLocationId;
     private String originLocationName;
+    private String originLocationAddress;
     private Long destinationLocationId;
     private String destinationLocationName;
+    private String destinationLocationAddress;
     private String currency;
     private BigDecimal baseCost;
     private Integer leadTimeDayMin;

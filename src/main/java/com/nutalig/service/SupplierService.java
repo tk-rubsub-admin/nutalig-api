@@ -1021,8 +1021,10 @@ public class SupplierService {
         dto.setRouteCode(route.getRouteCode());
         dto.setOriginLocationId(route.getOriginLocation().getId());
         dto.setOriginLocationName(route.getOriginLocation().getName());
+        dto.setOriginLocationAddress(route.getOriginLocation().getAddress());
         dto.setDestinationLocationId(route.getDestinationLocation().getId());
         dto.setDestinationLocationName(route.getDestinationLocation().getName());
+        dto.setDestinationLocationAddress(route.getDestinationLocation().getAddress());
         dto.setCurrency(entity.getCurrency());
         dto.setBaseCost(entity.getBaseCost());
         dto.setLeadTimeDayMin(entity.getLeadTimeDayMin());
