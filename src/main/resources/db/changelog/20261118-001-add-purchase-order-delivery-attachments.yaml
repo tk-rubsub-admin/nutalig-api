@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261118-001-add-purchase-order-delivery-attachments
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: purchase_order_delivery
+        - tableExists:
+            tableName: user
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_delivery_attachment (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  delivery_id BIGINT NOT NULL,
+                  file_name VARCHAR(255) NOT NULL,
+                  file_url VARCHAR(500) NOT NULL,
+                  delivery_section VARCHAR(30) NOT NULL,
+                  uploaded_by VARCHAR(100) NOT NULL,
+                  uploaded_at DATETIME(6) NOT NULL,
+                  active BOOLEAN NOT NULL DEFAULT TRUE,
+                  PRIMARY KEY (id),
+                  KEY idx_po_delivery_attachment_delivery (delivery_id),
+                  KEY idx_po_delivery_attachment_section (delivery_id, delivery_section),
+                  CONSTRAINT fk_po_delivery_attachment_delivery FOREIGN KEY (delivery_id)
+                      REFERENCES purchase_order_delivery (id) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_delivery_attachment_uploaded_by FOREIGN KEY (uploaded_by)
+                      REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

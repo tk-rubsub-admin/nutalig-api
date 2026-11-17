@@ -95,6 +95,7 @@ public class PurchaseOrderService {
     private final ProcurementNotificationService procurementNotificationService;
     private final SalesOrderItemShippingService salesOrderItemShippingService;
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
+    private final PurchaseOrderDeliveryAttachmentRepository purchaseOrderDeliveryAttachmentRepository;
     private final ShippingContainerLoadRepository shippingContainerLoadRepository;
     private final LineMessageService lineMessageService;
     private final LineConfiguration lineConfiguration;
@@ -1014,6 +1015,97 @@ public class PurchaseOrderService {
         );
 
         return mapToDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderDeliveryAttachmentDto> getDeliveryAttachments(
+            String purchaseOrderNo, Long deliveryId
+    ) throws DataNotFoundException, InvalidRequestException {
+        findDelivery(purchaseOrderNo, deliveryId);
+        return purchaseOrderDeliveryAttachmentRepository
+                .findByDeliveryIdAndActiveTrueOrderByUploadedAtAscIdAsc(deliveryId)
+                .stream()
+                .map(this::mapDeliveryAttachment)
+                .toList();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<PurchaseOrderDeliveryAttachmentDto> addDeliveryAttachment(
+            String purchaseOrderNo,
+            Long deliveryId,
+            MultipartFile file,
+            PurchaseOrderDeliveryAttachmentSection deliverySection,
+            String userId
+    ) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new InvalidRequestException("Attachment file is required");
+        }
+        if (deliverySection == null) {
+            throw new InvalidRequestException("deliverySection is required");
+        }
+
+        PurchaseOrderDeliveryEntity delivery = findDelivery(purchaseOrderNo, deliveryId);
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        UploadFileResponse upload = fileStorageService.uploadFile(file);
+
+        PurchaseOrderDeliveryAttachmentEntity attachment = new PurchaseOrderDeliveryAttachmentEntity();
+        attachment.setDelivery(delivery);
+        attachment.setFileName(upload.getFileName());
+        attachment.setFileUrl(upload.getUrl());
+        attachment.setDeliverySection(deliverySection);
+        attachment.setUploadedBy(user);
+        attachment.setUploadedAt(now(DateUtil.getTimeZone()));
+        attachment.setActive(Boolean.TRUE);
+        delivery.addAttachment(attachment);
+        purchaseOrderDeliveryAttachmentRepository.save(attachment);
+
+        return getDeliveryAttachments(purchaseOrderNo, deliveryId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<PurchaseOrderDeliveryAttachmentDto> deleteDeliveryAttachment(
+            String purchaseOrderNo, Long deliveryId, Long attachmentId, String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        findDelivery(purchaseOrderNo, deliveryId);
+        userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("User " + userId + " not found."));
+        PurchaseOrderDeliveryAttachmentEntity attachment = purchaseOrderDeliveryAttachmentRepository
+                .findByIdAndDeliveryIdAndActiveTrue(attachmentId, deliveryId)
+                .orElseThrow(() -> new DataNotFoundException(
+                        "Purchase order delivery attachment " + attachmentId + " not found."));
+        attachment.setActive(Boolean.FALSE);
+        purchaseOrderDeliveryAttachmentRepository.save(attachment);
+        return getDeliveryAttachments(purchaseOrderNo, deliveryId);
+    }
+
+    private PurchaseOrderDeliveryEntity findDelivery(String purchaseOrderNo, Long deliveryId)
+            throws DataNotFoundException, InvalidRequestException {
+        if (deliveryId == null) {
+            throw new InvalidRequestException("deliveryId is required");
+        }
+        purchaseOrderRepository.findById(purchaseOrderNo)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order " + purchaseOrderNo + " not found."));
+        PurchaseOrderDeliveryEntity delivery = purchaseOrderDeliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new DataNotFoundException("Purchase order delivery " + deliveryId + " not found."));
+        if (!purchaseOrderNo.equals(delivery.getPurchaseOrder().getPurchaseOrderNo())) {
+            throw new InvalidRequestException("Delivery does not belong to this purchase order.");
+        }
+        return delivery;
+    }
+
+    private PurchaseOrderDeliveryAttachmentDto mapDeliveryAttachment(
+            PurchaseOrderDeliveryAttachmentEntity attachment
+    ) {
+        PurchaseOrderDeliveryAttachmentDto dto = new PurchaseOrderDeliveryAttachmentDto();
+        dto.setId(attachment.getId());
+        dto.setDeliveryId(attachment.getDelivery().getId());
+        dto.setFileName(attachment.getFileName());
+        dto.setFileUrl(attachment.getFileUrl());
+        dto.setDeliverySection(attachment.getDeliverySection());
+        dto.setUploadedBy(attachment.getUploadedBy() == null ? null : attachment.getUploadedBy().getId());
+        dto.setUploadedAt(attachment.getUploadedAt());
+        return dto;
     }
 
     @Transactional(readOnly = true)

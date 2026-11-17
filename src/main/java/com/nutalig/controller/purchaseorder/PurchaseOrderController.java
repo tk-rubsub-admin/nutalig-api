@@ -2,6 +2,7 @@ package com.nutalig.controller.purchaseorder;
 
 import com.nutalig.constant.ExportFileFormat;
 import com.nutalig.constant.PurchaseOrderAttachmentDocumentType;
+import com.nutalig.constant.PurchaseOrderDeliveryAttachmentSection;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderPaymentInstructionRequest;
@@ -22,6 +23,7 @@ import com.nutalig.controller.request.PageableRequest;
 import com.nutalig.controller.response.GeneralResponse;
 import com.nutalig.controller.response.Pageable;
 import com.nutalig.dto.PurchaseOrderDto;
+import com.nutalig.dto.PurchaseOrderDeliveryAttachmentDto;
 import com.nutalig.dto.PurchaseOrderCbmPreviewDto;
 import com.nutalig.dto.PurchaseOrderPaymentDto;
 import com.nutalig.dto.PurchaseOrderPaymentInstructionDto;
@@ -148,6 +150,37 @@ public class PurchaseOrderController {
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateDelivery(
                 id, deliveryId, request, userId));
+    }
+
+    @GetMapping("/{id}/deliveries/{deliveryId}/attachments")
+    public GeneralResponse<List<PurchaseOrderDeliveryAttachmentDto>> getDeliveryAttachments(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.getDeliveryAttachments(id, deliveryId));
+    }
+
+    @PostMapping("/{id}/deliveries/{deliveryId}/attachments")
+    public GeneralResponse<List<PurchaseOrderDeliveryAttachmentDto>> addDeliveryAttachment(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("deliverySection") PurchaseOrderDeliveryAttachmentSection deliverySection,
+            @RequestHeader("userId") String userId
+    ) throws Exception {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.addDeliveryAttachment(
+                id, deliveryId, file, deliverySection, userId));
+    }
+
+    @DeleteMapping("/{id}/deliveries/{deliveryId}/attachments/{attachmentId}")
+    public GeneralResponse<List<PurchaseOrderDeliveryAttachmentDto>> deleteDeliveryAttachment(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId,
+            @PathVariable("attachmentId") Long attachmentId,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderService.deleteDeliveryAttachment(
+                id, deliveryId, attachmentId, userId));
     }
 
     @PatchMapping("/{id}/production-expected-end-date")

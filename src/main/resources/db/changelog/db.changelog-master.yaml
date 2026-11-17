@@ -3188,3 +3188,5 @@ databaseChangeLog:
       file: db/changelog/20261116-002-add-supplier-shipping-route-to-shipping-container.yaml
   - include:
       file: db/changelog/20261116-003-add-purchase-order-supplier-shipping-route-snapshot.yaml
+  - include:
+      file: db/changelog/20261118-001-add-purchase-order-delivery-attachments.yaml

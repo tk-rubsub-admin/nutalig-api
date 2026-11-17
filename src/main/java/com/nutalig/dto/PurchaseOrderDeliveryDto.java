@@ -31,6 +31,7 @@ public class PurchaseOrderDeliveryDto {
     private PurchaseOrderDeliveryStatus status;
     private DeliveryContainerStatus containerStatus;
     private List<ContainerReference> containers;
+    private List<PurchaseOrderDeliveryAttachmentDto> attachments;
 
     @Data
     public static class ContainerReference {

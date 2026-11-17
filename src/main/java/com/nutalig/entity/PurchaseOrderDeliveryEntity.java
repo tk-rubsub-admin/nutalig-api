@@ -108,6 +108,10 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
     @org.hibernate.annotations.BatchSize(size = 50)
     private List<PurchaseOrderDeliveryScrapBoxEntity> scrapBoxes = new ArrayList<>();
 
+    @OneToMany(mappedBy = "delivery", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("uploadedAt asc, id asc")
+    private List<PurchaseOrderDeliveryAttachmentEntity> attachments = new ArrayList<>();
+
     public void addScrapBox(PurchaseOrderDeliveryScrapBoxEntity box) {
         scrapBoxes.add(box);
         box.setPurchaseOrderDelivery(this);
@@ -123,6 +127,12 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
         if (detail == null) return;
         details.remove(detail);
         detail.setPurchaseOrderDelivery(null);
+    }
+
+    public void addAttachment(PurchaseOrderDeliveryAttachmentEntity attachment) {
+        if (attachment == null) return;
+        attachments.add(attachment);
+        attachment.setDelivery(this);
     }
 
     @Override

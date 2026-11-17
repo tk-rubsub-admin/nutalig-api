@@ -53,6 +53,20 @@ public final class PurchaseOrderDeliveryMapper {
                     ref.setContainerNo(container.getContainerNo());
                     return ref;
                 }).toList());
+        deliveryDto.setAttachments(delivery.getAttachments().stream()
+                .filter(attachment -> Boolean.TRUE.equals(attachment.getActive()))
+                .map(attachment -> {
+                    PurchaseOrderDeliveryAttachmentDto attachmentDto = new PurchaseOrderDeliveryAttachmentDto();
+                    attachmentDto.setId(attachment.getId());
+                    attachmentDto.setDeliveryId(delivery.getId());
+                    attachmentDto.setFileName(attachment.getFileName());
+                    attachmentDto.setFileUrl(attachment.getFileUrl());
+                    attachmentDto.setDeliverySection(attachment.getDeliverySection());
+                    attachmentDto.setUploadedBy(attachment.getUploadedBy() == null
+                            ? null : attachment.getUploadedBy().getId());
+                    attachmentDto.setUploadedAt(attachment.getUploadedAt());
+                    return attachmentDto;
+                }).toList());
         deliveryDto.setRemark(delivery.getRemark());
         deliveryDto.setCreatedBy(delivery.getCreatedBy());
         deliveryDto.setUpdatedBy(delivery.getUpdatedBy());
