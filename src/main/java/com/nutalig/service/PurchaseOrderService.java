@@ -1651,8 +1651,24 @@ public class PurchaseOrderService {
         snapshot.put("shippedDate", delivery.getShippedAt().toLocalDate().toString());
         snapshot.put("expectedWarehouseDate", delivery.getExpectedWarehouseDate().toString());
         snapshot.put("shippingMethod", delivery.getShippingMethod());
-        snapshot.put("shippingLocationId", delivery.getShippingLocation().getId());
+        snapshot.put("shippingLocationId", delivery.getShippingLocation() == null
+                ? null : delivery.getShippingLocation().getId());
         snapshot.put("shippingLocationName", delivery.getShippingLocationNameSnapshot());
+        snapshot.put("supplierShippingId", delivery.getSupplierShipping() == null
+                ? null : delivery.getSupplierShipping().getId());
+        snapshot.put("supplierShippingRouteId", delivery.getSupplierShippingRoute() == null
+                ? null : delivery.getSupplierShippingRoute().getId());
+        snapshot.put("shippingRouteCode", delivery.getSupplierShippingRoute() == null
+                || delivery.getSupplierShippingRoute().getShippingRoute() == null
+                ? null : delivery.getSupplierShippingRoute().getShippingRoute().getRouteCode());
+        snapshot.put("originLocationName", delivery.getSupplierShippingRoute() == null
+                || delivery.getSupplierShippingRoute().getShippingRoute() == null
+                || delivery.getSupplierShippingRoute().getShippingRoute().getOriginLocation() == null
+                ? null : delivery.getSupplierShippingRoute().getShippingRoute().getOriginLocation().getName());
+        snapshot.put("destinationLocationName", delivery.getSupplierShippingRoute() == null
+                || delivery.getSupplierShippingRoute().getShippingRoute() == null
+                || delivery.getSupplierShippingRoute().getShippingRoute().getDestinationLocation() == null
+                ? null : delivery.getSupplierShippingRoute().getShippingRoute().getDestinationLocation().getName());
         snapshot.put("note", delivery.getRemark());
         snapshot.put("allQuantitiesDelivered", allQuantitiesDelivered);
         snapshot.put("details", delivery.getDetails().stream().map(item -> {
