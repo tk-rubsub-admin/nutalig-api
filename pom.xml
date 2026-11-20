@@ -263,9 +263,9 @@
             <version>1.0.0</version>
         </dependency>
         <dependency>
-            <groupId>local.jasperFontOverrides</groupId>
-            <artifactId>local.jasperFontOverrides</artifactId>
-            <version>1.0.1</version>
+            <groupId>local.jasper.font</groupId>
+            <artifactId>local.jasper.font</artifactId>
+            <version>1.0.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.firebase</groupId>
