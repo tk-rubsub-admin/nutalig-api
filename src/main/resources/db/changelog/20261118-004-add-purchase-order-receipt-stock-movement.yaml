@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261118-004-add-purchase-order-receipt-stock-movement
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE IF NOT EXISTS purchase_order_receipt_stock_movement (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  receipt_no VARCHAR(50) NOT NULL,
+                  receipt_detail_id BIGINT NOT NULL,
+                  delivery_detail_id BIGINT NOT NULL,
+                  warehouse_id BIGINT NOT NULL,
+                  warehouse_location_id BIGINT DEFAULT NULL,
+                  purchase_order_detail_id BIGINT NOT NULL,
+                  purchase_order_detail_component_id BIGINT DEFAULT NULL,
+                  item_name VARCHAR(255) DEFAULT NULL,
+                  movement_type VARCHAR(30) NOT NULL,
+                  quantity DECIMAL(18,5) NOT NULL,
+                  movement_at DATETIME(6) NOT NULL,
+                  created_by VARCHAR(100) DEFAULT NULL,
+                  reverse_of_id BIGINT DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_receipt_stock_movement_receipt (receipt_no),
+                  KEY idx_receipt_stock_movement_detail (receipt_detail_id),
+                  KEY idx_receipt_stock_movement_reverse (reverse_of_id),
+                  CONSTRAINT fk_receipt_stock_movement_receipt
+                    FOREIGN KEY (receipt_no) REFERENCES purchase_order_receipt (receipt_no),
+                  CONSTRAINT fk_receipt_stock_movement_receipt_detail
+                    FOREIGN KEY (receipt_detail_id) REFERENCES purchase_order_receipt_detail (id),
+                  CONSTRAINT fk_receipt_stock_movement_reverse
+                    FOREIGN KEY (reverse_of_id) REFERENCES purchase_order_receipt_stock_movement (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

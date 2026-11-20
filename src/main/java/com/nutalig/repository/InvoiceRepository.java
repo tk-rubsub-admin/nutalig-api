@@ -15,7 +15,22 @@ import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<InvoiceEntity, String>, JpaSpecificationExecutor<InvoiceEntity> {
-    List<InvoiceEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(String salesOrderNo);
+    @Query("""
+            select invoice
+            from InvoiceEntity invoice
+            where invoice.salesOrder.salesOrderNo = :salesOrderNo
+            order by case
+                when invoice.status in (
+                    com.nutalig.constant.InvoiceStatus.CANCELLED,
+                    com.nutalig.constant.InvoiceStatus.VOID
+                ) then 1
+                else 0
+            end asc,
+            invoice.createdDate desc
+            """)
+    List<InvoiceEntity> findBySalesOrderSalesOrderNoOrderByCreatedDateDesc(
+            @Param("salesOrderNo") String salesOrderNo
+    );
     List<InvoiceEntity> findByPaymentScheduleId(Long paymentScheduleId);
 
     @Query(value = """

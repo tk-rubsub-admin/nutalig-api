@@ -3190,3 +3190,9 @@ databaseChangeLog:
       file: db/changelog/20261116-003-add-purchase-order-supplier-shipping-route-snapshot.yaml
   - include:
       file: db/changelog/20261118-001-add-purchase-order-delivery-attachments.yaml
+  - include:
+      file: db/changelog/20261118-002-add-purchase-order-receipts.yaml
+  - include:
+      file: db/changelog/20261118-003-add-purchase-order-receive-permissions.yaml
+  - include:
+      file: db/changelog/20261118-004-add-purchase-order-receipt-stock-movement.yaml

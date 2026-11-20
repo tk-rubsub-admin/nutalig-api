@@ -61,6 +61,7 @@ public class ReportService {
     private static final String DEPOSIT_RECEIPT_TAX_INVOICE_TEMPLATE = "report/depositReceiptTaxInvoice.jrxml";
     private static final String RECEIPT_TEMPLATE = "report/receipt.jrxml";
     private static final String RECEIPT_TAX_INVOICE_TEMPLATE = "report/receiptTaxInvoice.jrxml";
+    private static final String CARTON_LABEL_TEMPLATE = "report/cartonLabel.jrxml";
     private static final String NUTALIG_LOGO_V2 = "report/nutalig_new_logo.png";
     private static final String QUOTATION_TEMPLATE_TH_V2 = "report/v2/quotation_th.jrxml";
     private static final String QUOTATION_TEMPLATE_EN_V2 = "report/quotation_en.jrxml";
@@ -301,6 +302,22 @@ public class ReportService {
         }
 
         return null;
+    }
+
+    public Object getCartonLabelDocument(CartonLabelDocumentDto dto, ExportFileFormat format) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("logo", loadResource(NUTALIG_LOGO_V2));
+        parameters.put("purchaseNo", dto.getPurchaseNo());
+        parameters.put("salesOrderNo", dto.getSalesOrderNo());
+        parameters.put("productName", dto.getProductName());
+        parameters.put("spec", dto.getSpec());
+        parameters.put("component", dto.getComponent());
+        parameters.put("dimension", dto.getDimension());
+        parameters.put("weight", dto.getWeight());
+        parameters.put("qrCode", dto.getQrCode());
+        JasperPrint jasperPrint = buildJasperPrint(
+                CARTON_LABEL_TEMPLATE, parameters, new JREmptyDataSource(1));
+        return exportByFormat(jasperPrint, format);
     }
 
     private InputStream preparePurchaseOrderImage(InputStream image, String documentNo, Integer lineNo) {

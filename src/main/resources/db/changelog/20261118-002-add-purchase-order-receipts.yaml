@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261118-002-add-purchase-order-receipts
+      author: codex
+      preConditions:
+        - onFail: HALT
+        - tableExists:
+            tableName: purchase_order
+        - tableExists:
+            tableName: purchase_order_delivery
+        - tableExists:
+            tableName: user
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              CREATE TABLE purchase_order_receipt (
+                  receipt_no VARCHAR(50) NOT NULL,
+                  purchase_order_no VARCHAR(50) NOT NULL,
+                  delivery_id BIGINT NOT NULL,
+                  warehouse_id BIGINT DEFAULT NULL,
+                  received_date DATE NOT NULL,
+                  received_by VARCHAR(100) NOT NULL,
+                  status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED',
+                  remark VARCHAR(1000) DEFAULT NULL,
+                  created_date DATETIME(6) DEFAULT NULL,
+                  updated_date DATETIME(6) DEFAULT NULL,
+                  PRIMARY KEY (receipt_no),
+                  KEY idx_po_receipt_delivery (delivery_id),
+                  KEY idx_po_receipt_po (purchase_order_no),
+                  CONSTRAINT fk_po_receipt_po FOREIGN KEY (purchase_order_no)
+                      REFERENCES purchase_order (purchase_order_no) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_receipt_delivery FOREIGN KEY (delivery_id)
+                      REFERENCES purchase_order_delivery (id) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_receipt_received_by FOREIGN KEY (received_by)
+                      REFERENCES user (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+              CREATE TABLE purchase_order_receipt_detail (
+                  id BIGINT NOT NULL AUTO_INCREMENT,
+                  receipt_no VARCHAR(50) NOT NULL,
+                  delivery_detail_id BIGINT NOT NULL,
+                  shipped_quantity DECIMAL(18,5) NOT NULL,
+                  received_quantity DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  damaged_quantity DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  shortage_quantity DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  excess_quantity DECIMAL(18,5) NOT NULL DEFAULT 0,
+                  lot_no VARCHAR(100) DEFAULT NULL,
+                  expiry_date DATE DEFAULT NULL,
+                  warehouse_location_id BIGINT DEFAULT NULL,
+                  remark VARCHAR(1000) DEFAULT NULL,
+                  PRIMARY KEY (id),
+                  KEY idx_po_receipt_detail_receipt (receipt_no),
+                  KEY idx_po_receipt_detail_delivery_detail (delivery_detail_id),
+                  CONSTRAINT fk_po_receipt_detail_receipt FOREIGN KEY (receipt_no)
+                      REFERENCES purchase_order_receipt (receipt_no) ON DELETE CASCADE,
+                  CONSTRAINT fk_po_receipt_detail_delivery_detail FOREIGN KEY (delivery_detail_id)
+                      REFERENCES purchase_order_delivery_detail (id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

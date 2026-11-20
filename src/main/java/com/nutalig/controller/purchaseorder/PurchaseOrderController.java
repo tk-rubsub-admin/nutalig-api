@@ -14,6 +14,7 @@ import com.nutalig.controller.purchaseorder.request.SearchPendingSupplierPayment
 import com.nutalig.controller.purchaseorder.request.PurchaseOrderCbmPreviewRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderDeliveryRequest;
+import com.nutalig.controller.purchaseorder.request.CreatePurchaseOrderReceiptRequest;
 import com.nutalig.controller.purchaseorder.request.StartPurchaseOrderRunRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderPaymentRequest;
 import com.nutalig.controller.purchaseorder.request.UpdatePurchaseOrderMilestoneRequest;
@@ -62,6 +63,7 @@ public class PurchaseOrderController {
     private final PurchaseOrderPaymentInstructionService paymentInstructionService;
     private final PurchaseOrderPaymentScheduleService purchaseOrderPaymentScheduleService;
     private final PendingSupplierPaymentService pendingSupplierPaymentService;
+    private final com.nutalig.service.PurchaseOrderReceivingService purchaseOrderReceivingService;
 
     @GetMapping("/production-calendar")
     @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_TRACKING')")
@@ -150,6 +152,35 @@ public class PurchaseOrderController {
     ) throws DataNotFoundException, InvalidRequestException {
         return new GeneralResponse<>(SUCCESS, purchaseOrderService.updateDelivery(
                 id, deliveryId, request, userId));
+    }
+
+    @GetMapping("/{id}/deliveries/{deliveryId}/receive")
+    @PreAuthorize("hasAnyAuthority('PERM_PURCHASE_ORDER_RECEIVE_VIEW', 'PERM_PURCHASE_ORDER_VIEW')")
+    public GeneralResponse<com.nutalig.dto.PurchaseOrderReceiptDto> getReceiveContext(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderReceivingService.getReceiveContext(id, deliveryId));
+    }
+
+    @PostMapping("/{id}/deliveries/{deliveryId}/receipts")
+    @PreAuthorize("hasAuthority('PERM_PURCHASE_ORDER_RECEIVE_CONFIRM')")
+    public GeneralResponse<com.nutalig.dto.PurchaseOrderReceiptDto> createDeliveryReceipt(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId,
+            @RequestBody CreatePurchaseOrderReceiptRequest request,
+            @RequestHeader("userId") String userId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderReceivingService.createReceipt(id, deliveryId, request, userId));
+    }
+
+    @GetMapping("/{id}/deliveries/{deliveryId}/receipts")
+    @PreAuthorize("hasAnyAuthority('PERM_PURCHASE_ORDER_RECEIVE_VIEW', 'PERM_PURCHASE_ORDER_VIEW')")
+    public GeneralResponse<List<com.nutalig.dto.PurchaseOrderReceiptDto>> getDeliveryReceipts(
+            @PathVariable("id") String id,
+            @PathVariable("deliveryId") Long deliveryId
+    ) throws DataNotFoundException, InvalidRequestException {
+        return new GeneralResponse<>(SUCCESS, purchaseOrderReceivingService.getReceipts(id, deliveryId));
     }
 
     @GetMapping("/{id}/deliveries/{deliveryId}/attachments")

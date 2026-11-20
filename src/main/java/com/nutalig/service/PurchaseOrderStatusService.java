@@ -8,6 +8,7 @@ import com.nutalig.entity.PurchaseOrderDetailComponentEntity;
 import com.nutalig.entity.PurchaseOrderDetailEntity;
 import com.nutalig.entity.PurchaseOrderEntity;
 import com.nutalig.repository.PurchaseOrderDeliveryRepository;
+import com.nutalig.repository.PurchaseOrderReceiptRepository;
 import com.nutalig.utils.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -28,10 +30,13 @@ public class PurchaseOrderStatusService {
     private static final Set<PurchaseOrderDeliveryStatus> SHIPPED_STATUSES = Set.of(
             PurchaseOrderDeliveryStatus.HANDED_OVER_TO_CARRIER,
             PurchaseOrderDeliveryStatus.IN_TRANSIT,
+            PurchaseOrderDeliveryStatus.PARTIALLY_RECEIVED,
+            PurchaseOrderDeliveryStatus.RECEIVED_WITH_ISSUE,
             PurchaseOrderDeliveryStatus.RECEIVED_AT_WAREHOUSE
     );
 
     private final PurchaseOrderDeliveryRepository purchaseOrderDeliveryRepository;
+    private final PurchaseOrderReceiptRepository purchaseOrderReceiptRepository;
 
     @Transactional
     public void refresh(PurchaseOrderEntity purchaseOrder) {
@@ -47,6 +52,11 @@ public class PurchaseOrderStatusService {
         Map<DeliveryKey, BigDecimal> produced = new HashMap<>();
         Map<DeliveryKey, BigDecimal> shipped = new HashMap<>();
         Map<DeliveryKey, BigDecimal> received = new HashMap<>();
+        List<com.nutalig.entity.PurchaseOrderReceiptEntity> confirmedReceipts =
+                purchaseOrderReceiptRepository.findByPurchaseOrder_PurchaseOrderNoOrderByCreatedDateDesc(
+                        purchaseOrder.getPurchaseOrderNo()).stream()
+                        .filter(receipt -> receipt.getStatus() == com.nutalig.constant.PurchaseOrderReceiptStatus.CONFIRMED)
+                        .toList();
         List<PurchaseOrderDeliveryEntity> deliveries = purchaseOrderDeliveryRepository
                 .findAllByPurchaseOrder_PurchaseOrderNo(purchaseOrder.getPurchaseOrderNo());
 
@@ -60,11 +70,25 @@ public class PurchaseOrderStatusService {
                 BigDecimal quantity = valueOrZero(detail.getQuantity());
                 add(produced, key, quantity);
                 if (SHIPPED_STATUSES.contains(delivery.getStatus())) add(shipped, key, quantity);
-                if (delivery.getStatus() == PurchaseOrderDeliveryStatus.RECEIVED_AT_WAREHOUSE) {
+                if (delivery.getStatus() == PurchaseOrderDeliveryStatus.RECEIVED_AT_WAREHOUSE
+                        && confirmedReceipts.stream().noneMatch(receipt ->
+                        receipt.getDelivery() != null && Objects.equals(receipt.getDelivery().getId(), delivery.getId()))) {
                     add(received, key, quantity);
                 }
             }
         }
+
+        confirmedReceipts
+                .stream()
+                .flatMap(receipt -> receipt.getDetails().stream())
+                .forEach(detail -> {
+                    var deliveryDetail = detail.getDeliveryDetail();
+                    var key = new DeliveryKey(
+                            deliveryDetail.getPurchaseOrderDetail().getId(),
+                            deliveryDetail.getPurchaseOrderDetailComponent() == null
+                                    ? null : deliveryDetail.getPurchaseOrderDetailComponent().getId());
+                    add(received, key, valueOrZero(detail.getReceivedQuantity()));
+                });
 
         boolean hasProduced = hasPositive(produced);
         boolean hasShipped = hasPositive(shipped);

@@ -67,6 +67,21 @@ public final class PurchaseOrderDeliveryMapper {
                     attachmentDto.setUploadedAt(attachment.getUploadedAt());
                     return attachmentDto;
                 }).toList());
+        deliveryDto.setReceipts(delivery.getReceipts().stream()
+                .map(receipt -> {
+                    PurchaseOrderReceiptDto receiptDto = new PurchaseOrderReceiptDto();
+                    receiptDto.setReceiptNo(receipt.getReceiptNo());
+                    receiptDto.setPurchaseOrderNo(delivery.getPurchaseOrder().getPurchaseOrderNo());
+                    receiptDto.setDeliveryId(delivery.getId());
+                    receiptDto.setDeliveryNo(delivery.getDeliveryNo());
+                    receiptDto.setWarehouseId(receipt.getWarehouseId());
+                    receiptDto.setReceivedDate(receipt.getReceivedDate());
+                    receiptDto.setReceivedBy(receipt.getReceivedBy() == null ? null : receipt.getReceivedBy().getId());
+                    receiptDto.setStatus(receipt.getStatus());
+                    receiptDto.setRemark(receipt.getRemark());
+                    receiptDto.setCreatedDate(receipt.getCreatedDate());
+                    return receiptDto;
+                }).toList());
         deliveryDto.setRemark(delivery.getRemark());
         deliveryDto.setCreatedBy(delivery.getCreatedBy());
         deliveryDto.setUpdatedBy(delivery.getUpdatedBy());

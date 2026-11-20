@@ -40,7 +40,7 @@ class ShippingContainerIntegrationTest {
         try(var session=factory.openSession()){
             var t=session.beginTransaction();var repos=new JpaRepositoryFactory(session);var json=new ObjectMapper();
             var deliveryRepository = repos.getRepository(PurchaseOrderDeliveryRepository.class);
-            var service=new ShippingContainerService(repos.getRepository(ShippingContainerRepository.class),repos.getRepository(ShippingContainerLoadRepository.class),deliveryRepository,repos.getRepository(SupplierShippingRepository.class),new ShippingContainerMapper(json),json,history,milestones,new PurchaseOrderStatusService(deliveryRepository));
+            var service=new ShippingContainerService(repos.getRepository(ShippingContainerRepository.class),repos.getRepository(ShippingContainerLoadRepository.class),deliveryRepository,repos.getRepository(SupplierShippingRepository.class),new ShippingContainerMapper(json),json,history,milestones,new PurchaseOrderStatusService(deliveryRepository, repos.getRepository(PurchaseOrderReceiptRepository.class)));
             try{T result=work.run(session,service);t.commit();return result;}catch(Exception e){if(t.isActive())t.rollback();throw e;}
         }
     }

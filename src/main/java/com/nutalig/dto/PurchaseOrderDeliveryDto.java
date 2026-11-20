@@ -32,6 +32,7 @@ public class PurchaseOrderDeliveryDto {
     private DeliveryContainerStatus containerStatus;
     private List<ContainerReference> containers;
     private List<PurchaseOrderDeliveryAttachmentDto> attachments;
+    private List<PurchaseOrderReceiptDto> receipts;
 
     @Data
     public static class ContainerReference {

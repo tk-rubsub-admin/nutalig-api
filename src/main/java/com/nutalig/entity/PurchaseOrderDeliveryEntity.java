@@ -112,6 +112,10 @@ public class PurchaseOrderDeliveryEntity extends AuditDateEntity {
     @OrderBy("uploadedAt asc, id asc")
     private List<PurchaseOrderDeliveryAttachmentEntity> attachments = new ArrayList<>();
 
+    @OneToMany(mappedBy = "delivery", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdDate desc, receiptNo desc")
+    private List<PurchaseOrderReceiptEntity> receipts = new ArrayList<>();
+
     public void addScrapBox(PurchaseOrderDeliveryScrapBoxEntity box) {
         scrapBoxes.add(box);
         box.setPurchaseOrderDelivery(this);

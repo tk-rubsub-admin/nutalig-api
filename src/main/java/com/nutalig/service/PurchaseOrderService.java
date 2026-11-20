@@ -78,6 +78,7 @@ public class PurchaseOrderService {
     private final SalesOrderRepository salesOrderRepository;
     private final SupplierRepository supplierRepository;
     private final SupplierShippingRepository supplierShippingRepository;
+    private final SupplierShippingRouteRepository supplierShippingRouteRepository;
     private final UserRepository userRepository;
     private final SupplierMapper supplierMapper;
     private final CustomerMapper customerMapper;
@@ -2489,6 +2490,10 @@ public class PurchaseOrderService {
     }
 
     private String resolveShippingLocation(PurchaseOrderEntity purchaseOrderEntity) {
+        ShippingLocationEntity snapshotLocation = resolveSnapshotShippingLocation(purchaseOrderEntity);
+        if (snapshotLocation != null) {
+            return StringUtils.defaultIfBlank(snapshotLocation.getName(), snapshotLocation.getAddress());
+        }
         if (purchaseOrderEntity.getSupplierShipping() == null || purchaseOrderEntity.getSupplierShipping().getDestinations() == null) {
             return null;
         }
@@ -2502,6 +2507,10 @@ public class PurchaseOrderService {
     }
 
     private String resolveShippingAddress(PurchaseOrderEntity purchaseOrderEntity) {
+        ShippingLocationEntity snapshotLocation = resolveSnapshotShippingLocation(purchaseOrderEntity);
+        if (snapshotLocation != null) {
+            return snapshotLocation.getAddress();
+        }
         if (purchaseOrderEntity.getSupplierShipping() == null || purchaseOrderEntity.getSupplierShipping().getDestinations() == null) {
             return null;
         }
@@ -2511,6 +2520,17 @@ public class PurchaseOrderService {
                 .map(SupplierShippingDestinationEntity::getFullAddress)
                 .filter(StringUtils::isNotBlank)
                 .reduce((left, right) -> left + "\n" + right)
+                .orElse(null);
+    }
+
+    private ShippingLocationEntity resolveSnapshotShippingLocation(PurchaseOrderEntity purchaseOrderEntity) {
+        Long routeId = purchaseOrderEntity.getSupplierShippingRouteIdSnapshot();
+        if (routeId == null) {
+            return null;
+        }
+        return supplierShippingRouteRepository.findById(routeId)
+                .map(SupplierShippingRouteEntity::getShippingRoute)
+                .map(ShippingRouteEntity::getOriginLocation)
                 .orElse(null);
     }
 

@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20261118-003-add-purchase-order-receive-permissions
+      author: codex
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              INSERT INTO permission (code, name_th, name_en, `group`, created_at)
+              VALUES
+                ('PERM_PURCHASE_ORDER_RECEIVE_VIEW', 'ดูการรับสินค้า', 'View purchase order receiving', 'purchase_order', NOW(6)),
+                ('PERM_PURCHASE_ORDER_RECEIVE_CREATE', 'สร้างรายการรับสินค้า', 'Create purchase order receiving', 'purchase_order', NOW(6)),
+                ('PERM_PURCHASE_ORDER_RECEIVE_CONFIRM', 'ยืนยันรับสินค้า', 'Confirm purchase order receiving', 'purchase_order', NOW(6)),
+                ('PERM_PURCHASE_ORDER_RECEIVE_CANCEL', 'ยกเลิกรับสินค้า', 'Cancel purchase order receiving', 'purchase_order', NOW(6))
+              ON DUPLICATE KEY UPDATE name_th = VALUES(name_th), name_en = VALUES(name_en), `group` = VALUES(`group`);
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT role_code, 'PERM_PURCHASE_ORDER_RECEIVE_VIEW'
+              FROM user_role
+              WHERE role_code IN ('SUPER_ADMIN', 'PROCUREMENT', 'PROCUREMENT_ADMIN', 'PROCUREMENT_MANAGER');
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT role_code, 'PERM_PURCHASE_ORDER_RECEIVE_CREATE'
+              FROM user_role
+              WHERE role_code IN ('SUPER_ADMIN', 'PROCUREMENT', 'PROCUREMENT_ADMIN', 'PROCUREMENT_MANAGER');
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT role_code, 'PERM_PURCHASE_ORDER_RECEIVE_CONFIRM'
+              FROM user_role
+              WHERE role_code IN ('SUPER_ADMIN', 'PROCUREMENT', 'PROCUREMENT_ADMIN', 'PROCUREMENT_MANAGER');
+
+              INSERT IGNORE INTO role_permission (role_code, permission_code)
+              SELECT role_code, 'PERM_PURCHASE_ORDER_RECEIVE_CANCEL'
+              FROM user_role
+              WHERE role_code IN ('SUPER_ADMIN', 'PROCUREMENT_ADMIN', 'PROCUREMENT_MANAGER');
