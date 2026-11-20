@@ -28,12 +28,12 @@
 		<element kind="image" uuid="ee01af56-541e-4bcb-b3ac-282baea05be4" x="2" y="-10" width="168" height="69" scaleImage="FillFrame" lazy="true">
 			<expression><![CDATA[$P{logo}]]></expression>
 		</element>
-		<element kind="staticText" uuid="ab5ac2f4-fcda-42df-85f1-883f9921962a" x="0" y="0" width="552" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="13.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+		<element kind="staticText" uuid="ab5ac2f4-fcda-42df-85f1-883f9921962a" x="0" y="0" width="552" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="13.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
 			<text><![CDATA[MASTER CARTON LABEL]]></text>
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
 			<box rightPadding="5"/>
 		</element>
-		<element kind="staticText" uuid="8cc6f928-bc95-43c8-ba7b-d382670272e1" x="0" y="20" width="552" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+		<element kind="staticText" uuid="8cc6f928-bc95-43c8-ba7b-d382670272e1" x="0" y="20" width="552" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
 			<text><![CDATA[外箱标签  |  NUTALIG WAREHOUSE]]></text>
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
 			<box rightPadding="5"/>
@@ -45,24 +45,24 @@
 	</title>
 	<pageHeader height="350" splitType="Stretch">
 		<element kind="frame" uuid="1b9bf917-5112-4c96-ad2d-1f91d033e33d" mode="Opaque" x="0" y="0" width="552" height="20" backcolor="#F7F3EE">
-			<element kind="staticText" uuid="eb779c2d-4da0-43ef-a5a7-0478e7ab218f" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="eb779c2d-4da0-43ef-a5a7-0478e7ab218f" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[CONSIGNEE / 收货单位: NUTALIG CO., LTD.]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="staticText" uuid="2b05038a-5a23-4389-a348-36cd369d2775" x="300" y="0" width="252" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="2b05038a-5a23-4389-a348-36cd369d2775" x="300" y="0" width="252" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[SHIP REF / 运输编号:]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
 		</element>
 		<element kind="frame" uuid="e4a90e87-94ed-4c75-9090-683406a6cf2e" mode="Opaque" x="0" y="20" width="280" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="fadb7b88-330c-468b-8981-7e6c3455ddfc" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="fadb7b88-330c-468b-8981-7e6c3455ddfc" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[PO NUMBER  /  采购订单号]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="64052b4e-16b4-46b0-84db-900f5cac221c" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" vTextAlign="Middle">
+			<element kind="textField" uuid="64052b4e-16b4-46b0-84db-900f5cac221c" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" vTextAlign="Middle">
 				<expression><![CDATA[$P{purchaseNo}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -73,12 +73,12 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="8ccc31b8-f79e-4d50-b795-2c530116d33e" mode="Opaque" x="280" y="20" width="272" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="8855ab4e-f77c-4504-9ceb-44786f450720" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="8855ab4e-f77c-4504-9ceb-44786f450720" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[CARTON NUMBER  /  箱号]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="staticText" uuid="708871b7-e284-4353-abb7-5bf3077d1ef6" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<element kind="staticText" uuid="708871b7-e284-4353-abb7-5bf3077d1ef6" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
 				<text><![CDATA[_____ / _____]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
@@ -92,12 +92,12 @@
 		</element>
 		<element kind="frame" uuid="bcd136a0-d8be-4a82-8e68-49a070c33a5a" mode="Transparent" x="0" y="60" width="280" height="40" backcolor="#F5F7F5">
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
-			<element kind="staticText" uuid="d74ce151-d890-48e8-b123-217342f693da" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="d74ce151-d890-48e8-b123-217342f693da" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[PRODUCT CODE / SO  /  产品编号]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="ff46fd5b-a1f4-4cad-bd56-718ef215265d" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" vTextAlign="Middle">
+			<element kind="textField" uuid="ff46fd5b-a1f4-4cad-bd56-718ef215265d" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" vTextAlign="Middle">
 				<expression><![CDATA[$P{salesOrderNo}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -109,12 +109,12 @@
 		</element>
 		<element kind="frame" uuid="611a34ae-e62e-4585-bfef-02248c1b6d7c" mode="Transparent" x="280" y="60" width="272" height="40" backcolor="#F5F7F5">
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
-			<element kind="staticText" uuid="6646cb16-3789-40a8-aeed-0c00224213cb" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="6646cb16-3789-40a8-aeed-0c00224213cb" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[PRODUCT NAME  /  产品名称]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="3169c374-770c-41ee-9cb9-eaa9c36a04f1" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
+			<element kind="textField" uuid="3169c374-770c-41ee-9cb9-eaa9c36a04f1" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
 				<expression><![CDATA[$P{productName}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -126,12 +126,12 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="119fef2d-c159-4edf-9b91-f21e31fc1fcd" mode="Opaque" x="0" y="101" width="280" height="41" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="18be4ec2-79f2-40a6-a05c-d5dbe0325c0b" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="18be4ec2-79f2-40a6-a05c-d5dbe0325c0b" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[SPEC / COLOR / SIZE  /  规格 / 颜色 / 尺寸]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="f8ea4d84-88ce-4529-8952-a3d0c720d1f3" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
+			<element kind="textField" uuid="f8ea4d84-88ce-4529-8952-a3d0c720d1f3" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
 				<expression><![CDATA[$P{spec}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -142,12 +142,12 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="449413c0-20af-412f-86d8-3a9d45723262" mode="Opaque" x="280" y="101" width="272" height="41" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="a75dfd3d-6805-440e-a825-e3dee83b2203" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="a75dfd3d-6805-440e-a825-e3dee83b2203" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[COMPONENT  /  包装组件]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="88217299-9c88-4d3a-933d-d4a454a8edcb" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
+			<element kind="textField" uuid="88217299-9c88-4d3a-933d-d4a454a8edcb" x="0" y="21" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
 				<expression><![CDATA[$P{component}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -159,7 +159,7 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="b3f47f6e-1f62-41d8-b6da-f0395491c5ba" mode="Transparent" x="0" y="142" width="280" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="a5dfdb83-2dbd-43e3-90f6-3bb25c2a63dc" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="a5dfdb83-2dbd-43e3-90f6-3bb25c2a63dc" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[LOT / BATCH NO.  /  生产批次号]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
@@ -171,7 +171,7 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="fde7f7d5-e126-43cb-9dd6-7be52aae6b43" mode="Transparent" x="280" y="142" width="272" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="aa88caa9-70ff-419f-9fa2-337cf18cfd2a" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="aa88caa9-70ff-419f-9fa2-337cf18cfd2a" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[PACKING DATE  /  包装日期]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
@@ -185,12 +185,12 @@
 		</element>
 		<element kind="frame" uuid="b7a2b31b-8389-4d9a-8261-248750accee5" mode="Opaque" x="0" y="182" width="280" height="40" backcolor="#F5F7F5">
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
-			<element kind="staticText" uuid="37f2cda3-2f94-46ef-acd1-167da4a2755a" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="37f2cda3-2f94-46ef-acd1-167da4a2755a" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[QUANTITY IN THIS CARTON  /  本箱数量]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="staticText" uuid="7d4f6349-f87a-479e-8a05-2dc24a721c5e" x="110" y="20" width="70" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="7d4f6349-f87a-479e-8a05-2dc24a721c5e" x="110" y="20" width="70" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[PCS.]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
@@ -203,12 +203,12 @@
 		</element>
 		<element kind="frame" uuid="d9af7d42-ee00-4520-b123-cd9a3d473ffc" mode="Opaque" x="280" y="182" width="272" height="40" backcolor="#F5F7F5">
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
-			<element kind="staticText" uuid="638f3e08-22bc-460a-8517-18fb1ee44aa7" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="638f3e08-22bc-460a-8517-18fb1ee44aa7" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[GROSS WEIGHT  /  毛重]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="ff07d29e-e4cb-4322-ada6-9e973e217dbd" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
+			<element kind="textField" uuid="ff07d29e-e4cb-4322-ada6-9e973e217dbd" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
 				<expression><![CDATA[$P{weight}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -220,12 +220,12 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="4dd89f4b-4762-4951-9e39-ed0ecc0710bb" mode="Transparent" x="0" y="223" width="280" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="15586f07-ece1-40f4-928d-1759ecb3ffbd" x="0" y="0" width="240" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="15586f07-ece1-40f4-928d-1759ecb3ffbd" x="0" y="0" width="240" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[CARTON SIZE (L x W x H)  /  外箱尺寸 (长 x 宽 x 高)]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
 			</element>
-			<element kind="textField" uuid="3de29ee8-d2e2-4679-9d46-e0d779733a97" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
+			<element kind="textField" uuid="3de29ee8-d2e2-4679-9d46-e0d779733a97" x="0" y="20" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" blankWhenNull="true" vTextAlign="Middle">
 				<expression><![CDATA[$P{dimension}]]></expression>
 				<box leftPadding="5"/>
 			</element>
@@ -236,7 +236,7 @@
 			</box>
 		</element>
 		<element kind="frame" uuid="a7027cd4-26c3-4c27-9d69-4b34654c1658" mode="Transparent" x="280" y="223" width="272" height="40" backcolor="#F5F7F5">
-			<element kind="staticText" uuid="fe4cf0da-4e41-4a15-81f6-803e220663fd" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<element kind="staticText" uuid="fe4cf0da-4e41-4a15-81f6-803e220663fd" x="0" y="0" width="180" height="20" forecolor="#1F3F37" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
 				<text><![CDATA[FACTORY CODE  /  工厂代码]]></text>
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box leftPadding="5" rightPadding="0"/>
@@ -250,6 +250,7 @@
 				</element>
 				<box>
 					<pen lineColor="#D4C4BA"/>
+					<topPen lineWidth="1.0"/>
 					<leftPen lineWidth="1.0"/>
 					<bottomPen lineWidth="1.0" lineColor="#D4C4BA"/>
 					<rightPen lineWidth="0.0" lineColor="#D4C4BA"/>
@@ -259,7 +260,8 @@
 				<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				<box>
 					<pen lineColor="#D4C4BA"/>
-					<leftPen lineWidth="1.0"/>
+					<topPen lineWidth="1.0"/>
+					<leftPen lineWidth="0.0"/>
 					<bottomPen lineWidth="1.0" lineColor="#D4C4BA"/>
 					<rightPen lineWidth="0.0" lineColor="#D4C4BA"/>
 				</box>
@@ -271,7 +273,7 @@
 				<rightPen lineWidth="0.0" lineColor="#D4C4BA"/>
 			</box>
 		</element>
-		<element kind="staticText" uuid="121babb1-824b-4190-8618-9fa0d8a23468" x="1" y="324" width="552" height="20" forecolor="#925944" fontName="DejaVu Sans" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+		<element kind="staticText" uuid="121babb1-824b-4190-8618-9fa0d8a23468" x="1" y="324" width="552" height="20" forecolor="#925944" fontName="Arial" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
 			<text><![CDATA[ONE SKU / COMPONENT / LOT PER CARTON  ·  一箱一款一组件一批次  ·  MATCH PACKING LIST / 与装箱单一致]]></text>
 			<property name="com.jaspersoft.studio.unit.height" value="px"/>
 			<box leftPadding="5" rightPadding="0"/>

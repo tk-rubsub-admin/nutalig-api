@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fontFamilies>
+	<fontFamily name="Sarabun">
+		<normal><![CDATA[fonts/family1740061420648/Sarabun/Sarabun-Regular.ttf]]></normal>
+		<bold><![CDATA[fonts/family1740061420648/Sarabun/Sarabun-Bold.ttf]]></bold>
+		<italic><![CDATA[fonts/family1740061420648/Sarabun/Sarabun-Italic.ttf]]></italic>
+		<boldItalic><![CDATA[fonts/family1740061420648/Sarabun/Sarabun-BoldItalic.ttf]]></boldItalic>
+		<pdfEncoding><![CDATA[Identity-H]]></pdfEncoding>
+		<exportFonts/>
+		<locales>
+			<locale><![CDATA[th_TH_#Thai]]></locale>
+		</locales>
+	</fontFamily>
+</fontFamilies>
